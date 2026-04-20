@@ -32,5 +32,6 @@ describe("core-lifecycle", () => {
   it("has metadata", () => {
     expect(plugin.name).toBe("core-lifecycle");
     expect(plugin.apiVersion).toMatch(/^\d+\.\d+\.\d+/);
+    expect((plugin as any).lifecycle).toBe(true);
   });
 });
