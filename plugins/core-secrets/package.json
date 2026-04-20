@@ -1,0 +1,15 @@
+{
+  "name": "core-secrets",
+  "version": "0.1.0",
+  "description": "Pluggable secrets backend: keychain on macOS/Linux/Windows + file fallback.",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "keywords": [
+    "kaizen-plugin"
+  ],
+  "peerDependencies": {
+    "kaizen": "*"
+  }
+}

@@ -1,0 +1,190 @@
+{
+  "version": "1.0.0",
+  "name": "kaizen-official",
+  "description": "Official kaizen plugins and harnesses.",
+  "url": "https://github.com/CraightonH/kaizen-official-plugins.git",
+  "entries": [
+    {
+      "kind": "plugin",
+      "name": "core-events",
+      "description": "Default event vocabulary for kaizen sessions.",
+      "categories": ["core"],
+      "versions": [
+        {
+          "version": "0.1.0",
+          "source": { "type": "file", "path": "plugins/core-events" },
+          "minKaizenVersion": "0.1.0"
+        }
+      ]
+    },
+    {
+      "kind": "plugin",
+      "name": "core-lifecycle",
+      "description": "Drives session/turn lifecycle, events, and UI pump.",
+      "categories": ["core"],
+      "versions": [
+        {
+          "version": "0.1.0",
+          "source": { "type": "file", "path": "plugins/core-lifecycle" },
+          "minKaizenVersion": "0.1.0"
+        }
+      ]
+    },
+    {
+      "kind": "plugin",
+      "name": "core-ui-terminal",
+      "description": "Terminal UiProvider for kaizen sessions.",
+      "categories": ["core", "ui"],
+      "versions": [
+        {
+          "version": "0.1.0",
+          "source": { "type": "file", "path": "plugins/core-ui-terminal" },
+          "minKaizenVersion": "0.1.0"
+        }
+      ]
+    },
+    {
+      "kind": "plugin",
+      "name": "core-cli",
+      "description": "Registers configured CLIs as kaizen tools.",
+      "categories": ["core", "tools"],
+      "versions": [
+        {
+          "version": "0.1.0",
+          "source": { "type": "file", "path": "plugins/core-cli" },
+          "minKaizenVersion": "0.1.0"
+        }
+      ]
+    },
+    {
+      "kind": "plugin",
+      "name": "core-plugin-manager",
+      "description": "Exposes runtime plugin load/unload/reload API.",
+      "categories": ["core"],
+      "versions": [
+        {
+          "version": "0.1.0",
+          "source": { "type": "file", "path": "plugins/core-plugin-manager" },
+          "minKaizenVersion": "0.1.0"
+        }
+      ]
+    },
+    {
+      "kind": "plugin",
+      "name": "core-executor-debug",
+      "description": "Scripted/debug executor for local testing.",
+      "categories": ["executor"],
+      "versions": [
+        {
+          "version": "0.1.0",
+          "source": { "type": "file", "path": "plugins/core-executor-debug" },
+          "minKaizenVersion": "0.1.0"
+        }
+      ]
+    },
+    {
+      "kind": "plugin",
+      "name": "core-executor-shell",
+      "description": "Shell-pipe executor (stdin prompt, stdout completion).",
+      "categories": ["executor"],
+      "versions": [
+        {
+          "version": "0.1.0",
+          "source": { "type": "file", "path": "plugins/core-executor-shell" },
+          "minKaizenVersion": "0.1.0"
+        }
+      ]
+    },
+    {
+      "kind": "plugin",
+      "name": "core-executor-anthropic",
+      "description": "Anthropic LLM executor.",
+      "categories": ["executor"],
+      "versions": [
+        {
+          "version": "0.1.0",
+          "source": { "type": "file", "path": "plugins/core-executor-anthropic" },
+          "minKaizenVersion": "0.1.0"
+        }
+      ]
+    },
+    {
+      "kind": "plugin",
+      "name": "core-executor-openai",
+      "description": "OpenAI LLM executor.",
+      "categories": ["executor"],
+      "versions": [
+        {
+          "version": "0.1.0",
+          "source": { "type": "file", "path": "plugins/core-executor-openai" },
+          "minKaizenVersion": "0.1.0"
+        }
+      ]
+    },
+    {
+      "kind": "plugin",
+      "name": "timestamps",
+      "description": "Prefix user/agent messages with ISO-8601 timestamps.",
+      "categories": ["example"],
+      "versions": [
+        {
+          "version": "0.1.0",
+          "source": { "type": "file", "path": "plugins/timestamps" },
+          "minKaizenVersion": "0.1.0"
+        }
+      ]
+    },
+    {
+      "kind": "plugin",
+      "name": "core-secrets",
+      "description": "Pluggable secrets backend: keychain on macOS/Linux/Windows + file fallback.",
+      "categories": ["core"],
+      "versions": [
+        {
+          "version": "0.1.0",
+          "source": { "type": "file", "path": "plugins/core-secrets" },
+          "minKaizenVersion": "0.1.0"
+        }
+      ]
+    },
+    {
+      "kind": "harness",
+      "name": "core-anthropic",
+      "description": "Default Anthropic LLM harness.",
+      "categories": ["harness"],
+      "versions": [
+        {
+          "version": "1.0.0",
+          "path": "harnesses/core-anthropic.json",
+          "minKaizenVersion": "0.1.0"
+        }
+      ]
+    },
+    {
+      "kind": "harness",
+      "name": "core-debug",
+      "description": "Debug/scripted harness for local testing.",
+      "categories": ["harness"],
+      "versions": [
+        {
+          "version": "1.0.0",
+          "path": "harnesses/core-debug.json",
+          "minKaizenVersion": "0.1.0"
+        }
+      ]
+    },
+    {
+      "kind": "harness",
+      "name": "core-shell",
+      "description": "Shell-pipe executor harness.",
+      "categories": ["harness"],
+      "versions": [
+        {
+          "version": "1.0.0",
+          "path": "harnesses/core-shell.json",
+          "minKaizenVersion": "0.1.0"
+        }
+      ]
+    }
+  ]
+}

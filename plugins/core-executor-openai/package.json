@@ -1,0 +1,15 @@
+{
+  "name": "core-executor-openai",
+  "version": "0.1.0",
+  "description": "OpenAI LLM executor.",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "keywords": [
+    "kaizen-plugin"
+  ],
+  "peerDependencies": {
+    "kaizen": "*"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "core-events",
+  "version": "1.0.0",
+  "description": "Default event vocabulary for kaizen sessions.",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "keywords": [
+    "kaizen-plugin"
+  ],
+  "peerDependencies": {
+    "kaizen": "*"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "core-executor-shell",
+  "version": "0.1.0",
+  "description": "Shell-pipe executor (stdin prompt, stdout completion).",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "keywords": [
+    "kaizen-plugin"
+  ],
+  "peerDependencies": {
+    "kaizen": "*"
+  }
+}

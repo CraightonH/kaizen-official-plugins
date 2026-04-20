@@ -1,0 +1,15 @@
+{
+  "name": "core-plugin-manager",
+  "version": "0.1.0",
+  "description": "Exposes runtime plugin load/unload/reload API.",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "keywords": [
+    "kaizen-plugin"
+  ],
+  "peerDependencies": {
+    "kaizen": "*"
+  }
+}

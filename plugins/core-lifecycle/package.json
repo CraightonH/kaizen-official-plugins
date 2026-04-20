@@ -1,0 +1,16 @@
+{
+  "name": "core-lifecycle",
+  "version": "0.1.0",
+  "description": "Drives session/turn lifecycle, events, and UI pump.",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "keywords": [
+    "kaizen-plugin"
+  ],
+  "peerDependencies": {
+    "kaizen": "*",
+    "core-events": "*"
+  }
+}

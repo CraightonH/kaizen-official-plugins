@@ -1,0 +1,5 @@
+{
+  "name": "kaizen-official-plugins-workspace",
+  "private": true,
+  "workspaces": ["plugins/*"]
+}
