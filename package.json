@@ -1,5 +1,8 @@
 {
   "name": "kaizen-official-plugins-workspace",
   "private": true,
-  "workspaces": ["plugins/*"]
+  "workspaces": ["plugins/*"],
+  "devDependencies": {
+    "kaizen": "file:../kaizen"
+  }
 }
