@@ -9,7 +9,7 @@ const plugin: KaizenPlugin = {
     tier: "scoped",
     events: { subscribe: ["session:*"] },
   },
-  capabilities: { consumes: ["core-lifecycle:lifecycle.drive", "core-events:service"] },
+  capabilities: { consumes: ["core-events:service"] },
 
   async setup(ctx) {
     ctx.on(EVENTS.USER_MESSAGE, async (payload) => {

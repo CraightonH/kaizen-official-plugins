@@ -9,9 +9,9 @@ async function broadcast(channels: Iterable<UiChannel>, msg: AgentMessage): Prom
 const plugin: KaizenPlugin = {
   name: "core-lifecycle",
   apiVersion: "2.0.0",
+  lifecycle: true,
   permissions: { tier: "trusted" },
   capabilities: {
-    provides: ["core-lifecycle:lifecycle.drive"],
     consumes: [
       "core-lifecycle:executor.send",
       "core-lifecycle:ui.input",
@@ -21,10 +21,6 @@ const plugin: KaizenPlugin = {
   },
 
   async setup(ctx) {
-    ctx.defineCapability("core-lifecycle:lifecycle.drive", {
-      cardinality: "one",
-      description: "Drives the session loop via start(ctx).",
-    });
     ctx.defineCapability("core-lifecycle:ui.input", {
       cardinality: "many",
       description: "Provides user-input channels to the session loop.",
