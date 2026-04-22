@@ -1,8 +1,0 @@
-{"ts":1776466534503,"plugin":"core-executor-debug","op":{"kind":"events.subscribe","event":"session:start"},"allowed":true}
-{"ts":1776466534503,"plugin":"core-executor-debug","op":{"kind":"events.subscribe","event":"session:end"},"allowed":true}
-{"ts":1776466534503,"plugin":"core-executor-debug","op":{"kind":"events.subscribe","event":"session:user_message"},"allowed":true}
-{"ts":1776466534503,"plugin":"core-executor-debug","op":{"kind":"events.subscribe","event":"session:response"},"allowed":true}
-{"ts":1776466534503,"plugin":"core-executor-debug","op":{"kind":"events.subscribe","event":"tool:before"},"allowed":true}
-{"ts":1776466534503,"plugin":"core-executor-debug","op":{"kind":"events.subscribe","event":"tool:after"},"allowed":true}
-{"ts":1776466534503,"plugin":"kaizen-plugin-timestamps","op":{"kind":"events.subscribe","event":"session:user_message"},"allowed":true}
-{"ts":1776466534503,"plugin":"kaizen-plugin-timestamps","op":{"kind":"events.subscribe","event":"session:response"},"allowed":true}
