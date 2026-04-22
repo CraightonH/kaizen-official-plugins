@@ -19,13 +19,13 @@
     },
     {
       "kind": "plugin",
-      "name": "core-lifecycle",
-      "description": "Drives session/turn lifecycle, events, and UI pump.",
+      "name": "core-driver",
+      "description": "Session/turn driver, events, and UI pump.",
       "categories": ["core"],
       "versions": [
         {
           "version": "0.1.0",
-          "source": { "type": "file", "path": "plugins/core-lifecycle" },
+          "source": { "type": "file", "path": "plugins/core-driver" },
           "minKaizenVersion": "0.1.0"
         }
       ]

@@ -7,29 +7,29 @@ async function broadcast(channels: Iterable<UiChannel>, msg: AgentMessage): Prom
 }
 
 const plugin: KaizenPlugin = {
-  name: "core-lifecycle",
+  name: "core-driver",
   apiVersion: "2.0.0",
-  lifecycle: true,
+  driver: true,
   permissions: { tier: "trusted" },
   capabilities: {
     consumes: [
-      "core-lifecycle:executor.send",
-      "core-lifecycle:ui.input",
-      "core-lifecycle:ui.output",
+      "core-driver:executor.send",
+      "core-driver:ui.input",
+      "core-driver:ui.output",
       "core-events:service",
     ],
   },
 
   async setup(ctx) {
-    ctx.defineCapability("core-lifecycle:ui.input", {
+    ctx.defineCapability("core-driver:ui.input", {
       cardinality: "many",
       description: "Provides user-input channels to the session loop.",
     });
-    ctx.defineCapability("core-lifecycle:ui.output", {
+    ctx.defineCapability("core-driver:ui.output", {
       cardinality: "many",
       description: "Renders session output to a destination.",
     });
-    ctx.defineCapability("core-lifecycle:executor.send", {
+    ctx.defineCapability("core-driver:executor.send", {
       cardinality: "many",
       description: "Sends messages/tools to an executor backend.",
     });

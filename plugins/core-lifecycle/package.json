@@ -1,7 +1,7 @@
 {
-  "name": "core-lifecycle",
+  "name": "core-driver",
   "version": "0.1.0",
-  "description": "Drives session/turn lifecycle, events, and UI pump.",
+  "description": "Drives session/turn driver, events, and UI pump.",
   "type": "module",
   "exports": {
     ".": "./index.ts"

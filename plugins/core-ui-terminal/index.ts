@@ -52,7 +52,7 @@ const plugin: KaizenPlugin = {
   name: "core-ui-terminal",
   apiVersion: "2.0.0",
   permissions: { tier: "trusted" },
-  capabilities: { provides: ["core-lifecycle:ui.input", "core-lifecycle:ui.output"] },
+  capabilities: { provides: ["core-driver:ui.input", "core-driver:ui.output"] },
 
   config: {
     schema: {

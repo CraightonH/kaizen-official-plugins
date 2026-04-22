@@ -3,7 +3,7 @@
  *
  * An executor that runs the user's message as a shell command and returns
  * the output. Not a chat — a showcase of the executor abstraction: same
- * lifecycle and UI plugins, shell as the "intelligence".
+ * driver and UI plugins, shell as the "intelligence".
  *
  * ⚠ Runs arbitrary commands. Local dev and demo use only.
  *
@@ -42,7 +42,7 @@ const plugin: KaizenPlugin = {
     tier: "unscoped",
     exec: { binaries: ["*"] }, // informational; not enforced at unscoped tier
   },
-  capabilities: { provides: ["core-lifecycle:executor.send"] },
+  capabilities: { provides: ["core-driver:executor.send"] },
 
   config: {
     schema: {

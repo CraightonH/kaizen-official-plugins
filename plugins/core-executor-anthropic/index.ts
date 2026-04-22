@@ -4,7 +4,7 @@ import { createLLMRuntime } from "kaizen/types";
 const plugin: KaizenPlugin = {
   name: "core-executor-anthropic",
   apiVersion: "2.0.0",
-  capabilities: { provides: ["core-lifecycle:executor.send"] },
+  capabilities: { provides: ["core-driver:executor.send"] },
 
   permissions: {
     tier: "scoped",

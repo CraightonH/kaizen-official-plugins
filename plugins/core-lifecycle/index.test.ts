@@ -28,10 +28,10 @@ function makeCtx() {
   } as any;
 }
 
-describe("core-lifecycle", () => {
+describe("core-driver", () => {
   it("has metadata", () => {
-    expect(plugin.name).toBe("core-lifecycle");
+    expect(plugin.name).toBe("core-driver");
     expect(plugin.apiVersion).toMatch(/^\d+\.\d+\.\d+/);
-    expect((plugin as any).lifecycle).toBe(true);
+    expect((plugin as any).driver).toBe(true);
   });
 });

@@ -8,7 +8,7 @@
  *
  * Usage in kaizen.json:
  *   {
- *     "plugins": ["core-events", "core-executor-debug", "core-ui-terminal", "core-lifecycle"],
+ *     "plugins": ["core-events", "core-executor-debug", "core-ui-terminal", "core-driver"],
  *     "core-executor-debug": { "color": true }
  *   }
  *
@@ -122,7 +122,7 @@ const plugin: KaizenPlugin = {
   apiVersion: "2.0.0",
   permissions: { tier: "scoped", events: { subscribe: ["session:*", "tool:*"] } },
   capabilities: {
-    provides: ["core-lifecycle:executor.send"],
+    provides: ["core-driver:executor.send"],
     consumes: ["core-events:service"],
   },
 

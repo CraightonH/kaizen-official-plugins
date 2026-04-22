@@ -8,7 +8,7 @@ const plugin: KaizenPlugin = {
     net: { connect: ["api.openai.com:443"] },
     env: ["OPENAI_API_KEY"],
   },
-  capabilities: { provides: ["core-lifecycle:executor.send"] },
+  capabilities: { provides: ["core-driver:executor.send"] },
 
   config: {
     schema: {

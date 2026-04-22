@@ -5,7 +5,7 @@
     "official/timestamps@0.1.0",
     "official/core-ui-terminal@0.1.0",
     "official/core-plugin-manager@0.1.0",
-    "official/core-lifecycle@0.1.0"
+    "official/core-driver@0.1.0"
   ],
   "core-executor-debug": {
     "color": true

@@ -1,6 +1,6 @@
-# core-lifecycle
+# core-driver
 
-Runs the session/turn lifecycle: drives the executor, emits events, drains plugin reloads.
+Runs the session/turn driver: drives the executor, emits events, drains plugin reloads.
 
 ## Permissions
 
