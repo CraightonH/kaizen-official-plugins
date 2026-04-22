@@ -1,0 +1,7 @@
+{
+  "plugins": [
+    "official/events@0.1.0",
+    "official/shell@0.1.0",
+    "official/driver@0.1.0"
+  ]
+}
