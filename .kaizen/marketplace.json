@@ -3,5 +3,41 @@
   "name": "kaizen-official",
   "description": "Official kaizen plugins and harnesses.",
   "url": "https://github.com/CraightonH/kaizen-official-plugins.git",
-  "entries": []
+  "entries": [
+    {
+      "kind": "plugin",
+      "name": "claude-events",
+      "description": "Event vocabulary for the claude-wrapper harness.",
+      "categories": ["events"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/claude-events" } }]
+    },
+    {
+      "kind": "plugin",
+      "name": "claude-tui",
+      "description": "Terminal UI: rounded prompt box + status bar. Provides ui:channel.",
+      "categories": ["ui", "terminal"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/claude-tui" } }]
+    },
+    {
+      "kind": "plugin",
+      "name": "claude-status-items",
+      "description": "Default cwd + git.branch status items.",
+      "categories": ["status"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/claude-status-items" } }]
+    },
+    {
+      "kind": "plugin",
+      "name": "claude-driver",
+      "description": "Session driver: spawns claude CLI, streams output, emits llm.* status items.",
+      "categories": ["driver", "claude"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/claude-driver" } }]
+    },
+    {
+      "kind": "harness",
+      "name": "claude-wrapper",
+      "description": "Claude Code wrapper: distinctive prompt + extensible status bar over `claude -p`.",
+      "categories": ["harness", "claude"],
+      "versions": [{ "version": "0.1.0", "path": "harnesses/claude-wrapper.json" }]
+    }
+  ]
 }
