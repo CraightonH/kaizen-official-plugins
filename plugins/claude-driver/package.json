@@ -1,0 +1,13 @@
+{
+  "name": "claude-driver",
+  "version": "0.1.0",
+  "description": "Session driver: spawns claude CLI, streams output, emits status",
+  "type": "module",
+  "exports": { ".": "./index.ts" },
+  "keywords": ["kaizen-plugin"],
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  }
+}
