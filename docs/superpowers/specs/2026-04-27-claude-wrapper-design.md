@@ -175,17 +175,17 @@ Per [plugin-standards.md](../../../../../kaizen/docs/reference/plugin-standards.
   ```
 - Catalog entries for the four plugins (kind: plugin) and the harness (kind: harness) in `.kaizen/marketplace.json`. All `apiVersion: "3.0.0"`, version `0.1.0`.
 
-## Documentation gaps to file against kaizen
+## Documentation gaps filed against kaizen
 
-While walking the docs, the following gaps were noticed. Will file as issues against the kaizen repo before implementation starts:
+Filed as GitHub issues during implementation:
 
-1. **Stdin reading in `apiVersion` 3.** The existing 0.2.0 `driver` plugin imports `readStdinLine` from `kaizen/types` — but [host-api.md](../../../../../kaizen/docs/reference/host-api.md) explicitly says the only runtime export of `kaizen/types` is `PLUGIN_API_VERSION`. Either the helper still exists and isn't documented, or it was removed and the plugin is broken. Either way, plugin authors writing input-reading drivers have no documented path forward. Need an explicit "how to read stdin from a driver" section.
+1. [kaizen#57](https://github.com/CraightonH/kaizen/issues/57) — docs: how to read stdin in apiVersion 3 drivers.
+2. [kaizen#58](https://github.com/CraightonH/kaizen/issues/58) — docs: which Node globals are available on scoped tier?
+3. [kaizen#59](https://github.com/CraightonH/kaizen/issues/59) — docs: clarify apiVersion format vs PLUGIN_API_VERSION constant.
+4. [kaizen#60](https://github.com/CraightonH/kaizen/issues/60) — docs: highlight that ctx.on() is INITIALIZING-only with worked example. *(surfaced during e2e smoke test)*
+5. [kaizen#61](https://github.com/CraightonH/kaizen/issues/61) — cli/docs: pre-consenting scoped plugins non-interactively is undocumented. *(surfaced during e2e smoke test)*
 
-2. **`process.cwd()` on `scoped` tier.** Reference docs are ambiguous about which Node globals are filtered for non-`unscoped` plugins. The plugin-authoring guide enumerates banned imports (`node:fs`, etc.) but doesn't say what `process` globals (cwd, env, kill signals) are permitted on scoped. Adding a "what's available without grants" table would close the gap.
-
-3. **`apiVersion` example mismatch.** The plugin-authoring guide example shows `apiVersion: "3.0.0"`, the existing official plugins ship `"2.0.0"`, and `PLUGIN_API_VERSION` is `"3"`. Recommended explicit guidance on the apiVersion-vs-PLUGIN_API_VERSION format relationship would prevent confusion. (Is `"3"`, `"3.0.0"`, `"3.0"` all OK? Validator is documented to accept "semver" — `"3"` isn't semver.)
-
-These don't block v1; the implementation will use the existing patterns (and unscoped tier where uncertain) until the docs land.
+Issues 1–3 came from reading the docs during design. Issues 4 and 5 came from runtime errors during the harness smoke test — both warranted code changes in the wrapper plugins (commit `2b2792c`: service-name prefix rule, and moving `ctx.on()` from `start()` to `setup()`).
 
 ## File layout (per plugin)
 
