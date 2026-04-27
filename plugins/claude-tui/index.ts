@@ -11,13 +11,13 @@ const plugin: KaizenPlugin = {
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
   services: {
-    provides: ["ui:channel"],
+    provides: ["claude-tui:channel"],
     consumes: ["claude-events:vocabulary"],
   },
 
   async setup(ctx) {
     ctx.consumeService("claude-events:vocabulary");
-    ctx.defineService("ui:channel", { description: "Terminal UI channel: input + output + status bar." });
+    ctx.defineService("claude-tui:channel", { description: "Terminal UI channel: input + output + status bar." });
 
     const items = new Map<string, StatusItem>();
     let busy = false;
@@ -83,7 +83,7 @@ const plugin: KaizenPlugin = {
       },
     };
 
-    ctx.provideService<UiChannel>("ui:channel", ui);
+    ctx.provideService<UiChannel>("claude-tui:channel", ui);
     ctx.log("claude-tui ready");
   },
 

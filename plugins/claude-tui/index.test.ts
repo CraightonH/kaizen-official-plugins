@@ -29,10 +29,10 @@ describe("claude-tui", () => {
     expect(plugin.permissions?.tier).toBe("unscoped");
   });
 
-  it("provides ui:channel and subscribes to status events", async () => {
+  it("provides claude-tui:channel and subscribes to status events", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    expect(ctx.provided["ui:channel"]).toBeDefined();
+    expect(ctx.provided["claude-tui:channel"]).toBeDefined();
     expect(ctx.subs["status:item-update"]?.length).toBe(1);
     expect(ctx.subs["status:item-clear"]?.length).toBe(1);
   });
@@ -42,7 +42,7 @@ describe("claude-tui", () => {
     const writes: string[] = [];
     process.stdout.write = ((c: string) => { writes.push(String(c)); return true; }) as any;
     await plugin.setup(ctx);
-    const ui = ctx.provided["ui:channel"] as any;
+    const ui = ctx.provided["claude-tui:channel"] as any;
     ui.writeOutput("hello");
     expect(writes.join("")).toContain("hello");
   });

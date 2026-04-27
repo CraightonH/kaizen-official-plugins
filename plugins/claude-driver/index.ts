@@ -4,27 +4,27 @@ import { runTurn } from "./loop.ts";
 import { realSpawner } from "./spawn.ts";
 import { pickBusyMessage } from "./busy-messages.ts";
 
+const cancelController: { current: AbortController | null } = { current: null };
+
 const plugin: KaizenPlugin = {
   name: "claude-driver",
   apiVersion: "3.0.0",
   driver: true,
   permissions: { tier: "unscoped" },
-  services: { consumes: ["claude-events:vocabulary", "ui:channel"] },
+  services: { consumes: ["claude-events:vocabulary", "claude-tui:channel"] },
 
   async setup(ctx) {
     ctx.consumeService("claude-events:vocabulary");
-    ctx.consumeService("ui:channel");
+    ctx.consumeService("claude-tui:channel");
+    ctx.on("turn:cancel", async () => {
+      cancelController.current?.abort();
+    });
     ctx.log("claude-driver setup complete");
   },
 
   async start(ctx) {
-    const ui = ctx.useService<UiChannel>("ui:channel");
+    const ui = ctx.useService<UiChannel>("claude-tui:channel");
     let sessionId: string | null = null;
-    const cancelController = { current: null as AbortController | null };
-
-    ctx.on("turn:cancel", async () => {
-      cancelController.current?.abort();
-    });
 
     await ctx.emit("session:start");
     try {
@@ -48,7 +48,7 @@ const plugin: KaizenPlugin = {
           });
           if (r.cancelled) {
             ui.writeNotice("↯ cancelled");
-            sessionId = null; // start fresh next turn
+            sessionId = null;
           } else if (r.exitCode !== 0) {
             await ctx.emit("session:error", { message: `claude exited ${r.exitCode}` });
             sessionId = null;

@@ -24,10 +24,10 @@ describe("claude-driver", () => {
     expect(plugin.permissions?.tier).toBe("unscoped");
   });
 
-  it("setup declares consumes for events vocab and ui:channel", async () => {
+  it("setup declares consumes for events vocab and claude-tui:channel", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
     expect(ctx.consumeService).toHaveBeenCalledWith("claude-events:vocabulary");
-    expect(ctx.consumeService).toHaveBeenCalledWith("ui:channel");
+    expect(ctx.consumeService).toHaveBeenCalledWith("claude-tui:channel");
   });
 });
