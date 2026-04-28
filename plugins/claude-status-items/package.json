@@ -1,6 +1,6 @@
 {
   "name": "claude-status-items",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Default cwd + git.branch status items for claude-wrapper",
   "type": "module",
   "exports": { ".": "./index.ts" },

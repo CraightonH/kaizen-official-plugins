@@ -4,7 +4,11 @@ import { basename } from "node:path";
 const plugin: KaizenPlugin = {
   name: "claude-status-items",
   apiVersion: "3.0.0",
-  permissions: { tier: "scoped", exec: { binaries: ["git"] } },
+  permissions: {
+    tier: "scoped",
+    exec: { binaries: ["git"] },
+    events: { subscribe: ["session:start"] },
+  },
   services: { consumes: ["claude-events:vocabulary"] },
 
   async setup(ctx) {

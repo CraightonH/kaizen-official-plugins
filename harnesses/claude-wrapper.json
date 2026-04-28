@@ -2,7 +2,7 @@
   "plugins": [
     "official/claude-events@0.1.0",
     "official/claude-tui@0.1.0",
-    "official/claude-status-items@0.1.0",
+    "official/claude-status-items@0.1.1",
     "official/claude-driver@0.1.0"
   ]
 }
