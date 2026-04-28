@@ -6,51 +6,38 @@
   "entries": [
     {
       "kind": "plugin",
-      "name": "events",
-      "description": "Event vocabulary for the minimum shell harness.",
+      "name": "claude-events",
+      "description": "Event vocabulary for the claude-wrapper harness.",
       "categories": ["events"],
-      "versions": [
-        {
-          "version": "0.1.0",
-          "source": { "type": "file", "path": "plugins/events" }
-        }
-      ]
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/claude-events" } }]
     },
     {
       "kind": "plugin",
-      "name": "shell",
-      "description": "TTY passthrough shell (unscoped). Provides shell:exec.",
-      "categories": ["shell", "exec"],
-      "versions": [
-        {
-          "version": "0.1.0",
-          "source": { "type": "file", "path": "plugins/shell" }
-        }
-      ]
+      "name": "claude-tui",
+      "description": "Terminal UI: rounded prompt box + status bar. Provides ui:channel.",
+      "categories": ["ui", "terminal"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/claude-tui" } }]
     },
     {
       "kind": "plugin",
-      "name": "driver",
-      "description": "Session driver for the minimum shell harness. Loops stdin -> shell:exec.",
-      "categories": ["driver"],
-      "versions": [
-        {
-          "version": "0.1.0",
-          "source": { "type": "file", "path": "plugins/driver" }
-        }
-      ]
+      "name": "claude-status-items",
+      "description": "Default cwd + git.branch status items.",
+      "categories": ["status"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/claude-status-items" } }]
+    },
+    {
+      "kind": "plugin",
+      "name": "claude-driver",
+      "description": "Session driver: spawns claude CLI, streams output, emits llm.* status items.",
+      "categories": ["driver", "claude"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/claude-driver" } }]
     },
     {
       "kind": "harness",
-      "name": "minimum-shell",
-      "description": "Minimum-viable harness: events + driver + shell. No LLM.",
-      "categories": ["harness", "shell"],
-      "versions": [
-        {
-          "version": "0.1.0",
-          "path": "harnesses/minimum-shell.json"
-        }
-      ]
+      "name": "claude-wrapper",
+      "description": "Claude Code wrapper: distinctive prompt + extensible status bar over `claude -p`.",
+      "categories": ["harness", "claude"],
+      "versions": [{ "version": "0.1.0", "path": "harnesses/claude-wrapper.json" }]
     }
   ]
 }

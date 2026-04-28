@@ -1,0 +1,12 @@
+{
+  "name": "claude-events",
+  "version": "0.1.0",
+  "description": "Event vocabulary for the claude-wrapper harness",
+  "type": "module",
+  "exports": { ".": "./index.ts" },
+  "keywords": ["kaizen-plugin"],
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.4.0"
+  }
+}

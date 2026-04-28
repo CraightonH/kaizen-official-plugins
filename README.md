@@ -1,24 +1,29 @@
 # kaizen-official-plugins
 
-First-party plugins and harnesses for [kaizen](https://github.com/CraightonH/kaizen).
+Official kaizen plugin marketplace. Hosts plugins and harnesses for [kaizen](https://github.com/CraightonH/kaizen) 0.3+.
 
-## Status — rewrite in progress
+## Plugins
 
-The previous PoC plugins (`core-driver`, `core-events`, `core-ui-terminal`,
-`core-executor-*`, `core-cli`, `core-plugin-manager`, `core-secrets`,
-`timestamps`) and their harnesses were scrapped ahead of a production-ready
-rewrite against kaizen v0.2.0 (service-registry model).
+- **claude-events** — event vocabulary for the claude-wrapper harness.
+- **claude-tui** — terminal UI: rounded "kaizen" prompt box + status bar. Provides `ui:channel`.
+- **claude-status-items** — emits `cwd` and `git.branch` status items.
+- **claude-driver** — session driver; wraps the local `claude` CLI in headless stream-json mode.
 
-- The old code is preserved on the **`archive/poc`** branch and the
-  **`pre-v0.2-rewrite`** tag.
-- The catalog (`.kaizen/marketplace.json`) is intentionally empty until
-  rewritten plugins land.
-- `kaizen install official/<name>@<ver>` will fail against this marketplace
-  until entries are added back.
+## Harnesses
 
-Follow kaizen v0.2.0's service-registry spec
-(`docs/superpowers/specs/2026-04-22-service-registry-merge-design.md` in the
-kaizen repo) for the new plugin authoring model.
+- **claude-wrapper** — Claude Code wrapper UI over `claude -p`. Requires the `claude` binary on `$PATH` and an authenticated Claude Code login (Pro/Max/Team/Enterprise OAuth, or API key).
+
+## Usage
+
+```sh
+kaizen --harness official/claude-wrapper@0.1.0
+```
+
+Or run from a local checkout:
+
+```sh
+kaizen --harness ./harnesses/claude-wrapper.json
+```
 
 ## Layout
 
@@ -26,15 +31,20 @@ kaizen repo) for the new plugin authoring model.
 .
 ├── .kaizen/
 │   └── marketplace.json      # catalog: plugin + harness entries
-├── plugins/                  # workspace packages (populated by rewrite)
-│   └── <plugin>/
-│       ├── package.json
-│       ├── index.ts
-│       ├── index.test.ts
-│       ├── public.d.ts
-│       └── README.md
-└── harnesses/                # canonical-ref harness JSON files
-    └── <name>.json
+├── plugins/
+│   ├── claude-events/
+│   ├── claude-tui/
+│   ├── claude-status-items/
+│   └── claude-driver/
+└── harnesses/
+    └── claude-wrapper.json
+```
+
+## Development
+
+```sh
+bun install
+bun test
 ```
 
 ## Contributing a plugin
@@ -42,14 +52,9 @@ kaizen repo) for the new plugin authoring model.
 1. Scaffold: `kaizen plugin create plugins/<name>`.
 2. Implement against `kaizen/types`. Tests, README, permissions, `public.d.ts`.
 3. Validate: `kaizen plugin validate plugins/<name>`.
-4. Add an entry under `.kaizen/marketplace.json#entries` (see the shape
-   in `docs/reference/plugin-standards.md` in the `kaizen` repo).
-5. Validate the catalog: `kaizen marketplace validate .`.
-6. Open a PR.
-
-Contributing a harness follows the same shape with `kind: "harness"`.
+4. Add an entry under `.kaizen/marketplace.json#entries`.
+5. Open a PR.
 
 ## Standards
 
-See [`docs/reference/plugin-standards.md`](https://github.com/CraightonH/kaizen/blob/master/docs/reference/plugin-standards.md)
-in the kaizen repo for the authoritative plugin requirements.
+See [`docs/reference/plugin-standards.md`](https://github.com/CraightonH/kaizen/blob/master/docs/reference/plugin-standards.md) in the kaizen repo.
