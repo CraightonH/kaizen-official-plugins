@@ -1,6 +1,6 @@
 {
   "name": "claude-driver",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Session driver: spawns claude CLI, streams output, emits status",
   "type": "module",
   "exports": { ".": "./index.ts" },

@@ -36,12 +36,12 @@ export async function runTurn(opts: RunTurnOpts): Promise<TurnResult> {
 
   let sessionId: string | null = null;
   let cancelled = false;
+  let wroteAnyText = false;
   const onCancel = () => { cancelled = true; child.kill("SIGINT"); };
   opts.cancelSignal?.addEventListener("abort", onCancel);
 
   try {
     let sawResult = false;
-    let resultSummary: string | null = null;
 
     for await (const line of child.stdout) {
       const ev = parseStreamJsonLine(line);
@@ -53,6 +53,7 @@ export async function runTurn(opts: RunTurnOpts): Promise<TurnResult> {
           break;
         case "text-delta":
           writeOutput(ev.text);
+          wroteAnyText = true;
           break;
         case "result": {
           sawResult = true;
@@ -71,7 +72,6 @@ export async function runTurn(opts: RunTurnOpts): Promise<TurnResult> {
             cacheCreationTokens: ev.cacheCreationTokens,
             durationMs: ev.durationMs,
           });
-          resultSummary = `tokens:${ev.tokensIn}/${ev.tokensOut}`;
           break;
         }
         case "retry":
@@ -85,6 +85,10 @@ export async function runTurn(opts: RunTurnOpts): Promise<TurnResult> {
       }
     }
 
+    // Make sure the assistant's streamed text is followed by a newline before
+    // the UI repaints the prompt. claude does not emit a trailing newline.
+    if (wroteAnyText) writeOutput("\n");
+
     if (sawResult && child.isAlive()) {
       await sleep(grace);
       if (child.isAlive()) {
@@ -95,7 +99,6 @@ export async function runTurn(opts: RunTurnOpts): Promise<TurnResult> {
     }
 
     const exitCode = await child.wait();
-    if (resultSummary) log(resultSummary);
     return { sessionId, exitCode, cancelled };
   } finally {
     opts.cancelSignal?.removeEventListener("abort", onCancel);

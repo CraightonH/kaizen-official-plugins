@@ -16,7 +16,7 @@
       "name": "claude-tui",
       "description": "Terminal UI: rounded prompt box + status bar. Provides ui:channel.",
       "categories": ["ui", "terminal"],
-      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/claude-tui" } }]
+      "versions": [{ "version": "0.1.1", "source": { "type": "file", "path": "plugins/claude-tui" } }]
     },
     {
       "kind": "plugin",
@@ -30,7 +30,7 @@
       "name": "claude-driver",
       "description": "Session driver: spawns claude CLI, streams output, emits llm.* status items.",
       "categories": ["driver", "claude"],
-      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/claude-driver" } }]
+      "versions": [{ "version": "0.1.1", "source": { "type": "file", "path": "plugins/claude-driver" } }]
     },
     {
       "kind": "harness",

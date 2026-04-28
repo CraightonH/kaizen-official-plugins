@@ -6,7 +6,10 @@ function fakeSpawner(lines: string[]): ClaudeSpawner {
   return () => {
     let alive = true;
     return {
-      stdout: (async function* () { for (const l of lines) yield l; })(),
+      stdout: (async function* () {
+        for (const l of lines) yield l;
+        alive = false; // simulates clean exit after stream ends
+      })(),
       stderr: () => "",
       kill: () => { alive = false; },
       wait: async () => 0,
@@ -50,7 +53,7 @@ describe("runTurn", () => {
       emit: async (ev, p) => { emitted.push({ ev, p }); },
       log: () => {},
     });
-    expect(writes.join("")).toBe("Hello world");
+    expect(writes.join("")).toBe("Hello world\n");
     expect(emitted.find((e) => e.ev === "status:item-update" && e.p.id === "llm.model")?.p.content).toBe("opus-4.7");
     expect(emitted.find((e) => e.ev === "status:item-update" && e.p.id === "llm.context")?.p.content).toMatch(/10.*5/);
     expect(result.sessionId).toBe("s1");
@@ -65,7 +68,7 @@ describe("runTurn", () => {
       emit: async () => {},
       log: () => {},
     });
-    expect(writes.join("")).toBe("Hello world");
+    expect(writes.join("")).toBe("Hello world\n");
   });
 
   it("kills child if it stays alive after result (hang bug guard)", async () => {

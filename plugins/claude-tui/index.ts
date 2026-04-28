@@ -42,15 +42,16 @@ const plugin: KaizenPlugin = {
       },
     });
 
+    // Status items accumulate silently; the bar redraws on the next setBusy()
+    // transition or readInput() so we don't spam the terminal with repainted
+    // prompt boxes for every incoming item.
     ctx.on("status:item-update", async (payload: any) => {
       if (!payload?.id) return;
       items.set(payload.id, payload as StatusItem);
-      if (!busy) repaint();
     });
     ctx.on("status:item-clear", async (payload: any) => {
       if (!payload?.id) return;
       items.delete(payload.id);
-      if (!busy) repaint();
     });
 
     const ui: UiChannel = {
