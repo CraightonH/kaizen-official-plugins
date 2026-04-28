@@ -24,7 +24,6 @@ const plugin: KaizenPlugin = {
     });
     ctx.provideService<Vocab>("claude-events:vocabulary", VOCAB);
     for (const name of Object.values(VOCAB)) ctx.defineEvent(name);
-    ctx.log("claude-events ready");
   },
 };
 

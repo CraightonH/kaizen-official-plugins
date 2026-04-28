@@ -19,7 +19,6 @@ const plugin: KaizenPlugin = {
     ctx.on("turn:cancel", async () => {
       cancelController.current?.abort();
     });
-    ctx.log("claude-driver setup complete");
   },
 
   async start(ctx) {

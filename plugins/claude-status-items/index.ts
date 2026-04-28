@@ -36,7 +36,6 @@ const plugin: KaizenPlugin = {
     }
 
     ctx.on("session:start", emitItems);
-    ctx.log("claude-status-items ready");
   },
 };
 

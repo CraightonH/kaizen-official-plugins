@@ -1,6 +1,6 @@
 {
   "name": "claude-events",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Event vocabulary for the claude-wrapper harness",
   "type": "module",
   "exports": { ".": "./index.ts" },

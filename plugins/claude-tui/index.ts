@@ -85,7 +85,6 @@ const plugin: KaizenPlugin = {
     };
 
     ctx.provideService<UiChannel>("claude-tui:channel", ui);
-    ctx.log("claude-tui ready");
   },
 
   async stop() {
