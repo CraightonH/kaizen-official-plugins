@@ -3,6 +3,6 @@
   "private": true,
   "workspaces": ["plugins/*"],
   "devDependencies": {
-    "kaizen": "file:../kaizen"
+    "kaizen": "github:CraightonH/kaizen#v0.3.1"
   }
 }
