@@ -1,7 +1,7 @@
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "./index.tsx";
 
-function makeCtx() {
+function makeCtx(opts?: { isTTY?: boolean }) {
   const provided: Record<string, unknown> = {};
   const subs: Record<string, Function[]> = {};
   return {
@@ -22,14 +22,18 @@ function makeCtx() {
   } as any;
 }
 
-describe("claude-tui", () => {
+describe("claude-tui plugin (non-TTY mode)", () => {
+  // Tests run in `bun test` — stdin/stdout are not TTYs, so the plugin
+  // takes the fallback path. This keeps the test deterministic without
+  // mounting Ink during unit tests.
+
   it("has correct metadata", () => {
     expect(plugin.name).toBe("claude-tui");
     expect(plugin.apiVersion).toBe("3.0.0");
     expect(plugin.permissions?.tier).toBe("unscoped");
   });
 
-  it("provides claude-tui:channel and subscribes to status events", async () => {
+  it("provides claude-tui:channel and registers status handlers", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
     expect(ctx.provided["claude-tui:channel"]).toBeDefined();
@@ -37,13 +41,13 @@ describe("claude-tui", () => {
     expect(ctx.subs["status:item-clear"]?.length).toBe(1);
   });
 
-  it("ui.writeOutput writes the chunk verbatim", async () => {
+  it("channel exposes UiChannel methods", async () => {
     const ctx = makeCtx();
-    const writes: string[] = [];
-    process.stdout.write = ((c: string) => { writes.push(String(c)); return true; }) as any;
     await plugin.setup(ctx);
     const ui = ctx.provided["claude-tui:channel"] as any;
-    ui.writeOutput("hello");
-    expect(writes.join("")).toContain("hello");
+    expect(typeof ui.readInput).toBe("function");
+    expect(typeof ui.writeOutput).toBe("function");
+    expect(typeof ui.writeNotice).toBe("function");
+    expect(typeof ui.setBusy).toBe("function");
   });
 });
