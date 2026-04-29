@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "description": "Terminal UI for claude-wrapper: prompt box + status bar (Ink)",
   "type": "module",
-  "exports": { ".": "./index.ts" },
+  "exports": { ".": "./index.tsx" },
   "keywords": ["kaizen-plugin"],
   "dependencies": {
     "ink": "^7.0.1",

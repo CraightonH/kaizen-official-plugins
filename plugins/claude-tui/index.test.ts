@@ -1,5 +1,5 @@
 import { describe, it, expect, mock } from "bun:test";
-import plugin from "./index.ts";
+import plugin from "./index.tsx";
 
 function makeCtx() {
   const provided: Record<string, unknown> = {};
