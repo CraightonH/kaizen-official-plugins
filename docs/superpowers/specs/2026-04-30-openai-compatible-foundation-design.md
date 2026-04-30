@@ -42,9 +42,9 @@ The only OpenAI-specific plugin is `openai-llm`. Swapping providers later (Anthr
 Driving the parallelization plan. Detailed specs for each tier will reference the contracts in this document.
 
 - **Tier 0 (this spec):** `llm-events` + all service interfaces.
-- **Tier 1 (A milestone, chat E2E):** `openai-llm`, `llm-driver`, harness file.
-- **Tier 2 (B milestone, tool calls):** `llm-tools-registry` + `llm-native-dispatch`, `llm-codemode-dispatch`, `llm-local-tools`.
-- **Tier 3 (C milestone, full agent harness):** `llm-skills`, `llm-slash-commands`, `llm-memory`, `llm-agents`, `llm-mcp-bridge`, optional plugins.
+- **Tier 1 (A milestone, chat E2E):** `openai-llm`, `llm-driver`, `llm-tui`, harness file.
+- **Tier 2 (B milestone, tool calls):** `llm-tools-registry` + `llm-native-dispatch`, `llm-codemode-dispatch`, `llm-local-tools`, `llm-slash-commands` (slash commands begin to matter as soon as the user can do real work).
+- **Tier 3 (C milestone, full agent harness):** `llm-skills`, `llm-memory`, `llm-agents`, `llm-mcp-bridge`, optional plugins.
 
 ## Event vocabulary
 
@@ -315,6 +315,32 @@ export interface AgentsRegistryService {
 
 The agents plugin registers a single `dispatch_agent({ name, prompt })` tool that internally calls `driver:run-conversation` with the agent's manifest.
 
+### `tui:completion` (`llm-tui`)
+
+Generic completion-source registry exposed by the TUI. Plugins register sources keyed on a trigger character (e.g., `/` for slash commands, `@` for file refs). The TUI handles popup rendering, navigation, filtering, and insertion.
+
+```ts
+export interface CompletionSource {
+  trigger: string | RegExp;     // matched at word-start in the input field
+  list(input: string, cursor: number): Promise<CompletionItem[]>;
+  // Higher weight sorts first when multiple sources merge into one popup.
+  weight?: number;
+}
+
+export interface CompletionItem {
+  label: string;                // shown in popup
+  insertText: string;           // replaces trigger+typed-text on accept
+  description?: string;         // shown alongside label
+  detail?: string;              // shown below selection (preview/help)
+}
+
+export interface TuiCompletionService {
+  register(source: CompletionSource): () => void;
+}
+```
+
+`llm-slash-commands` consumes this service and registers a `/`-triggered source backed by `slash:registry.list()`. Future plugins can add `@file`, `@agent`, etc., without touching the TUI.
+
 ### `slash:registry` (`llm-slash-commands`)
 
 ```ts
@@ -412,15 +438,42 @@ Future tier specs will reference this section to declare which plugins they requ
 official/llm-events
 official/openai-llm
 official/llm-driver
-official/claude-tui          (reused)
-official/claude-status-items (reused)
+official/llm-tui
 ```
 
-**B-tier harness:** A-tier plus `llm-tools-registry`, one of `llm-native-dispatch` / `llm-codemode-dispatch`, and `llm-local-tools`.
+**B-tier harness:** A-tier plus `llm-tools-registry`, one of `llm-native-dispatch` / `llm-codemode-dispatch`, `llm-local-tools`, and `llm-slash-commands`.
 
-**C-tier harness:** B-tier plus `llm-skills`, `llm-slash-commands`, `llm-memory`, `llm-agents`, `llm-mcp-bridge`, and any optional plugins selected by the user.
+**C-tier harness:** B-tier plus `llm-skills`, `llm-memory`, `llm-agents`, `llm-mcp-bridge`, and any optional plugins selected by the user (e.g., `llm-status-items`, `llm-hooks-shell`).
 
 The default C-tier harness uses `llm-codemode-dispatch` (better reliability for local LLMs).
+
+Note: the existing `claude-tui` and `claude-status-items` plugins are NOT reused. They continue to back the claude-wrapper harness unchanged. The openai-compatible harness ships its own dedicated `llm-tui` (Spec 13) — generic LLM-chat TUI primitives extracted with separation-of-concerns in mind.
+
+## Config path convention
+
+All plugins in this ecosystem read user config from `~/.kaizen/<role>/...` and project config from `<project>/.kaizen/<role>/...`. The `~/.kaizen/` namespace is shared with the broader kaizen system; this spec ecosystem does NOT introduce a separate `~/.kaizen-llm/` directory.
+
+Role subdirectories:
+
+| Role | Path |
+|---|---|
+| Skills | `~/.kaizen/skills/` |
+| Agents | `~/.kaizen/agents/` |
+| Slash commands (markdown) | `~/.kaizen/commands/` |
+| Memory | `~/.kaizen/memory/` |
+| MCP server config | `~/.kaizen/mcp/servers.json` |
+| Hooks (file-based, optional) | `~/.kaizen/hooks/` |
+| Per-plugin config | `~/.kaizen/plugins/<plugin-name>/config.json` |
+
+This convention is load-bearing across many plugins. Adding a new file-backed feature follows the same pattern: pick a role name, put it under `~/.kaizen/<role>/`, mirror at `<project>/.kaizen/<role>/`. Per-plugin config that doesn't fit a role goes under `~/.kaizen/plugins/<plugin-name>/`.
+
+## Slash command bare-name reservation
+
+Plugin authors should know up front: bare slash command names (no colon) are reserved. Only built-ins shipped by `llm-slash-commands` (`/help`, `/exit`), driver-coupled built-ins from `llm-driver` (`/clear`, `/model`), and user/project markdown files in `~/.kaizen/commands/` may claim bare names. All plugin-registered commands MUST use `<source>:<name>` form (e.g., `mcp:reload`, `skills:list`, `memory:save`). The `slash:registry.register()` enforces this. See Spec 8 for full conflict-resolution rules.
+
+## MCP prompts deferred to v1
+
+`llm-mcp-bridge` v0 surfaces only MCP tools and resources. MCP prompts (a server-defined, user-invoked parameterized message-template primitive) are SKIPPED in v0 because most MCP servers in the wild don't expose them. Reserved for v1, where they will register into `slash:registry` as `/mcp:<server>:<prompt>`. See Spec 11 for the deferred design.
 
 ## Spec 0 is the source of truth — propagation rule
 
@@ -445,7 +498,7 @@ Conversely, dependent specs MAY introduce types and interfaces internal to their
 ## Acceptance criteria for Tier 0
 
 - `llm-events` plugin builds, passes its own tests, and is published to the marketplace catalog.
-- `public.d.ts` files for all Tier 1+ plugins can import `Vocab`, `ChatMessage`, `ToolCall`, `ToolSchema`, `LLMRequest`, `LLMResponse`, `LLMStreamEvent`, `ToolsRegistryService`, `ToolExecutionContext`, `ToolDispatchStrategy`, `DriverService`, `SkillsRegistryService`, `AgentsRegistryService`, `SlashRegistryService`, `CANCEL_TOOL` without introducing circular dependencies.
+- `public.d.ts` files for all Tier 1+ plugins can import `Vocab`, `ChatMessage`, `ToolCall`, `ToolSchema`, `LLMRequest`, `LLMResponse`, `LLMStreamEvent`, `ToolsRegistryService`, `ToolExecutionContext`, `ToolDispatchStrategy`, `DriverService`, `SkillsRegistryService`, `AgentsRegistryService`, `SlashRegistryService`, `TuiCompletionService`, `CompletionSource`, `CompletionItem`, `CANCEL_TOOL` without introducing circular dependencies.
 - Marketplace `entries` updated for `llm-events`.
 - Tier 1 specs can be authored by reading only this document plus the existing kaizen plugin docs.
 
@@ -463,3 +516,16 @@ Surfaced during parallel authoring of Specs 1–12. All entries below were flagg
 - **`LLMRequest.cancelled?: boolean`** added to support the above.
 
 No dependent-spec rewrites required — the dependent specs already documented the shapes above; this commit just brings Spec 0 into alignment so it remains authoritative.
+
+### 2026-04-30 — design-review revision pass
+
+A focused design-review session surfaced several cross-cutting changes; they're applied here and in the dependent specs in the same commit batch.
+
+- **`tui:completion` service** added (new contract; introduced by Spec 13 `llm-tui` and consumed by Spec 8 `llm-slash-commands`). Generic completion-source registry that powers the slash-autocomplete popup in the TUI and is forward-compatible with future `@file`, `@agent` triggers.
+- **`llm-tui` plugin** introduced (Spec 13). The openai-compatible harness no longer reuses `claude-tui`/`claude-status-items`. `llm-tui` is a fresh, narrow Ink-based TUI that owns generic primitives only (input, output, status bar, completion popup, theme) and emits `input:submit`. claude-tui stays unchanged for the claude-wrapper harness.
+- **A-tier plugin list updated**: drops `claude-tui` and `claude-status-items`, adds `llm-tui`. B-tier promoted `llm-slash-commands` from C-tier (slash commands matter as soon as the user can take real action).
+- **Config path convention codified** (`~/.kaizen/<role>/...`, `~/.kaizen/plugins/<plugin>/config.json`). The previously-introduced `~/.kaizen-llm/` directory is abandoned across all dependent specs. New section "Config path convention" added above.
+- **Slash command bare-name reservation rule** codified. New section "Slash command bare-name reservation" added above. Plugin-registered slash commands MUST be namespaced.
+- **MCP prompts deferred to v1.** `llm-mcp-bridge` v0 surfaces only tools and resources. New section "MCP prompts deferred to v1" added above. Spec 11 documents the deferred design.
+
+No new shared types or interfaces beyond `tui:completion`. The acceptance-criteria import list is updated to include the new types.

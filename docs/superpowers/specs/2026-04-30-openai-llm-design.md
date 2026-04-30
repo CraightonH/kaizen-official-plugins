@@ -1,5 +1,7 @@
 # `openai-llm` Plugin — Design (Spec 1)
 
+> **Note:** Config paths use the `~/.kaizen/<subdir>/` convention. See Spec 0 for rationale.
+
 **Status:** draft
 **Date:** 2026-04-30
 **Scope:** Tier 1. Single plugin `openai-llm`. Provides the `llm:complete` service against any OpenAI-compatible HTTP endpoint (OpenAI, LM Studio, vLLM, Together, Groq, Ollama with `/v1` shim). Reads its own configuration. Owns retry, streaming SSE parsing, and abort handling. Depends on Spec 0 contracts only.
@@ -41,10 +43,10 @@ const plugin: KaizenPlugin = {
 
 ### Location
 
-`~/.kaizen/openai-llm/config.json`. The plugin reads its own config (microservice ownership — no global config service). Path resolution rules:
+`~/.kaizen/plugins/openai-llm/config.json`. The plugin reads its own config (microservice ownership — no global config service). Path resolution rules:
 
 1. `KAIZEN_OPENAI_LLM_CONFIG` env var (absolute path) wins if set.
-2. Otherwise `${process.env.HOME}/.kaizen/openai-llm/config.json`.
+2. Otherwise `${process.env.HOME}/.kaizen/plugins/openai-llm/config.json`.
 3. If the file does not exist, the plugin uses defaults and logs (via `ctx.log`) the path it would have read so the user can create it.
 4. Malformed JSON is a hard failure during `setup` — do not silently fall back.
 

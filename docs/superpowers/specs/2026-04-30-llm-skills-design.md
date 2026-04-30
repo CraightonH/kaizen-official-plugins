@@ -1,5 +1,7 @@
 # `llm-skills` — Skill Discovery & Injection (Spec 7)
 
+> **Note:** Config paths use the `~/.kaizen/<subdir>/` convention. See Spec 0 for rationale.
+
 **Status:** draft
 **Date:** 2026-04-30
 **Depends on:** Spec 0 (`2026-04-30-openai-compatible-foundation-design.md`), Spec 3 (`llm-tools-registry`)
@@ -37,8 +39,8 @@ The plugin is read-only with respect to the filesystem and never executes anythi
 
 ### Search paths (in lookup order, highest priority first)
 
-1. `<project>/.kaizen-llm/skills/` — project-scoped. Project root is resolved via `ctx.cwd` at plugin start.
-2. `~/.kaizen-llm/skills/` — user-scoped.
+1. `<project>/.kaizen/skills/` — project-scoped. Project root is resolved via `ctx.cwd` at plugin start.
+2. `~/.kaizen/skills/` — user-scoped.
 3. Plugin-registered skills via `skillsRegistry.register(manifest, loader)` — lowest priority.
 
 Both directories are optional. If neither exists, the registry is simply empty plus whatever plugins register.
@@ -54,7 +56,7 @@ A `KAIZEN_LLM_SKILLS_PATH` env var MAY be honored as a colon-separated override 
 Skills nested in subdirectories are namespaced by their relative path. Example layout:
 
 ```
-~/.kaizen-llm/skills/
+~/.kaizen/skills/
   git-rebase.md          → name "git-rebase"
   python/
     poetry-deps.md       → name "python/poetry-deps"
@@ -94,8 +96,8 @@ Rationale: avoids a tokenizer dependency in this plugin. The codemode/native dis
 
 When the same `name` appears in multiple sources, precedence is:
 
-1. Project (`<project>/.kaizen-llm/skills/`) wins.
-2. Then user (`~/.kaizen-llm/skills/`).
+1. Project (`<project>/.kaizen/skills/`) wins.
+2. Then user (`~/.kaizen/skills/`).
 3. Then plugin-registered skills.
 
 When a higher-priority source masks a lower one, the masked entry is dropped and a single `console.warn`-style log line is emitted (not an event — this is a config-time concern, not a runtime one).
@@ -218,7 +220,7 @@ Both subscribers are advisory (e.g. status-bar plugins counting available skills
 
 Justification:
 
-- Reads files from `~/.kaizen-llm/skills/` and `<project>/.kaizen-llm/skills/`.
+- Reads files from `~/.kaizen/skills/` and `<project>/.kaizen/skills/`.
 - No filesystem writes.
 - No process execution.
 - No network.

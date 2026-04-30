@@ -1,5 +1,7 @@
 # `llm-agents` — Design (Spec 10)
 
+> **Note:** Config paths use the `~/.kaizen/<subdir>/` convention. See Spec 0 for rationale.
+
 **Status:** draft
 **Date:** 2026-04-30
 **Scope:** The `llm-agents` plugin: agent discovery from on-disk markdown manifests, the `agents:registry` service, the `dispatch_agent` tool, and recursive invocation of `driver:run-conversation` to run a sub-conversation per dispatch.
@@ -21,7 +23,7 @@ Let the parent LLM delegate sub-tasks to specialized "agents" — narrow persona
 
 The plugin owns three concerns:
 
-1. **Discovery.** Scan two well-known directories (`~/.kaizen-llm/agents/` and `<project>/.kaizen-llm/agents/`) for `*.md` agent files at startup. Parse each into an `AgentManifest`. Project-scoped agents shadow user-scoped agents on name collision.
+1. **Discovery.** Scan two well-known directories (`~/.kaizen/agents/` and `<project>/.kaizen/agents/`) for `*.md` agent files at startup. Parse each into an `AgentManifest`. Project-scoped agents shadow user-scoped agents on name collision.
 2. **Registry.** Provide the `agents:registry` service defined in Spec 0. Loaded manifests are exposed via `list()`; programmatic registration via `register()` is supported (e.g., a future plugin could register synthetic agents).
 3. **Dispatch.** Register one tool — `dispatch_agent` — into `tools:registry`. When invoked, look up the named manifest, build a `RunConversationInput`, recurse into `driver:run-conversation`, and return the final assistant message content as the tool result. Subscribe to `turn:start` to inject an "Available agents" section into the parent's outgoing system prompt so the LLM knows what it can dispatch.
 
@@ -31,10 +33,10 @@ The plugin owns no conversation state of its own. Each dispatch is a leaf in the
 
 Agent files are markdown with YAML frontmatter. They live in:
 
-- `~/.kaizen-llm/agents/*.md` (user scope, available across projects)
-- `<project-root>/.kaizen-llm/agents/*.md` (project scope, shadows user scope)
+- `~/.kaizen/agents/*.md` (user scope, available across projects)
+- `<project-root>/.kaizen/agents/*.md` (project scope, shadows user scope)
 
-`<project-root>` is the directory containing the harness file the user launched, located by walking up from `process.cwd()` until a `harnesses/` sibling or `.kaizen-llm/` directory is found. If neither is found, project scope is skipped and only user-scope agents load.
+`<project-root>` is the directory containing the harness file the user launched, located by walking up from `process.cwd()` until a `harnesses/` sibling or `.kaizen/` directory is found. If neither is found, project scope is skipped and only user-scope agents load.
 
 ### Frontmatter schema
 
@@ -223,8 +225,8 @@ Read from the harness settings file under the `agents` namespace:
 {
   "agents": {
     "maxDepth": 3,                  // integer, ≥1
-    "userDir": "~/.kaizen-llm/agents",
-    "projectDir": ".kaizen-llm/agents"
+    "userDir": "~/.kaizen/agents",
+    "projectDir": ".kaizen/agents"
   }
 }
 ```

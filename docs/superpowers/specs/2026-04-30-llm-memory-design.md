@@ -1,5 +1,7 @@
 # `llm-memory` — Persistent Memory Plugin (Spec 9)
 
+> **Note:** Config paths use the `~/.kaizen/<subdir>/` convention. See Spec 0 for rationale.
+
 **Status:** draft
 **Date:** 2026-04-30
 **Tier:** 3 (C milestone)
@@ -41,10 +43,10 @@ The plugin does NOT subscribe to streaming events (`llm:token`, etc.). All work 
 
 | Layer | Path | When written | When injected |
 |---|---|---|---|
-| Project | `<project>/.kaizen-llm/memory/` | When the harness is invoked inside a project root that has (or opts into) this dir | First |
-| Global | `~/.kaizen-llm/memory/` | Always | After project |
+| Project | `<project>/.kaizen/memory/` | When the harness is invoked inside a project root that has (or opts into) this dir | First |
+| Global | `~/.kaizen/memory/` | Always | After project |
 
-`<project>` is the harness's CWD at startup. If `<project>/.kaizen-llm/memory/` does not exist, project-layer reads return empty and project-layer writes create the directory on first use (only when the user has opted into project memory; see Configuration).
+`<project>` is the harness's CWD at startup. If `<project>/.kaizen/memory/` does not exist, project-layer reads return empty and project-layer writes create the directory on first use (only when the user has opted into project memory; see Configuration).
 
 ### Why this path (and not Claude Code's path)
 
@@ -52,7 +54,7 @@ Claude Code's auto-memory lives at `~/.claude/projects/<slug>/memory/MEMORY.md`.
 
 Instead, we mirror the *file format* exactly so memories are portable:
 
-- A user can `cp -r ~/.claude/projects/<slug>/memory/* ~/.kaizen-llm/memory/` and everything works.
+- A user can `cp -r ~/.claude/projects/<slug>/memory/* ~/.kaizen/memory/` and everything works.
 - A user who wants a single shared store can configure `globalDir` to point at a Claude path; both harnesses then read/write the same files. Document this trade-off in the README.
 
 ### File format (Claude-Code-compatible)
@@ -125,11 +127,11 @@ context about the user, their projects, and prior feedback.
 
 ## Project memory (<project-path>)
 
-<contents of <project>/.kaizen-llm/memory/MEMORY.md>
+<contents of <project>/.kaizen/memory/MEMORY.md>
 
-## Global memory (~/.kaizen-llm/memory/)
+## Global memory (~/.kaizen/memory/)
 
-<contents of ~/.kaizen-llm/memory/MEMORY.md>
+<contents of ~/.kaizen/memory/MEMORY.md>
 
 ## Available memory entries (use the `memory_recall` tool to load any of these)
 
@@ -246,17 +248,17 @@ Configurable via plugin settings (`autoExtract: false` default). When enabled:
 Risks documented in the README:
 
 - Side calls cost tokens. Heuristic gating makes this rare but not free.
-- The model may save things the user did not intend. The user can audit `~/.kaizen-llm/memory/` and remove entries.
+- The model may save things the user did not intend. The user can audit `~/.kaizen/memory/` and remove entries.
 - Recommend `autoExtract: true` only after the user has reviewed the extraction prompt and is comfortable with the privacy implications (Section "Privacy").
 
 ## Privacy
 
 Memory writes capture conversational content. Implications:
 
-- Anything passed to `memory_save` (by the LLM) or `memory:store.put` (by another plugin) is persisted in plain text on disk under `~/.kaizen-llm/memory/`.
+- Anything passed to `memory_save` (by the LLM) or `memory:store.put` (by another plugin) is persisted in plain text on disk under `~/.kaizen/memory/`.
 - Auto-extraction can write user-message snippets even if the user did not explicitly ask to save them. This is why it ships off by default.
 - The plugin emits a `status:item-update` on every write so the TUI can surface "memory saved: <name>" to the user. Users notice writes in real time.
-- The README MUST recommend a `.gitignore` rule for `.kaizen-llm/memory/` if the project directory is committed.
+- The README MUST recommend a `.gitignore` rule for `.kaizen/memory/` if the project directory is committed.
 
 No memory content is sent anywhere except as part of the normal `llm:complete` request to the configured provider. The plugin never makes its own outbound calls.
 
@@ -266,8 +268,8 @@ Plugin settings (read via the standard plugin-settings file pattern):
 
 | Key | Default | Notes |
 |---|---|---|
-| `globalDir` | `~/.kaizen-llm/memory` | Override to point at a Claude-compatible directory |
-| `projectDir` | `<cwd>/.kaizen-llm/memory` | Override or set null to disable project layer |
+| `globalDir` | `~/.kaizen/memory` | Override to point at a Claude-compatible directory |
+| `projectDir` | `<cwd>/.kaizen/memory` | Override or set null to disable project layer |
 | `injectionByteCap` | `2048` | Per-layer cap on injected MEMORY.md |
 | `autoExtract` | `false` | Enable opt-in extraction described above |
 | `extractTriggers` | (default list) | Override heuristic phrases |
@@ -275,12 +277,12 @@ Plugin settings (read via the standard plugin-settings file pattern):
 
 ## Permissions
 
-`tier: "trusted"` — the plugin reads and writes user-config directories (`~/.kaizen-llm/`, `<project>/.kaizen-llm/`). Same tier as `claude-events`, `llm-events`, and other foundation plugins.
+`tier: "trusted"` — the plugin reads and writes user-config directories (`~/.kaizen/`, `<project>/.kaizen/`). Same tier as `claude-events`, `llm-events`, and other foundation plugins.
 
 Specifically the plugin needs:
 
 - Read/write filesystem under `globalDir` and `projectDir`.
-- Read filesystem at `<project>/.kaizen-llm/memory/MEMORY.md` and entries.
+- Read filesystem at `<project>/.kaizen/memory/MEMORY.md` and entries.
 - No network. No process spawn. No env mutation.
 
 ## Test plan
@@ -343,7 +345,7 @@ Unit + integration tests, all driven from the plugin's own test harness (mock ev
 - A C-tier harness with `llm-memory` registered injects a working memory block on every `llm:before-call`, verified end-to-end with a mock LLM.
 - `memory:store` service is callable from another plugin (verified by an integration test that uses the slash-commands plugin to call `memory:store.put`).
 - `memory_recall` and `memory_save` are listed by `tools:registry.list({ tags: ["memory"] })`.
-- A pre-existing Claude-Code memory directory copied into `~/.kaizen-llm/memory/` is read without modification (frontmatter, body, MEMORY.md catalog all parse).
+- A pre-existing Claude-Code memory directory copied into `~/.kaizen/memory/` is read without modification (frontmatter, body, MEMORY.md catalog all parse).
 - README documents: directory choice, opt-in for `autoExtract`, privacy implications, suggested `.gitignore` line for project memory.
 
 ## Changelog

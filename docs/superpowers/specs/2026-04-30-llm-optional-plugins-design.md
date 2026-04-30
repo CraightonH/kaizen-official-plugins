@@ -1,5 +1,7 @@
 # LLM Optional Plugins — `llm-status-items` & `llm-hooks-shell` (Spec 12)
 
+> **Note:** Config paths use the `~/.kaizen/<subdir>/` convention. See Spec 0 for rationale.
+
 **Status:** draft
 **Date:** 2026-04-30
 **Depends on:** Spec 0 (`2026-04-30-openai-compatible-foundation-design.md`) — event vocabulary, `ChatMessage`/`LLMRequest`/`LLMResponse` shapes, `status:item-update` / `status:item-clear` payload contract.
@@ -67,7 +69,7 @@ The cleanest way to drive this: maintain `turnInFlight: boolean` and `currentToo
 
 ### Cost estimate
 
-Configuration shape (read at `setup` from `~/.kaizen-llm/cost-table.json`, missing file is fine):
+Configuration shape (read at `setup` from `~/.kaizen/plugins/llm-status-items/cost-table.json`, missing file is fine):
 
 ```json
 {
@@ -130,8 +132,8 @@ Read a JSON config of `{ event, command, ... }` declarations. For each entry, su
 
 Two locations, merged with project-local overriding home (entries are concatenated, not deduped — both can run):
 
-- `~/.kaizen-llm/hooks.json`
-- `<cwd>/.kaizen-llm/hooks.json`
+- `~/.kaizen/hooks/hooks.json`
+- `<cwd>/.kaizen/hooks/hooks.json`
 
 Schema:
 

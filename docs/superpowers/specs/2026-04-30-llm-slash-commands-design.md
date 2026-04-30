@@ -3,7 +3,7 @@
 **Status:** draft
 **Date:** 2026-04-30
 **Depends on:** Spec 0 (foundation), Spec 2 (`llm-driver`), Spec 7 (`llm-skills`), Spec 9 (`llm-agents`).
-**Scope:** A single C-tier plugin that intercepts `input:submit` events, recognizes `/<command>` syntax, and dispatches to a registered command handler. Provides a `slash:registry` service for other plugins to register commands. Loads markdown-based command files from disk. Ships a small set of built-in commands (`/help`, `/clear`, `/model`, `/skills`, `/agents`, `/exit`).
+**Scope:** A single C-tier plugin that intercepts `input:submit` events, recognizes `/<command>` syntax, and dispatches to a registered command handler. Provides a `slash:registry` service for other plugins to register commands. Loads markdown-based command files from disk. Ships a minimal set of built-in commands (`/help`, `/exit`).
 
 ## Goal
 
@@ -23,6 +23,8 @@ This spec introduces a new cross-plugin service. Per Spec 0's propagation rule, 
 1. Add the `slash:registry` interface to Spec 0's "Service interfaces" section, owned by `llm-slash-commands`.
 2. Add a Changelog entry recording the addition.
 3. No event-vocabulary additions are required — `input:submit` and `input:handled` already exist in Spec 0, and `conversation:cleared` is already defined.
+
+**Note (this revision):** This revision pass also adds `tui:completion` as a separate Spec 0 contract. That contract is **not owned by this plugin** — it is owned by the TUI plugin and introduced in Spec 0 in this same revision pass — but it is **consumed** by `llm-slash-commands` (see "Completion integration" below). The `slash:registry` interface itself remains as defined here.
 
 The interface to add to Spec 0 verbatim:
 
@@ -60,7 +62,7 @@ export interface SlashCommandManifest {
    * Source of the command — used by `/help` to group entries.
    * `"builtin"` for the commands shipped by this plugin,
    * `"plugin"` when registered programmatically by another plugin,
-   * `"file"` when loaded from a markdown file under `~/.kaizen-llm/commands/` or `<project>/.kaizen-llm/commands/`.
+   * `"file"` when loaded from a markdown file under `~/.kaizen/commands/` or `<project>/.kaizen/commands/`.
    */
   source: "builtin" | "plugin" | "file";
   /** Set when `source === "file"`; absolute path to the source markdown. */
@@ -85,7 +87,7 @@ The plugin is a passive interceptor with three small subsystems:
 
 1. **Parser.** Pure function `parse(text)` → `{ name, args } | null`. Treats input as a slash command iff it starts with `/`, the next character is `[a-z]`, and the command name (`[a-z0-9-]+`) is in the registry.
 2. **Registry.** In-memory `Map<string, { manifest, handler }>`. Backs the `slash:registry` service.
-3. **File loader.** Synchronous-ish bootstrap that walks `~/.kaizen-llm/commands/` and `<project>/.kaizen-llm/commands/` once at `start()` time, parses each `*.md` file, and registers a wrapping handler that injects the rendered body into the next turn.
+3. **File loader.** Synchronous-ish bootstrap that walks `~/.kaizen/commands/` and `<project>/.kaizen/commands/` once at `start()` time, parses each `*.md` file, and registers a wrapping handler that injects the rendered body into the next turn.
 
 The plugin's `input:submit` subscriber runs at high priority (see "Priority handling"). On a match it dispatches to the handler, then emits `input:handled` with `by: "llm-slash-commands"`. On no match it returns without doing anything — the driver's lower-priority subscriber handles the input as a normal user message.
 
@@ -146,8 +148,8 @@ Rejections (treated as not-a-command, falls through to driver):
 
 At `start()`:
 
-1. Resolve user dir: `~/.kaizen-llm/commands/`.
-2. Resolve project dir: `<cwd>/.kaizen-llm/commands/` (cwd at session start; this plugin does not watch for `cd`-style changes).
+1. Resolve user dir: `~/.kaizen/commands/`.
+2. Resolve project dir: `<cwd>/.kaizen/commands/` (cwd at session start; this plugin does not watch for `cd`-style changes).
 3. For each existing dir, glob `*.md` non-recursively.
 4. Parse each file. Project-scoped commands shadow user-scoped commands of the same name. Built-ins shadow both — built-ins are registered last but the registry rejects duplicate registration; the loader skips files whose name collides with an already-registered command and emits a single `conversation:system-message` warning at startup listing skipped files.
 
@@ -183,33 +185,80 @@ The wrapping handler that file-based commands get:
 
 This makes file-based commands behave exactly like a Claude-Code-style prompt template.
 
+## Naming convention and conflicts
+
+Bare command names (no `<source>:` prefix) are a reserved namespace. They are allowed only for:
+
+- **Built-ins shipped by `llm-slash-commands`.** This list is now restricted to `/help` and `/exit` only. No other bare names are claimed by this plugin.
+- **Driver-coupled built-ins registered by `llm-driver` (NOT this plugin):** `/clear` and `/model`. These are registered through the `slash:registry` service by Spec 2's plugin at start time. The implementation lives in Spec 2; this spec only documents the reservation so authors know those names are taken.
+- **User and project markdown files** discovered under `~/.kaizen/commands/` and `<project>/.kaizen/commands/`. The filename (sans `.md`) becomes the bare command name.
+
+**All plugin-registered slash commands MUST use the `<source>:<name>` form.** Examples: `mcp:reload`, `skills:list`, `memory:save`, `agents:list`. The `register()` method enforces this:
+
+- If `manifest.source === "plugin"` and `manifest.name` does not contain a `:`, `register()` throws a typed `BareNamePluginError`. This is the only structural validation `register()` performs on the name beyond the existing `[a-z][a-z0-9-]*` (per segment) rule.
+- Built-ins shipped by this plugin and file-loaded commands are exempt from the prefix rule (they use `source: "builtin"` and `source: "file"` respectively).
+- `llm-driver`'s `/clear` and `/model` registrations are also exempt: the driver registers them with `source: "builtin"` (or an equivalent the registry treats as exempt) because they are part of the reserved bare-name set documented above. Spec 2 owns the exact `source` value used.
+
+### Conflict resolution
+
+| Collision | Resolution |
+|---|---|
+| Built-in vs user/project bare name | Built-in wins. The conflicting user/project file is rejected at load time and a clear startup warning is emitted listing the file path and the reserved name. |
+| User bare name vs project bare name | Project wins. The user-scoped file is shadowed and a debug-level log line is emitted (no user-visible warning — shadowing is expected). |
+| Two plugins registering the same `foo:bar` | `register()` throws. The second plugin to call `register` gets the error and is responsible for handling it; this plugin does not silently overwrite. |
+| Two MCP servers exposing a prompt with the same name | Avoided structurally by the `mcp:<server>:<prompt>` triple-namespacing scheme. See Spec 11 (`llm-mcp-bridge`) for the canonical form. The `slash:registry` itself never sees a collision because the MCP bridge constructs distinct fully-qualified names per server. |
+
 ## Built-in commands
+
+The list of built-ins shipped by `llm-slash-commands` is:
 
 | Command | Behavior |
 |---|---|
-| `/help` | Lists all registered commands grouped by `source` (Built-ins, Plugins, Files). Each line: `/<name>[ <usage>] — <description>`. With `args` non-empty (e.g. `/help model`), prints just that entry plus its `filePath` if it has one. Emits via `ctx.print`; does not start a turn. |
-| `/clear` | Emits `conversation:cleared`. The driver subscribes and resets its in-memory message history, token counters, and current `turnId`. Prints `Conversation cleared.`. |
-| `/model <name>` | Calls `driver:set-model` on the `DriverService` (see "Driver service additions" below). On unknown model, prints the error returned by the driver. On success, prints `Model set to <name>.`. |
-| `/skills` | Calls `skills:registry.list()`. If the service is not present (B-tier harness), prints `Skills plugin not loaded.`. Otherwise prints each manifest as `<name> — <description>` with token estimate if available. |
-| `/agents` | Same shape as `/skills` against `agents:registry.list()`. |
+| `/help` | Lists all registered commands grouped by `source` — one section per group, in this order: **Built-in**, **Driver**, **Skills**, **Agents**, **Memory**, **MCP**, **User**. Each line: `/<name>[ <usage>] — <description>`. With `args` non-empty (e.g. `/help model`), prints just that entry plus its `filePath` if it has one. Emits via `ctx.print`; does not start a turn. Grouping is derived from the manifest's `source` field plus the prefix segment of the name (e.g. `skills:list` is grouped under Skills); commands with `source: "file"` go under User. |
 | `/exit` | Emits `session:end`. The driver / TUI are responsible for actually terminating the process; this command does not call `process.exit` directly. |
 
-### Driver service additions
+All other previously-listed commands have moved to the plugin that owns the underlying capability. They are documented here only for cross-reference; the implementation does **not** live in this spec:
 
-`/model` requires the driver to expose a way to mutate the active default model. Add to Spec 2 (driver) — not Spec 0, because this is a single-plugin contract:
+| Command | Now owned by | Notes |
+|---|---|---|
+| `/clear` | `llm-driver` (Spec 2) | Registered via `slash:registry` at driver start. Reserved bare name. |
+| `/model` | `llm-driver` (Spec 2) | Registered via `slash:registry` at driver start. Reserved bare name. Driver also owns the `getModel`/`setModel` extension on `DriverService`. |
+| `/skills`, `/skills:reload` | `llm-skills` (Spec 7) | Registered via `slash:registry` if present. |
+| `/agents:list` | `llm-agents` (Spec 9) | Namespaced; uses the `agents:` prefix per the rule above. |
+| `/memory:save`, `/memory:recall`, `/memory:list` | `llm-memory` | Namespaced under `memory:`. |
+| `/mcp:list`, `/mcp:reload`, etc. | `llm-mcp-bridge` (Spec 11) | Namespaced under `mcp:`; per-prompt commands use the triple form `mcp:<server>:<prompt>`. |
+
+This change is purely a relocation: the user-visible behavior is identical, but the registration site moves to the plugin that owns the underlying capability so that loading `llm-slash-commands` without those plugins yields a smaller, honest command surface.
+
+## Completion integration
+
+`llm-slash-commands` consumes a new `tui:completion` service introduced in this revision of Spec 0 (owned by the TUI plugin, not this plugin). On `setup`, the plugin registers a single completion source against `tui:completion`:
 
 ```ts
-// Extension to DriverService in llm-driver's public.d.ts.
-export interface DriverService {
-  // ... existing members from Spec 0 ...
-  /** Returns the currently selected default model id. */
-  getModel(): string;
-  /** Sets the default model. Validates against `llm:complete.listModels()`; throws if unknown. */
-  setModel(modelId: string): Promise<void>;
+{
+  trigger: "/",
+  async list(input, cursor) {
+    const all = slashRegistry.list();
+    const prefix = extractTriggerPrefix(input, cursor);  // text after "/"
+    return all
+      .filter(cmd => cmd.name.startsWith(prefix))
+      .sort(byBuiltinFirstThenNamespace)
+      .map(cmd => ({
+        label: `/${cmd.name}`,
+        insertText: `/${cmd.name} `,
+        description: cmd.description,
+      }));
+  }
 }
 ```
 
-Spec 0 already declares `DriverService`; the addition above lives in Spec 2 and does not require a Spec 0 edit because no other plugin needs `getModel`/`setModel`.
+Division of responsibilities:
+
+- **TUI plugin** owns popup rendering, navigation (up/down/enter/tab/esc), and insertion of the chosen `insertText` into the input buffer.
+- **This plugin** only supplies the data: it filters the registry against the trigger prefix, sorts (built-ins first, then alphabetical within each `<source>:` namespace), and returns completion items.
+- The completion source is passive — it does not subscribe to `input:submit` or mutate state.
+
+If `tui:completion` is not present (e.g. headless test harness), the plugin no-ops the registration and continues to function via direct `input:submit` dispatch as before.
 
 ## Plugin lifecycle
 
@@ -221,10 +270,13 @@ register() {
 }
 
 start() {
-  registerBuiltins();                  // /help, /clear, /model, /skills, /agents, /exit
+  registerBuiltins();                  // /help, /exit
   loadFileCommands();                  // user dir, then project dir
   ctx.provideService("slash:registry", registry);
   ctx.subscribe("input:submit", onInputSubmit, { priority: 100 });
+  // Optional: register a completion source if `tui:completion` is present.
+  const completion = ctx.getServiceOptional("tui:completion");
+  if (completion) completion.registerSource(slashCompletionSource);
 }
 
 stop() {
@@ -249,9 +301,7 @@ Note: `input:handled` is emitted **after** the handler completes successfully. I
 
 `tier: "trusted"`. Justification:
 
-- Reads from `~/.kaizen-llm/commands/` and `<project>/.kaizen-llm/commands/` (user-controlled directories).
-- `/clear` mutates driver conversation state.
-- `/model` mutates driver active model.
+- Reads from `~/.kaizen/commands/` and `<project>/.kaizen/commands/` (user-controlled directories).
 - `/exit` emits a session-terminating event.
 
 No network access. No arbitrary subprocess execution (markdown bodies are sent to the LLM, not shell-executed).
@@ -275,12 +325,21 @@ Unit tests, all isolated with the kaizen test harness:
    - `list` returns sorted manifests.
 
 3. **Built-in handlers.**
-   - `/help` with no args lists all registered commands grouped by source.
-   - `/help model` prints just the `/model` entry.
-   - `/clear` emits exactly one `conversation:cleared` event.
-   - `/model gpt-4o` calls `driver.setModel("gpt-4o")` once; on a thrown error from `setModel`, prints the error and does not crash.
-   - `/skills` and `/agents` print the expected list when the registry is present, and a clear "not loaded" line when absent.
+   - `/help` with no args lists all registered commands grouped by source in the documented order (Built-in, Driver, Skills, Agents, Memory, MCP, User).
+   - `/help <name>` prints just the entry for the named command (including `filePath` for file-sourced entries).
    - `/exit` emits exactly one `session:end` and does not call `process.exit`.
+   - (Driver-owned `/clear` and `/model`, and plugin-owned `/skills`, `/agents`, `/memory:*`, `/mcp:*` are tested in their respective specs, not here.)
+
+8. **Naming convention enforcement.**
+   - `register({ source: "plugin", name: "foo" }, h)` throws `BareNamePluginError`.
+   - `register({ source: "plugin", name: "foo:bar" }, h)` succeeds.
+   - `register({ source: "builtin", name: "help" }, h)` succeeds (built-in path is exempt).
+   - File-loader path: a user/project file named `help.md` is rejected at load time with a startup warning, because `help` is reserved by a built-in.
+
+9. **Completion source.**
+   - With `tui:completion` present, the plugin registers a `/`-triggered source.
+   - `list("/he", cursor=3)` returns an item for `/help` with `insertText === "/help "`.
+   - With `tui:completion` absent, `setup` no-ops the registration and `input:submit` dispatch still works.
 
 4. **Dispatch + fall-through.**
    - Submitting `/help` triggers the help handler and emits `input:handled`.
@@ -312,11 +371,13 @@ Integration test (one, in the C-tier harness fixture):
 
 - Plugin builds and passes its own unit tests.
 - `slash:registry` interface added to Spec 0 with a Changelog entry, and Spec 0's "Service interfaces" section lists `llm-slash-commands` as the owner.
-- `DriverService.getModel`/`setModel` extension added to Spec 2.
+- `tui:completion` contract added to Spec 0 in the same revision pass (owned by the TUI plugin), and this plugin's setup-time consumption of it is documented above.
+- `DriverService.getModel`/`setModel` extension and the `/clear` + `/model` registrations live in Spec 2 (`llm-driver`); cross-referenced from this spec.
 - Marketplace `entries` updated for `llm-slash-commands` at `tier: "trusted"`.
 - C-tier harness fixture passes the integration test above.
-- All built-ins behave per the table in this spec.
-- Manual smoke test: in a real C-tier harness session, `/help`, `/clear`, `/model`, `/skills`, `/agents`, and a project-local file-based command all behave as documented.
+- Built-ins shipped by this plugin (`/help`, `/exit`) behave per the table in this spec.
+- `register()` rejects bare names when `manifest.source === "plugin"`; covered by unit test.
+- Manual smoke test: in a real C-tier harness session, `/help` and `/exit` work; `/clear`, `/model` (from `llm-driver`), and a project-local file-based command also work end-to-end.
 
 ## Open questions
 
