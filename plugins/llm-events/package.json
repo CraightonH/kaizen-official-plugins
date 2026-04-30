@@ -1,0 +1,13 @@
+{
+  "name": "llm-events",
+  "version": "0.1.0",
+  "description": "Event vocabulary and shared types for the openai-compatible harness",
+  "type": "module",
+  "exports": { ".": "./index.ts" },
+  "keywords": ["kaizen-plugin"],
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/json-schema": "^7.0.15",
+    "typescript": "^5.4.0"
+  }
+}
