@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun install *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(~/.bun/bin/bunx tsc *)",
+      "Bash(~/.bun/bin/bun test *)",
+      "Bash(bun test *)"
+    ]
+  }
+}
