@@ -87,7 +87,7 @@ Defined and exported by the `llm-events` plugin as a frozen `VOCAB` constant and
 
 | Event | Payload | Notes |
 |---|---|---|
-| `llm:before-call` | `{ request: LLMRequest }` (mutable) | Subscribers may mutate `request` in-place. Memory injection, system-prompt rewriting, model overrides happen here. |
+| `llm:before-call` | `{ request: LLMRequest }` (mutable) | Subscribers may mutate `request` in-place. Memory injection, system-prompt rewriting, model overrides happen here. To cancel the call entirely, set `request.cancelled = true`; the driver checks after all subscribers have resolved and ends the turn cleanly. |
 | `llm:request` | `{ request: LLMRequest }` (immutable snapshot) | Post-mutation; for logging/observability only. |
 | `llm:token` | `{ delta: string }` | Streaming chunk. |
 | `llm:tool-call` | `{ toolCall: ToolCall }` | Native dispatch only. Code mode uses `codemode:*`. |
@@ -98,7 +98,7 @@ Defined and exported by the `llm-events` plugin as a frozen `VOCAB` constant and
 
 | Event | Payload | Notes |
 |---|---|---|
-| `tool:before-execute` | `{ name: string; args: unknown; callId: string }` (mutable) | Subscribers may rewrite `args` or set `args` to a sentinel to cancel. |
+| `tool:before-execute` | `{ name: string; args: unknown; callId: string }` (mutable) | Subscribers may rewrite `args`, or set `args` to the sentinel `CANCEL_TOOL` (`Symbol.for("kaizen.cancel")`) to cancel the call. The registry surfaces a cancelled call as a `tool:error` with message `"cancelled"`. |
 | `tool:execute` | `{ name: string; args: unknown; callId: string }` |
 | `tool:result` | `{ name: string; callId: string; result: unknown }` |
 | `tool:error` | `{ name: string; callId: string; message: string; cause?: unknown }` |
@@ -157,6 +157,9 @@ export interface LLMRequest {
   stop?: string[];
   // Provider-specific extras land in `extra` and the provider plugin decides what to do.
   extra?: Record<string, unknown>;
+  // Set by an `llm:before-call` subscriber to abort this LLM call. Driver checks
+  // after the event resolves; if true, no HTTP request is made and the turn ends cleanly.
+  cancelled?: boolean;
 }
 
 export interface LLMResponse {
@@ -198,6 +201,11 @@ export interface ToolHandler {
 export interface ToolExecutionContext {
   signal: AbortSignal;
   callId: string;
+  // The id of the turn that triggered this tool call. Used by `llm-agents` to
+  // measure recursion depth and link parent/child turns. Optional only because
+  // tools can be invoked outside a turn (tests, slash commands); inside a turn
+  // it MUST be set by the dispatcher.
+  turnId?: string;
   log: (msg: string) => void;
 }
 
@@ -283,6 +291,7 @@ export interface SkillsRegistryService {
   list(): SkillManifest[];
   load(name: string): Promise<string>;   // returns body to inject into system prompt
   register(manifest: SkillManifest, loader: () => Promise<string>): () => void;
+  rescan(): Promise<void>;               // re-discover file-backed skills; used by `/skills reload`
 }
 ```
 
@@ -305,6 +314,40 @@ export interface AgentsRegistryService {
 ```
 
 The agents plugin registers a single `dispatch_agent({ name, prompt })` tool that internally calls `driver:run-conversation` with the agent's manifest.
+
+### `slash:registry` (`llm-slash-commands`)
+
+```ts
+export interface SlashCommandManifest {
+  name: string;              // without leading slash, e.g. "help"
+  description: string;
+  // If set, the command body is rendered with `{{args}}` substitution and
+  // re-emitted as a user message. If unset, `handler` runs.
+  body?: string;
+  source: "builtin" | "user" | "project" | "plugin";
+}
+
+export interface SlashCommandContext {
+  args: string;              // everything after the command name, single leading space stripped
+  emit: (event: string, payload: unknown) => Promise<void>;
+  signal: AbortSignal;
+}
+
+export interface SlashCommandHandler {
+  (ctx: SlashCommandContext): Promise<void>;
+}
+
+export interface SlashRegistryService {
+  register(manifest: SlashCommandManifest, handler?: SlashCommandHandler): () => void;
+  list(): SlashCommandManifest[];
+  // Returns true if the input matched a registered command (and was dispatched);
+  // false if no match. Subscribers to `input:submit` call this to decide whether
+  // to emit `input:handled`.
+  tryDispatch(input: string, ctx: Omit<SlashCommandContext, "args">): Promise<boolean>;
+}
+```
+
+The slash-commands plugin subscribes to `input:submit` at high priority, calls `tryDispatch`, and emits `input:handled` if it returns true. Other plugins (memory, agents, MCP-bridge) register their own slash commands by consuming this service.
 
 ## Shared types
 
@@ -333,6 +376,11 @@ export interface ModelInfo {
 }
 
 // JSONSchema7 imported from `@types/json-schema`.
+
+// Cancellation sentinel for `tool:before-execute` subscribers. Set
+// `event.args = CANCEL_TOOL` to abort a tool call. The well-known
+// Symbol.for() identity means subscribers don't need to import this constant.
+export const CANCEL_TOOL: unique symbol = Symbol.for("kaizen.cancel");
 ```
 
 ## The `llm-events` plugin
@@ -397,6 +445,21 @@ Conversely, dependent specs MAY introduce types and interfaces internal to their
 ## Acceptance criteria for Tier 0
 
 - `llm-events` plugin builds, passes its own tests, and is published to the marketplace catalog.
-- `public.d.ts` files for all Tier 1+ plugins can import `Vocab`, `ChatMessage`, `ToolCall`, `ToolSchema`, `LLMRequest`, `LLMResponse`, `LLMStreamEvent`, `ToolsRegistryService`, `ToolDispatchStrategy`, `DriverService`, `SkillsRegistryService`, `AgentsRegistryService` without introducing circular dependencies.
+- `public.d.ts` files for all Tier 1+ plugins can import `Vocab`, `ChatMessage`, `ToolCall`, `ToolSchema`, `LLMRequest`, `LLMResponse`, `LLMStreamEvent`, `ToolsRegistryService`, `ToolExecutionContext`, `ToolDispatchStrategy`, `DriverService`, `SkillsRegistryService`, `AgentsRegistryService`, `SlashRegistryService`, `CANCEL_TOOL` without introducing circular dependencies.
 - Marketplace `entries` updated for `llm-events`.
 - Tier 1 specs can be authored by reading only this document plus the existing kaizen plugin docs.
+
+## Changelog
+
+### 2026-04-30 — initial post-Spec-1-12 contract sync
+
+Surfaced during parallel authoring of Specs 1–12. All entries below were flagged in the dependent specs and are now authoritative here.
+
+- **`ToolExecutionContext.turnId`** added (Spec 10). Required for `llm-agents` to compute recursion depth and link parent/child turns.
+- **`SkillsRegistryService.rescan()`** added (Spec 7). Required for the `/skills reload` slash command and any future file-watcher integration.
+- **`slash:registry` service** added (Spec 8). New service, owned by `llm-slash-commands`. Lets capability plugins register slash commands without coupling to the slash-commands plugin's internals.
+- **`tool:before-execute` cancellation sentinel** concretized as `CANCEL_TOOL = Symbol.for("kaizen.cancel")`, exported from `llm-events` shared types (Spec 4). Previously hand-waved as "a sentinel."
+- **`llm:before-call` cancellation mechanism** concretized as `request.cancelled = true` (Spec 12). Previously implicit. Driver checks the field after all subscribers resolve.
+- **`LLMRequest.cancelled?: boolean`** added to support the above.
+
+No dependent-spec rewrites required — the dependent specs already documented the shapes above; this commit just brings Spec 0 into alignment so it remains authoritative.
