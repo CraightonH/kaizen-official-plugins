@@ -374,6 +374,18 @@ official/claude-status-items (reused)
 
 The default C-tier harness uses `llm-codemode-dispatch` (better reliability for local LLMs).
 
+## Spec 0 is the source of truth — propagation rule
+
+This document defines the contracts every dependent spec (Specs 1–12) is written against. If implementation surfaces a problem with any contract here — a missing field on `LLMStreamEvent`, a wrong return type on a service, an event payload that needs splitting — the change MUST be made here first, then propagated:
+
+1. Edit Spec 0 to update the contract. Note the change in a `## Changelog` section at the bottom (date, what changed, why).
+2. Audit every dependent spec (Specs 1–12) for sections that reference the changed contract. Update them to match. If a spec has already been turned into an implementation plan or merged code, update those too.
+3. Re-run any acceptance-criteria checks in dependent specs that the contract change might invalidate.
+
+Any plugin author or implementing agent who finds Spec 0 wrong during their work must stop and follow this propagation flow rather than diverging silently. A divergent dependent spec is a bug; the contracts in Spec 0 are authoritative.
+
+Conversely, dependent specs MAY introduce types and interfaces internal to their own plugin without touching Spec 0 — only changes that cross plugin boundaries (event payloads, service interfaces, shared types) belong here.
+
 ## Open questions deferred to dependent specs
 
 - HTTP/streaming details and retry semantics → Spec 1 (`openai-llm`).
