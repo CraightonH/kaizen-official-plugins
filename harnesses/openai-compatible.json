@@ -1,11 +1,8 @@
 {
-  "name": "openai-compatible",
-  "description": "OpenAI-compatible LLM harness (A-tier).",
-  "version": "0.1.0",
   "plugins": [
-    { "name": "llm-events", "version": "0.1.0" },
-    { "name": "openai-llm", "version": "0.1.0" },
-    { "name": "llm-driver", "version": "0.1.0" },
-    { "name": "claude-tui", "version": "0.2.0" }
+    "official/llm-events@0.1.0",
+    "official/openai-llm@0.1.0",
+    "official/llm-driver@0.1.0",
+    "official/llm-tui@0.1.0"
   ]
 }
