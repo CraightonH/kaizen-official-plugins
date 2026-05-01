@@ -58,6 +58,13 @@
     },
     {
       "kind": "plugin",
+      "name": "llm-skills",
+      "description": "Skills registry + default file-loader for ~/.kaizen/skills/ and <project>/.kaizen/skills/.",
+      "categories": ["skills"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-skills" } }]
+    },
+    {
+      "kind": "plugin",
       "name": "llm-mcp-bridge",
       "description": "Bridge MCP servers (tools + resources) into the kaizen tools:registry. v0 — prompts deferred.",
       "categories": ["mcp", "tools"],
