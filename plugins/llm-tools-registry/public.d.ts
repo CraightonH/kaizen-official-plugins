@@ -1,3 +1,7 @@
+// llm-tools-registry public surface — re-exports only.
+// Spec 0 owns ToolSchema, ToolCall, ChatMessage, CANCEL_TOOL.
+// This plugin owns ToolsRegistryService, ToolHandler, ToolExecutionContext.
+
 export type {
   ToolSchema,
   ToolCall,
@@ -6,5 +10,8 @@ export type {
 
 export { CANCEL_TOOL } from "llm-events/public";
 
-// Re-declared here for ergonomic single-import; full bodies live in llm-events.
-export type { ToolsRegistryService, ToolHandler, ToolExecutionContext } from "./registry";
+export type {
+  ToolsRegistryService,
+  ToolHandler,
+  ToolExecutionContext,
+} from "./registry";
