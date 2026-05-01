@@ -21,6 +21,6 @@ export interface McpBridgeService {
   list(): ServerInfo[];
   get(name: string): ServerInfo | undefined;
   reconnect(name: string): Promise<void>;
-  reload(): Promise<{ added: string[]; removed: string[]; updated: string[] }>;
+  reload(newConfig?: Map<string, import("./config.ts").ResolvedServerConfig>): Promise<{ added: string[]; removed: string[]; updated: string[] }>;
   shutdown(name: string): Promise<void>;
 }
