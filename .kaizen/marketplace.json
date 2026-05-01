@@ -50,11 +50,25 @@
       "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/openai-llm" } }]
     },
     {
+      "kind": "plugin",
+      "name": "llm-driver",
+      "description": "Coordination plugin for the openai-compatible harness: turn loop, conversation state, lifecycle events.",
+      "categories": ["driver", "llm"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-driver" } }]
+    },
+    {
       "kind": "harness",
       "name": "claude-wrapper",
       "description": "Claude Code wrapper: distinctive prompt + extensible status bar over `claude -p`.",
       "categories": ["harness", "claude"],
       "versions": [{ "version": "0.1.0", "path": "harnesses/claude-wrapper.json" }]
+    },
+    {
+      "kind": "harness",
+      "name": "openai-compatible",
+      "description": "OpenAI-compatible LLM harness (A-tier: chat E2E, no tools).",
+      "categories": ["harness", "llm"],
+      "versions": [{ "version": "0.1.0", "path": "harnesses/openai-compatible.json" }]
     }
   ]
 }
