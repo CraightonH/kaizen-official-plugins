@@ -16,7 +16,7 @@ import { createFallbackChannel } from "./fallback.ts";
 const plugin: KaizenPlugin = {
   name: "llm-tui",
   apiVersion: "3.0.0",
-  permissions: { tier: "trusted" },
+  permissions: { tier: "unscoped" },
   services: {
     provides: ["llm-tui:channel", "llm-tui:completion", "llm-tui:status", "llm-tui:theme"],
     consumes: ["llm-events:vocabulary"],

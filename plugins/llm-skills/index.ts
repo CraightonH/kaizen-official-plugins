@@ -40,7 +40,7 @@ function rescanIntervalMs(ctx: any): number {
 const plugin: KaizenPlugin = {
   name: "llm-skills",
   apiVersion: "3.0.0",
-  permissions: { tier: "trusted" },
+  permissions: { tier: "unscoped" },
   services: { provides: ["skills:registry"] },
 
   async setup(ctx) {

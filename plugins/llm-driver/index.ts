@@ -35,7 +35,7 @@ const plugin: KaizenPlugin = {
   services: {
     consumes: [
       "llm-events:vocabulary",
-      "claude-tui:channel",
+      "llm-tui:channel",
       "llm:complete",
       "tools:registry",
       "tool-dispatch:strategy",
@@ -45,7 +45,7 @@ const plugin: KaizenPlugin = {
 
   async setup(ctx) {
     ctx.consumeService("llm-events:vocabulary");
-    ctx.consumeService("claude-tui:channel");
+    ctx.consumeService("llm-tui:channel");
     ctx.consumeService("llm:complete");
 
     ctx.defineService("driver:run-conversation", {
@@ -95,7 +95,7 @@ const plugin: KaizenPlugin = {
   },
 
   async start(ctx) {
-    const ui = ctx.useService<UiChannel>("claude-tui:channel")!;
+    const ui = ctx.useService<UiChannel>("llm-tui:channel")!;
     const state = (ctx as any).__llmDriverState as {
       currentTurn: CurrentTurn | null;
       messages: ChatMessage[];

@@ -13,7 +13,7 @@ interface TuiCompletionService {
 const plugin: KaizenPlugin = {
   name: "llm-slash-commands",
   apiVersion: "3.0.0",
-  permissions: { tier: "trusted" },
+  permissions: { tier: "unscoped" },
   services: { provides: ["slash:registry"] },
 
   async setup(ctx) {

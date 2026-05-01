@@ -12,7 +12,7 @@ import type { MemoryStoreService } from "./public.d.ts";
 const plugin: KaizenPlugin = {
   name: "llm-memory",
   apiVersion: "3.0.0",
-  permissions: { tier: "trusted" },
+  permissions: { tier: "unscoped" },
   services: {
     provides: ["memory:store"],
     consumes: ["llm-events:vocabulary", "tools:registry", "driver:run-conversation"],

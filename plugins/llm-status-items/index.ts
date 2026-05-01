@@ -16,10 +16,7 @@ const SUBSCRIBED = [
 const plugin: KaizenPlugin = {
   name: "llm-status-items",
   apiVersion: "3.0.0",
-  permissions: {
-    tier: "trusted",
-    events: { subscribe: [...SUBSCRIBED] },
-  },
+  permissions: { tier: "unscoped" },
   services: { consumes: ["llm-events:vocabulary"] },
 
   async setup(ctx) {
