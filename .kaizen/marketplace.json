@@ -58,6 +58,20 @@
     },
     {
       "kind": "plugin",
+      "name": "llm-tools-registry",
+      "description": "Central tool registry and single tool-execution chokepoint for the openai-compatible harness.",
+      "categories": ["tools", "registry"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-tools-registry" } }]
+    },
+    {
+      "kind": "plugin",
+      "name": "llm-native-dispatch",
+      "description": "Native OpenAI tool-calling dispatch strategy (alternate to code-mode).",
+      "categories": ["tools", "dispatch"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-native-dispatch" } }]
+    },
+    {
+      "kind": "plugin",
       "name": "llm-driver",
       "description": "Turn loop and conversation state. Provides `driver:run-conversation`.",
       "categories": ["driver", "llm"],
