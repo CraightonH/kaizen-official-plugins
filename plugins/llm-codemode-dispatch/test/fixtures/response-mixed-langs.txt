@@ -1,0 +1,9 @@
+```python
+print("ignored")
+```
+```typescript
+1 + 1;
+```
+```text
+also ignored
+```

@@ -1,0 +1,8 @@
+First read:
+```typescript
+const cfg = await kaizen.tools.readFile({ path: "config.json" });
+```
+Then parse:
+```ts
+JSON.parse(cfg);
+```

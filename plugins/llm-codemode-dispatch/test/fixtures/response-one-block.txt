@@ -1,0 +1,5 @@
+Here is the read:
+```typescript
+const x = await kaizen.tools.readFile({ path: "a" });
+x;
+```

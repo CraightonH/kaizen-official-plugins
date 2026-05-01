@@ -1,0 +1,4 @@
+````typescript
+const s = "inner ``` not a fence";
+s;
+````
