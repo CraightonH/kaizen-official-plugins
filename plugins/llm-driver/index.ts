@@ -27,6 +27,22 @@ const DEFAULTS = {
   defaultSystemPrompt: "",
 } as const;
 
+// Plugin-scoped state. setup() and start() receive different ctx instances
+// (kaizen creates a fresh ctx for the driver's start phase), so state must
+// live here rather than stashed on the setup-ctx.
+const state: {
+  currentTurn: CurrentTurn | null;
+  messages: ChatMessage[];
+  systemPrompt: string;
+  model: string;
+} = {
+  currentTurn: null,
+  messages: [],
+  systemPrompt: "",
+  model: "",
+};
+let buildDeps: (() => RunConversationDeps) | null = null;
+
 const plugin: KaizenPlugin = {
   name: "llm-driver",
   apiVersion: "3.0.0",
@@ -52,18 +68,12 @@ const plugin: KaizenPlugin = {
       description: "Run a (possibly nested) conversation against the LLM with optional tool dispatch.",
     });
 
-    // Driver-private state for the interactive loop and the current turn.
-    const state: {
-      currentTurn: CurrentTurn | null;
-      messages: ChatMessage[];
-      systemPrompt: string;
-      model: string;
-    } = {
-      currentTurn: null,
-      messages: [],
-      systemPrompt: "",
-      model: "",
-    };
+    // Reset plugin-scoped state on every setup() so test re-setups and
+    // re-loads start from a clean slate.
+    state.currentTurn = null;
+    state.messages = [];
+    state.systemPrompt = "";
+    state.model = "";
 
     // Subscribers
     wireCancel(ctx as any, () => state.currentTurn);
@@ -71,11 +81,16 @@ const plugin: KaizenPlugin = {
 
     // Build the deps bag for runConversation. We resolve services lazily inside
     // each call so consumers that load after setup() (registry/strategy) are seen.
-    const buildDeps = (): RunConversationDeps => ({
+    // Capture optional services with try/catch since they may not be present
+    // in minimal harnesses (A-tier graceful degradation per Spec 0).
+    const safeUse = <T>(name: string): T | undefined => {
+      try { return ctx.useService<T>(name); } catch { return undefined; }
+    };
+    buildDeps = (): RunConversationDeps => ({
       emit: ctx.emit.bind(ctx),
       llmComplete: ctx.useService<LLMCompleteService>("llm:complete")!,
-      registry: ctx.useService<ToolsRegistryService>("tools:registry"),
-      strategy: ctx.useService<ToolDispatchStrategy>("tool-dispatch:strategy"),
+      registry: safeUse<ToolsRegistryService>("tools:registry"),
+      strategy: safeUse<ToolDispatchStrategy>("tool-dispatch:strategy"),
       log: ctx.log.bind(ctx),
       idGen: newTurnId,
       defaultModel: state.model || (ctx.config as DriverConfig)?.defaultModel || DEFAULTS.defaultModel,
@@ -84,25 +99,17 @@ const plugin: KaizenPlugin = {
 
     const driverService: DriverService = {
       async runConversation(input: RunConversationInput): Promise<RunConversationOutput> {
-        return runConversation(input, buildDeps());
+        return runConversation(input, buildDeps!());
       },
     };
     ctx.provideService<DriverService>("driver:run-conversation", driverService);
-
-    // Stash for start().
-    (ctx as any).__llmDriverState = state;
-    (ctx as any).__llmDriverBuildDeps = buildDeps;
   },
 
   async start(ctx) {
     const ui = ctx.useService<UiChannel>("llm-tui:channel")!;
-    const state = (ctx as any).__llmDriverState as {
-      currentTurn: CurrentTurn | null;
-      messages: ChatMessage[];
-      systemPrompt: string;
-      model: string;
-    };
-    const buildDeps = (ctx as any).__llmDriverBuildDeps as () => RunConversationDeps;
+    if (!buildDeps) {
+      throw new Error("llm-driver.start() called before setup() — buildDeps not initialized");
+    }
 
     const cfg = (ctx.config ?? {}) as DriverConfig;
     state.systemPrompt = cfg.defaultSystemPrompt ?? DEFAULTS.defaultSystemPrompt;

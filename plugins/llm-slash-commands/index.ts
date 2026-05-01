@@ -54,8 +54,13 @@ const plugin: KaizenPlugin = {
     });
     ctx.on?.("input:submit", onSubmit, { priority: 100 });
 
-    // Optional tui:completion.
-    const completion = ctx.useService?.<TuiCompletionService>("tui:completion");
+    // Optional llm-tui:completion.
+    let completion: TuiCompletionService | undefined;
+    try {
+      completion = ctx.useService<TuiCompletionService>("llm-tui:completion");
+    } catch {
+      completion = undefined;
+    }
     if (completion) {
       completion.register(buildCompletionSource(registry) as any);
     }

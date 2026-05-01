@@ -16,8 +16,11 @@ function makeCtx(opts: { driver?: any; tuiCompletion?: any } = {}) {
     provideService: mock((name: string, impl: unknown) => { services[name] = impl; }),
     useService: mock(<T,>(name: string): T | undefined => {
       if (name === "driver:run-conversation") return opts.driver as T | undefined;
-      if (name === "tui:completion") return opts.tuiCompletion as T | undefined;
-      return undefined;
+      if (name === "llm-tui:completion") {
+        if (!opts.tuiCompletion) throw new Error(`useService: no provider for '${name}'`);
+        return opts.tuiCompletion as T;
+      }
+      throw new Error(`useService: no provider for '${name}'`);
     }),
     on: mock((event: string, fn: any, o?: { priority?: number }) => {
       (subs[event] ??= []).push({ fn, priority: o?.priority ?? 0 });

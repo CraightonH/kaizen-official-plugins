@@ -37,9 +37,9 @@ function makeCtx(deps: { ui: any; llm: any; cleared?: () => Promise<void>; cfg?:
     consumeService: mock(() => {}),
     defineEvent: mock(() => {}),
     useService: (name: string) => {
-      if (name === "claude-tui:channel") return deps.ui;
+      if (name === "llm-tui:channel") return deps.ui;
       if (name === "llm:complete") return deps.llm;
-      return undefined;
+      throw new Error(`useService: no provider for '${name}'`);
     },
     on: (name: string, fn: Function) => {
       (handlers[name] ??= []).push(fn);

@@ -81,9 +81,14 @@ const plugin: KaizenPlugin = {
     });
 
     // Register load_skill into tools:registry if available.
-    const tools = ctx.useService?.("tools:registry") as
+    let tools:
       | { register: (s: ToolSchema, h: (a: unknown, c: any) => Promise<unknown>) => () => void }
       | undefined;
+    try {
+      tools = ctx.useService("tools:registry");
+    } catch {
+      tools = undefined;
+    }
     let unregisterTool: (() => void) | undefined;
     if (tools && typeof tools.register === "function") {
       const handler = makeLoadSkillHandler(registry, (event, payload) => ctx.emit(event, payload));

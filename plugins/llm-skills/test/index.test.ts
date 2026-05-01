@@ -43,7 +43,7 @@ function makeCtx(opts: { cwd?: string; env?: Record<string, string | undefined>;
 describe("plugin metadata", () => {
   it("name + tier", () => {
     expect(plugin.name).toBe("llm-skills");
-    expect(plugin.permissions?.tier).toBe("trusted");
+    expect(plugin.permissions?.tier).toBe("unscoped");
     expect(plugin.services?.provides).toContain("skills:registry");
   });
 });

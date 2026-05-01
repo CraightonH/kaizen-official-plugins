@@ -28,7 +28,11 @@ describe("llm-driver integration (synthetic llm:complete)", () => {
       provideService: () => {},
       consumeService: () => {},
       defineEvent: () => {},
-      useService: (n: string) => n === "claude-tui:channel" ? ui : n === "llm:complete" ? llm : undefined,
+      useService: (n: string) => {
+        if (n === "llm-tui:channel") return ui;
+        if (n === "llm:complete") return llm;
+        throw new Error(`useService: no provider for '${n}'`);
+      },
       on: (n: string, fn: Function) => { (handlers[n] ??= []).push(fn); return () => {}; },
       emit: async (n: string, p?: any) => { events.push({ name: n, payload: p }); for (const fn of handlers[n] ?? []) await fn(p); },
     };

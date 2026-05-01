@@ -6,8 +6,8 @@ describe("llm-memory metadata", () => {
     expect(plugin.name).toBe("llm-memory");
     expect(plugin.apiVersion).toBe("3.0.0");
   });
-  it("declares trusted tier", () => {
-    expect(plugin.permissions?.tier).toBe("trusted");
+  it("declares unscoped tier", () => {
+    expect(plugin.permissions?.tier).toBe("unscoped");
   });
   it("provides memory:store", () => {
     expect(plugin.services?.provides).toContain("memory:store");

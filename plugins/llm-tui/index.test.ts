@@ -26,7 +26,7 @@ describe("llm-tui plugin", () => {
   it("metadata", () => {
     expect(plugin.name).toBe("llm-tui");
     expect(plugin.apiVersion).toBe("3.0.0");
-    expect(plugin.permissions?.tier).toBe("trusted");
+    expect(plugin.permissions?.tier).toBe("unscoped");
   });
 
   it("provides all four services in non-TTY mode", async () => {
