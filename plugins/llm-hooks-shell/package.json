@@ -1,0 +1,15 @@
+{
+  "name": "llm-hooks-shell",
+  "version": "0.1.0",
+  "description": "Declarative shell-command hooks bound to harness events. Optional, opt-in.",
+  "type": "module",
+  "exports": { ".": "./index.ts" },
+  "keywords": ["kaizen-plugin"],
+  "dependencies": {
+    "llm-events": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.4.0"
+  }
+}
