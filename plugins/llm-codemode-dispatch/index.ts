@@ -1,5 +1,6 @@
 import type { KaizenPlugin } from "kaizen/types";
 import type { ToolDispatchStrategy } from "llm-events/public";
+import { loadConfig, realDeps } from "./config.ts";
 import { makeStrategy } from "./service.ts";
 
 const plugin: KaizenPlugin = {
@@ -9,11 +10,14 @@ const plugin: KaizenPlugin = {
   services: { provides: ["tool-dispatch:strategy"] },
 
   async setup(ctx) {
+    const config = await loadConfig(realDeps((m) => ctx.log(m)));
     ctx.defineService("tool-dispatch:strategy", {
-      description: "Code-mode tool dispatch strategy (LLM writes TS calling kaizen.tools.*).",
+      description: "Code-mode tool dispatch (LLM writes TS calling kaizen.tools.*).",
     });
-    const strategy: ToolDispatchStrategy = makeStrategy({}, { log: (m) => ctx.log(m) });
-    ctx.provideService<ToolDispatchStrategy>("tool-dispatch:strategy", strategy);
+    ctx.provideService<ToolDispatchStrategy>(
+      "tool-dispatch:strategy",
+      makeStrategy(config, { log: (m) => ctx.log(m) }),
+    );
   },
 };
 
