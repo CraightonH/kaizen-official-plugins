@@ -116,8 +116,13 @@ self.addEventListener("message", async (ev: MessageEvent<HostToWorker>) => {
       // Transpile TS→JS before evaluating (strips type assertions like `as any`).
       // BunTranspilerCtor was captured before curateGlobals() removed Bun from globalThis.
       const jsCode = transpileToJs(msg.wrappedCode);
-      const fn = new (AsyncFunctionCtor as any)("kaizen", `return ${jsCode};`);
-      const value = await fn((globalThis as any).kaizen);
+      // Shadow non-deletable/non-writable globals (like Bun, process) by passing them
+      // as function parameters with undefined values. This prevents user code from
+      // accessing them even though they're non-configurable on the worker global.
+      const shadowedNames = ["Bun","process","require","fetch","XMLHttpRequest","WebSocket","setInterval","setImmediate","eval","Function"];
+      const fn = new (AsyncFunctionCtor as any)("kaizen", ...shadowedNames, `return ${jsCode};`);
+      const shadowedUndefineds = new Array(shadowedNames.length).fill(undefined);
+      const value = await fn((globalThis as any).kaizen, ...shadowedUndefineds);
       (self as any).postMessage({ type: "done", returnValue: value } satisfies DoneMsg);
     } catch (err) {
       (self as any).postMessage({ type: "error", name: (err as Error)?.name ?? "Error", message: String((err as Error)?.message ?? err), stack: (err as Error)?.stack } satisfies ErrorMsg);
