@@ -128,6 +128,13 @@
     },
     {
       "kind": "plugin",
+      "name": "llm-hooks-shell",
+      "description": "Optional shell-command hooks for harness events (audit / blocking gates / notifications). Unscoped — runs arbitrary shell.",
+      "categories": ["hooks", "llm", "automation"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-hooks-shell" } }]
+    },
+    {
+      "kind": "plugin",
       "name": "llm-status-items",
       "description": "Optional status-bar items (model, tokens, turn-state, optional cost) for the openai-compatible harness.",
       "categories": ["status", "llm"],
