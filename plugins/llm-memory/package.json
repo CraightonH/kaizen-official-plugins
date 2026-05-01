@@ -1,0 +1,16 @@
+{
+  "name": "llm-memory",
+  "version": "0.1.0",
+  "description": "File-backed persistent memory plugin (memory:store + memory_recall/memory_save tools + llm:before-call injection)",
+  "type": "module",
+  "exports": { ".": "./index.ts" },
+  "keywords": ["kaizen-plugin"],
+  "dependencies": {
+    "llm-events": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/json-schema": "^7.0.15",
+    "typescript": "^5.4.0"
+  }
+}
