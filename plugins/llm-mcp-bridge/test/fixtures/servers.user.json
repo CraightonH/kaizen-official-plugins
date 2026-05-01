@@ -1,0 +1,18 @@
+{
+  "servers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      "env": { "DEBUG": "1" }
+    },
+    "github": {
+      "transport": "sse",
+      "url": "https://mcp.example.com/sse",
+      "headers": { "Authorization": "Bearer ${env:TEST_TOKEN}" }
+    },
+    "disabled-server": {
+      "command": "true",
+      "enabled": false
+    }
+  }
+}

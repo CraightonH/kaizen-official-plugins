@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/me/code"]
+    },
+    "internal-api": {
+      "url": "http://localhost:8080/mcp",
+      "headers": { "X-API-Key": "${env:INTERNAL_KEY}" }
+    }
+  }
+}
