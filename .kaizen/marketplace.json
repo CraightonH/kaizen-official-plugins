@@ -79,6 +79,13 @@
     },
     {
       "kind": "plugin",
+      "name": "llm-codemode-dispatch",
+      "description": "Code-mode tool dispatch: LLM writes TypeScript calling kaizen.tools.* in a Bun Worker sandbox. Default dispatch strategy for local LLMs.",
+      "categories": ["llm", "tool-dispatch"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-codemode-dispatch" } }]
+    },
+    {
+      "kind": "plugin",
       "name": "llm-driver",
       "description": "Turn loop and conversation state. Provides `driver:run-conversation`.",
       "categories": ["driver", "llm"],
