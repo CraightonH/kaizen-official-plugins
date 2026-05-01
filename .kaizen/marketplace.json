@@ -65,6 +65,13 @@
     },
     {
       "kind": "plugin",
+      "name": "llm-local-tools",
+      "description": "Built-in local-development toolset (read/write/create/edit/glob/grep/bash) for the openai-compatible harness. NOT sandboxed.",
+      "categories": ["tools", "local"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-local-tools" } }]
+    },
+    {
+      "kind": "plugin",
       "name": "llm-native-dispatch",
       "description": "Native OpenAI tool-calling dispatch strategy (alternate to code-mode).",
       "categories": ["tools", "dispatch"],
