@@ -1,0 +1,5 @@
+{
+  "hooks": [
+    { "event": "turn:start", "command": "echo home >> /tmp/audit.log" }
+  ]
+}

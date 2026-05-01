@@ -1,0 +1,5 @@
+{
+  "hooks": [
+    { "event": "tool:before-execute", "command": "./check-tool.sh", "block_on_nonzero": true, "timeout_ms": 5000 }
+  ]
+}
