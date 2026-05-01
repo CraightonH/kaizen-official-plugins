@@ -53,9 +53,6 @@
     "plugins/llm-agents": {
       "name": "llm-agents",
       "version": "0.1.0",
-      "dependencies": {
-        "llm-events": "workspace:*",
-      },
       "devDependencies": {
         "@types/bun": "latest",
         "@types/json-schema": "^7.0.15",
@@ -67,7 +64,6 @@
       "version": "0.1.0",
       "dependencies": {
         "json-schema-to-typescript": "^15.0.3",
-        "llm-events": "workspace:*",
         "mdast-util-from-markdown": "^2.0.2",
         "mdast-util-to-string": "^4.0.0",
       },
@@ -80,9 +76,6 @@
     "plugins/llm-driver": {
       "name": "llm-driver",
       "version": "0.1.0",
-      "dependencies": {
-        "llm-events": "workspace:*",
-      },
       "devDependencies": {
         "@types/bun": "latest",
         "typescript": "^5.4.0",
@@ -100,9 +93,6 @@
     "plugins/llm-hooks-shell": {
       "name": "llm-hooks-shell",
       "version": "0.1.0",
-      "dependencies": {
-        "llm-events": "workspace:*",
-      },
       "devDependencies": {
         "@types/bun": "latest",
         "typescript": "^5.4.0",
@@ -111,9 +101,6 @@
     "plugins/llm-local-tools": {
       "name": "llm-local-tools",
       "version": "0.1.0",
-      "dependencies": {
-        "llm-events": "workspace:*",
-      },
       "devDependencies": {
         "@types/bun": "latest",
         "@types/json-schema": "^7.0.15",
@@ -125,7 +112,6 @@
       "version": "0.1.0",
       "dependencies": {
         "@modelcontextprotocol/sdk": "1.10.1",
-        "llm-events": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -136,9 +122,6 @@
     "plugins/llm-memory": {
       "name": "llm-memory",
       "version": "0.1.0",
-      "dependencies": {
-        "llm-events": "workspace:*",
-      },
       "devDependencies": {
         "@types/bun": "latest",
         "@types/json-schema": "^7.0.15",
@@ -148,10 +131,6 @@
     "plugins/llm-native-dispatch": {
       "name": "llm-native-dispatch",
       "version": "0.1.0",
-      "dependencies": {
-        "llm-events": "workspace:*",
-        "llm-tools-registry": "workspace:*",
-      },
       "devDependencies": {
         "@types/bun": "latest",
         "@types/json-schema": "^7.0.15",
@@ -161,9 +140,6 @@
     "plugins/llm-skills": {
       "name": "llm-skills",
       "version": "0.1.0",
-      "dependencies": {
-        "llm-events": "workspace:*",
-      },
       "devDependencies": {
         "@types/bun": "latest",
         "@types/json-schema": "^7.0.15",
@@ -174,7 +150,6 @@
       "name": "llm-slash-commands",
       "version": "0.1.0",
       "dependencies": {
-        "llm-events": "workspace:*",
         "yaml": "^2.5.0",
       },
       "devDependencies": {
@@ -185,9 +160,6 @@
     "plugins/llm-status-items": {
       "name": "llm-status-items",
       "version": "0.1.0",
-      "dependencies": {
-        "llm-events": "workspace:*",
-      },
       "devDependencies": {
         "@types/bun": "latest",
         "typescript": "^5.4.0",
@@ -196,9 +168,6 @@
     "plugins/llm-tools-registry": {
       "name": "llm-tools-registry",
       "version": "0.1.0",
-      "dependencies": {
-        "llm-events": "workspace:*",
-      },
       "devDependencies": {
         "@types/bun": "latest",
         "@types/json-schema": "^7.0.15",
@@ -211,7 +180,6 @@
       "dependencies": {
         "ink": "^7.0.1",
         "ink-spinner": "^5.0.0",
-        "llm-events": "workspace:*",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -225,9 +193,6 @@
     "plugins/openai-llm": {
       "name": "openai-llm",
       "version": "0.1.0",
-      "dependencies": {
-        "llm-events": "workspace:*",
-      },
       "devDependencies": {
         "@types/bun": "latest",
         "@types/json-schema": "^7.0.15",

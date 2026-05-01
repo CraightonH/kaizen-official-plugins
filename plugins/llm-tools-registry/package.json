@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "description": "Central tool registry and single tool-execution chokepoint for the openai-compatible harness.",
   "type": "module",
-  "exports": { ".": "./index.ts", "./registry": "./registry.ts" },
-  "keywords": ["kaizen-plugin"],
-  "dependencies": {
-    "llm-events": "workspace:*"
+  "exports": {
+    ".": "./index.ts",
+    "./registry": "./registry.ts"
   },
+  "keywords": [
+    "kaizen-plugin"
+  ],
   "devDependencies": {
     "@types/bun": "latest",
     "@types/json-schema": "^7.0.15",

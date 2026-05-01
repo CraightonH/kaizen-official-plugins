@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "description": "Code-mode tool dispatch strategy: LLM writes TypeScript that calls a typed kaizen.tools.* API in a Bun Worker sandbox.",
   "type": "module",
-  "exports": { ".": "./index.ts" },
-  "keywords": ["kaizen-plugin"],
+  "exports": {
+    ".": "./index.ts"
+  },
+  "keywords": [
+    "kaizen-plugin"
+  ],
   "dependencies": {
-    "llm-events": "workspace:*",
     "json-schema-to-typescript": "^15.0.3",
     "mdast-util-from-markdown": "^2.0.2",
     "mdast-util-to-string": "^4.0.0"

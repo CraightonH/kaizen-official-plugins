@@ -2,11 +2,9 @@ import type {
   ChatMessage,
   ToolSchema,
   LLMResponse,
-} from "llm-events/public";
-import type {
   ToolsRegistryService,
   ToolExecutionContext,
-} from "llm-tools-registry/public";
+} from "llm-events/public";
 import { serializeResult, serializeError } from "./serialize.ts";
 import { isValidToolArgs, malformedArgsMessage } from "./args-validation.ts";
 

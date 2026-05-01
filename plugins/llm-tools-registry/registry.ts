@@ -1,7 +1,8 @@
 import type {
   ToolSchema,
 } from "llm-events/public";
-import { CANCEL_TOOL } from "llm-events";
+
+const CANCEL_TOOL: unique symbol = Symbol.for("kaizen.cancel") as never;
 
 export interface ToolExecutionContext {
   signal: AbortSignal;

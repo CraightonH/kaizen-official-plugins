@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "description": "Subagent dispatch + file-loader registry for the openai-compatible harness",
   "type": "module",
-  "exports": { ".": "./index.ts" },
-  "keywords": ["kaizen-plugin"],
-  "dependencies": {
-    "llm-events": "workspace:*"
+  "exports": {
+    ".": "./index.ts"
   },
+  "keywords": [
+    "kaizen-plugin"
+  ],
   "devDependencies": {
     "@types/bun": "latest",
     "@types/json-schema": "^7.0.15",

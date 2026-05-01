@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "description": "Bridge MCP servers (tools + resources) into the kaizen tools:registry.",
   "type": "module",
-  "exports": { ".": "./index.ts" },
-  "keywords": ["kaizen-plugin"],
+  "exports": {
+    ".": "./index.ts"
+  },
+  "keywords": [
+    "kaizen-plugin"
+  ],
   "dependencies": {
-    "llm-events": "workspace:*",
     "@modelcontextprotocol/sdk": "1.10.1"
   },
   "devDependencies": {
