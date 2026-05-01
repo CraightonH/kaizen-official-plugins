@@ -45,6 +45,46 @@ describe("llm-events", () => {
     expect(CANCEL_TOOL).toBe(Symbol.for("kaizen.cancel"));
   });
 
+  it("VOCAB contains every Spec 0 event name", () => {
+    const expected = new Set([
+      "session:start",
+      "session:end",
+      "session:error",
+      "input:submit",
+      "input:handled",
+      "conversation:user-message",
+      "conversation:assistant-message",
+      "conversation:system-message",
+      "conversation:cleared",
+      "turn:start",
+      "turn:end",
+      "turn:cancel",
+      "turn:error",
+      "llm:before-call",
+      "llm:request",
+      "llm:token",
+      "llm:tool-call",
+      "llm:done",
+      "llm:error",
+      "tool:before-execute",
+      "tool:execute",
+      "tool:result",
+      "tool:error",
+      "codemode:code-emitted",
+      "codemode:before-execute",
+      "codemode:result",
+      "codemode:error",
+      "skill:loaded",
+      "skill:available-changed",
+      "status:item-update",
+      "status:item-clear",
+    ]);
+    const actual = new Set(Object.values(VOCAB));
+    for (const name of expected) expect(actual.has(name)).toBe(true);
+    for (const name of actual) expect(expected.has(name as string)).toBe(true);
+    expect(actual.size).toBe(expected.size);
+  });
+
   it("provides llm-events:vocabulary and defines every event name", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
