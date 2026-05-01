@@ -85,6 +85,149 @@ describe("llm-events", () => {
     expect(actual.size).toBe(expected.size);
   });
 
+  it("re-exports tools:registry interface types", async () => {
+    type _Probe = import("./public").ToolsRegistryService extends {
+      register: (...a: any[]) => any;
+      list: (...a: any[]) => any;
+      invoke: (...a: any[]) => any;
+    } ? true : false;
+    const ok: _Probe = true;
+    expect(ok).toBe(true);
+
+    type _Ctx = import("./public").ToolExecutionContext extends {
+      signal: AbortSignal;
+      callId: string;
+      log: (msg: string) => void;
+    } ? true : false;
+    const ctxOk: _Ctx = true;
+    expect(ctxOk).toBe(true);
+
+    type _Handler = import("./public").ToolHandler extends
+      (args: unknown, ctx: any) => Promise<unknown> ? true : false;
+    const handlerOk: _Handler = true;
+    expect(handlerOk).toBe(true);
+  });
+
+  it("re-exports tool-dispatch:strategy interface type", () => {
+    type _Strat = import("./public").ToolDispatchStrategy extends {
+      prepareRequest: (...a: any[]) => any;
+      handleResponse: (...a: any[]) => Promise<any>;
+    } ? true : false;
+    const ok: _Strat = true;
+    expect(ok).toBe(true);
+  });
+
+  it("re-exports driver:run-conversation interface types", () => {
+    type _Driver = import("./public").DriverService extends {
+      runConversation: (...a: any[]) => Promise<any>;
+    } ? true : false;
+    const ok: _Driver = true;
+    expect(ok).toBe(true);
+
+    type _In = import("./public").RunConversationInput extends {
+      systemPrompt: string;
+      messages: any[];
+    } ? true : false;
+    const inOk: _In = true;
+    expect(inOk).toBe(true);
+
+    type _Out = import("./public").RunConversationOutput extends {
+      finalMessage: any;
+      messages: any[];
+      usage: { promptTokens: number; completionTokens: number };
+    } ? true : false;
+    const outOk: _Out = true;
+    expect(outOk).toBe(true);
+  });
+
+  it("re-exports skills:registry interface types", () => {
+    type _Reg = import("./public").SkillsRegistryService extends {
+      list: () => any;
+      load: (name: string) => Promise<string>;
+      register: (...a: any[]) => () => void;
+      rescan: () => Promise<void>;
+    } ? true : false;
+    const ok: _Reg = true;
+    expect(ok).toBe(true);
+
+    type _Manifest = import("./public").SkillManifest extends {
+      name: string;
+      description: string;
+    } ? true : false;
+    const mOk: _Manifest = true;
+    expect(mOk).toBe(true);
+  });
+
+  it("re-exports agents:registry interface types", () => {
+    type _Reg = import("./public").AgentsRegistryService extends {
+      list: () => any;
+      register: (...a: any[]) => () => void;
+    } ? true : false;
+    const ok: _Reg = true;
+    expect(ok).toBe(true);
+
+    type _Manifest = import("./public").AgentManifest extends {
+      name: string;
+      description: string;
+      systemPrompt: string;
+    } ? true : false;
+    const mOk: _Manifest = true;
+    expect(mOk).toBe(true);
+  });
+
+  it("re-exports slash:registry interface types", () => {
+    type _Reg = import("./public").SlashRegistryService extends {
+      register: (...a: any[]) => () => void;
+      list: () => any;
+      tryDispatch: (...a: any[]) => Promise<boolean>;
+    } ? true : false;
+    const ok: _Reg = true;
+    expect(ok).toBe(true);
+
+    type _Manifest = import("./public").SlashCommandManifest extends {
+      name: string;
+      description: string;
+      source: "builtin" | "user" | "project" | "plugin";
+    } ? true : false;
+    const mOk: _Manifest = true;
+    expect(mOk).toBe(true);
+
+    type _Ctx = import("./public").SlashCommandContext extends {
+      args: string;
+      emit: (event: string, payload: unknown) => Promise<void>;
+      signal: AbortSignal;
+    } ? true : false;
+    const cOk: _Ctx = true;
+    expect(cOk).toBe(true);
+
+    type _Handler = import("./public").SlashCommandHandler extends
+      (ctx: any) => Promise<void> ? true : false;
+    const hOk: _Handler = true;
+    expect(hOk).toBe(true);
+  });
+
+  it("re-exports tui:completion interface types", () => {
+    type _Svc = import("./public").TuiCompletionService extends {
+      register: (...a: any[]) => () => void;
+    } ? true : false;
+    const ok: _Svc = true;
+    expect(ok).toBe(true);
+
+    type _Source = import("./public").CompletionSource extends {
+      trigger: string | RegExp;
+      list: (input: string, cursor: number) => Promise<any[]>;
+    } ? true : false;
+    const sOk: _Source = true;
+    expect(sOk).toBe(true);
+
+    type _Item = import("./public").CompletionItem extends {
+      label: string;
+      insertText: string;
+    } ? true : false;
+    const iOk: _Item = true;
+    expect(iOk).toBe(true);
+  });
+
   it("provides llm-events:vocabulary and defines every event name", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
