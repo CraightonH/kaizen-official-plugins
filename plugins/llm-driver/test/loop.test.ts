@@ -217,3 +217,54 @@ describe("runConversation (multi-step strategy)", () => {
     expect(out.messages.length).toBe(2);
   });
 });
+
+describe("runConversation (llm:before-call hooks)", () => {
+  it("subscriber mutation of request is visible to llm:complete and llm:request", async () => {
+    const { events } = makeEmit();
+    let captured: any;
+    const emit = async (name: string, payload?: any) => {
+      events.push({ name, payload });
+      if (name === "llm:before-call") {
+        payload.request.model = "mutated";
+        payload.request.systemPrompt = "mutated-sp";
+      }
+    };
+    const llm = makeLlm([[{ type: "done", response: { content: "ok", finishReason: "stop" } }]]);
+    llm.complete = (async function* (req: any) {
+      captured = req;
+      yield { type: "done", response: { content: "ok", finishReason: "stop" } };
+    }) as any;
+    const deps = makeDeps({ emit, llmComplete: llm });
+    await runConversation({ systemPrompt: "orig", messages: [{ role: "user", content: "x" }], model: "orig-model" }, deps);
+    expect(captured.model).toBe("mutated");
+    expect(captured.systemPrompt).toBe("mutated-sp");
+    const reqEv = events.find(e => e.name === "llm:request")!;
+    expect(reqEv.payload.request.model).toBe("mutated");
+    expect(reqEv.payload.request.systemPrompt).toBe("mutated-sp");
+  });
+
+  it("request.cancelled=true short-circuits: no llm:complete call, turn ends with reason=complete", async () => {
+    const { events } = makeEmit();
+    const llmCalls: any[] = [];
+    const emit = async (name: string, payload?: any) => {
+      events.push({ name, payload });
+      if (name === "llm:before-call") payload.request.cancelled = true;
+    };
+    const llm = {
+      async *complete(req: any) {
+        llmCalls.push(req);
+        yield { type: "done", response: { content: "should-not-happen", finishReason: "stop" } } as any;
+      },
+      async listModels() { return []; },
+    } as any;
+    const deps = makeDeps({ emit, llmComplete: llm });
+    const out = await runConversation({ systemPrompt: "s", messages: [{ role: "user", content: "x" }] }, deps);
+    expect(llmCalls.length).toBe(0);
+    expect(out.messages).toEqual([{ role: "user", content: "x" }]); // no assistant appended
+    const names = events.map(e => e.name);
+    expect(names).not.toContain("llm:request");
+    expect(names).not.toContain("llm:done");
+    const endEv = events.find(e => e.name === "turn:end")!;
+    expect(endEv.payload.reason).toBe("complete");
+  });
+});
