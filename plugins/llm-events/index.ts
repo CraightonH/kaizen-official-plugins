@@ -2,6 +2,7 @@ import type { KaizenPlugin } from "kaizen/types";
 import type { Vocab } from "./public";
 
 export const CANCEL_TOOL: unique symbol = Symbol.for("kaizen.cancel") as any;
+export const CODEMODE_CANCEL_SENTINEL = "__kaizen_cancel__" as const;
 
 export const VOCAB: Vocab = Object.freeze({
   SESSION_START: "session:start",

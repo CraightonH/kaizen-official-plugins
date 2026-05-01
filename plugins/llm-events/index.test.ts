@@ -228,6 +228,11 @@ describe("llm-events", () => {
     expect(iOk).toBe(true);
   });
 
+  it("CODEMODE_CANCEL_SENTINEL is the well-known string", async () => {
+    const mod = await import("./index.ts");
+    expect(mod.CODEMODE_CANCEL_SENTINEL).toBe("__kaizen_cancel__");
+  });
+
   it("provides llm-events:vocabulary and defines every event name", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
