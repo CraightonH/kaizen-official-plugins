@@ -1,0 +1,8 @@
+[
+  { "name": "readFile", "description": "Read a file from disk.",
+    "parameters": { "type": "object", "properties": { "path": { "type": "string" } }, "required": ["path"], "additionalProperties": false } },
+  { "name": "writeFile", "description": "Write a file.",
+    "parameters": { "type": "object", "properties": { "path": { "type": "string" }, "contents": { "type": "string" } }, "required": ["path","contents"], "additionalProperties": false } },
+  { "name": "echo", "description": "Echo input.",
+    "parameters": { "type": "object", "properties": { "msg": { "type": "string" } }, "required": ["msg"], "additionalProperties": false } }
+]

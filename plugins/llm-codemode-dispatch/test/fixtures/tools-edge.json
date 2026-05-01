@@ -1,0 +1,8 @@
+[
+  { "name": "web-search", "description": "Search the web.",
+    "parameters": { "type": "object", "properties": { "q": { "type": "string", "enum": ["a","b"] } }, "required": ["q"], "additionalProperties": false } },
+  { "name": "noargs", "description": "No args." },
+  { "name": "freeform", "description": "Freeform args.", "parameters": { "type": "object" } },
+  { "name": "nullable", "description": "Nullable arg.",
+    "parameters": { "type": "object", "properties": { "x": { "type": ["string","null"] } }, "additionalProperties": false } }
+]
