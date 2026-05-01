@@ -106,6 +106,20 @@
       "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-driver" } }]
     },
     {
+      "kind": "plugin",
+      "name": "llm-agents",
+      "description": "Subagent dispatch + file-loader registry for ~/.kaizen/agents/.",
+      "categories": ["agents", "llm"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-agents" } }]
+    },
+    {
+      "kind": "plugin",
+      "name": "llm-memory",
+      "description": "File-backed persistent memory: memory:store service + memory_recall/memory_save tools + llm:before-call injection.",
+      "categories": ["memory"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-memory" } }]
+    },
+    {
       "kind": "harness",
       "name": "claude-wrapper",
       "description": "Claude Code wrapper: distinctive prompt + extensible status bar over `claude -p`.",
