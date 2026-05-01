@@ -35,7 +35,7 @@
     {
       "kind": "plugin",
       "name": "llm-events",
-      "description": "Event vocabulary and shared types for the openai-compatible harness.",
+      "description": "Event vocabulary and shared types for openai-compatible harnesses.",
       "categories": ["events"],
       "versions": [
         { "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-events" } },
@@ -45,21 +45,21 @@
     {
       "kind": "plugin",
       "name": "llm-tui",
-      "description": "Generic LLM chat TUI: input + output + completion popup + status bar (Ink). Provides llm-tui:channel, llm-tui:completion, llm-tui:status, llm-tui:theme.",
+      "description": "Generic LLM-chat TUI primitives: input, output, status bar, completion popup, theme.",
       "categories": ["ui", "terminal"],
       "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-tui" } }]
     },
     {
       "kind": "plugin",
       "name": "openai-llm",
-      "description": "OpenAI-compatible LLM provider plugin (llm:complete service).",
-      "categories": ["llm", "provider"],
+      "description": "OpenAI-compatible LLM provider. Provides `llm:complete`.",
+      "categories": ["llm", "openai"],
       "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/openai-llm" } }]
     },
     {
       "kind": "plugin",
       "name": "llm-driver",
-      "description": "Coordination plugin for the openai-compatible harness: turn loop, conversation state, lifecycle events.",
+      "description": "Turn loop and conversation state. Provides `driver:run-conversation`.",
       "categories": ["driver", "llm"],
       "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-driver" } }]
     },
@@ -73,8 +73,8 @@
     {
       "kind": "harness",
       "name": "openai-compatible",
-      "description": "OpenAI-compatible LLM harness (A-tier: chat E2E, no tools).",
-      "categories": ["harness", "llm"],
+      "description": "OpenAI-compatible LLM harness: chat against any OpenAI-compatible endpoint (LM Studio, Ollama, vLLM, etc.).",
+      "categories": ["harness", "llm", "openai"],
       "versions": [{ "version": "0.1.0", "path": "harnesses/openai-compatible.json" }]
     }
   ]
