@@ -1,0 +1,15 @@
+{
+  "name": "llm-status-items",
+  "version": "0.1.0",
+  "description": "Status-bar items (model, tokens, turn-state, optional cost) for the openai-compatible harness.",
+  "type": "module",
+  "exports": { ".": "./index.ts" },
+  "keywords": ["kaizen-plugin"],
+  "dependencies": {
+    "llm-events": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.4.0"
+  }
+}
