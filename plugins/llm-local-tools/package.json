@@ -1,0 +1,16 @@
+{
+  "name": "llm-local-tools",
+  "version": "0.1.0",
+  "description": "Built-in local-development toolset (filesystem + shell) for the openai-compatible harness.",
+  "type": "module",
+  "exports": { ".": "./index.ts" },
+  "keywords": ["kaizen-plugin"],
+  "dependencies": {
+    "llm-events": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/json-schema": "^7.0.15",
+    "typescript": "^5.4.0"
+  }
+}
