@@ -58,6 +58,13 @@
     },
     {
       "kind": "plugin",
+      "name": "llm-mcp-bridge",
+      "description": "Bridge MCP servers (tools + resources) into the kaizen tools:registry. v0 — prompts deferred.",
+      "categories": ["mcp", "tools"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-mcp-bridge" } }]
+    },
+    {
+      "kind": "plugin",
       "name": "llm-tools-registry",
       "description": "Central tool registry and single tool-execution chokepoint for the openai-compatible harness.",
       "categories": ["tools", "registry"],
