@@ -21,8 +21,5 @@
     "@types/react": "^19.0.0",
     "ink-testing-library": "^4.0.0",
     "typescript": "^5.4.0"
-  },
-  "kaizen": {
-    "bundleExternals": ["react-devtools-core"]
   }
 }
