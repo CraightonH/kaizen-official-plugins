@@ -82,7 +82,20 @@ function makeKaizen(): unknown {
 }
 
 // ---------- Main (single listener) ----------
+// Capture references to Bun APIs BEFORE curateGlobals() removes them.
 const AsyncFunctionCtor: FunctionConstructor = (async function () {}).constructor as unknown as FunctionConstructor;
+const BunTranspilerCtor: (new (opts: { loader: string }) => { transformSync(s: string): string }) | undefined =
+  (globalThis as any).Bun?.Transpiler;
+
+function transpileToJs(code: string): string {
+  if (!BunTranspilerCtor) return code;
+  try {
+    const t = new BunTranspilerCtor({ loader: "ts" });
+    return t.transformSync(code);
+  } catch {
+    return code;
+  }
+}
 
 self.addEventListener("message", async (ev: MessageEvent<HostToWorker>) => {
   const msg = ev.data;
@@ -100,7 +113,10 @@ self.addEventListener("message", async (ev: MessageEvent<HostToWorker>) => {
     (globalThis as any).kaizen = makeKaizen();
     (globalThis as any).console = makeConsole();
     try {
-      const fn = new (AsyncFunctionCtor as any)("kaizen", `return ${msg.wrappedCode};`);
+      // Transpile TS→JS before evaluating (strips type assertions like `as any`).
+      // BunTranspilerCtor was captured before curateGlobals() removed Bun from globalThis.
+      const jsCode = transpileToJs(msg.wrappedCode);
+      const fn = new (AsyncFunctionCtor as any)("kaizen", `return ${jsCode};`);
       const value = await fn((globalThis as any).kaizen);
       (self as any).postMessage({ type: "done", returnValue: value } satisfies DoneMsg);
     } catch (err) {

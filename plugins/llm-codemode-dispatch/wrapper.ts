@@ -30,11 +30,38 @@ function trySyntaxCheck(code: string): string | undefined {
   }
 }
 
+/** Find the last expression statement inside a block (between the outermost braces). */
+function rewriteLastExprInBlock(block: string): string | null {
+  // block is the content of a { ... } including the braces
+  const trimmed = block.trimEnd();
+  if (!trimmed.endsWith("}")) return null;
+  // Find the matching opening {
+  let depth = 0;
+  let openIdx = -1;
+  for (let i = trimmed.length - 1; i >= 0; i--) {
+    const ch = trimmed[i];
+    if (ch === "}") depth++;
+    else if (ch === "{") {
+      depth--;
+      if (depth === 0) { openIdx = i; break; }
+    }
+  }
+  if (openIdx === -1) return null;
+  const before = trimmed.slice(0, openIdx);
+  const inner = trimmed.slice(openIdx + 1, trimmed.length - 1);
+  const rewrittenInner = rewriteTrailingExpression(inner);
+  if (rewrittenInner === inner) return null; // no change
+  return `${before}{${rewrittenInner}}`;
+}
+
 function rewriteTrailingExpression(code: string): string {
   // Heuristic: split on top-level statements by scanning balanced braces/parens
   // and locating the final `;` or newline-terminated unit. If the final unit
   // looks like a bare expression (no leading keyword like const/let/var/if/for/while/return/throw/try/{), wrap in return.
-  const trimmed = code.replace(/\s+$/, "");
+  let trimmed = code.replace(/\s+$/, "");
+  if (trimmed.length === 0) return code;
+  // Strip a single trailing semicolon so that `expr;` at end is treated as `expr`.
+  if (trimmed.endsWith(";")) trimmed = trimmed.slice(0, -1).trimEnd();
   if (trimmed.length === 0) return code;
   // Find the start of the last top-level statement.
   let depth = 0, inStr: string | null = null, lastBoundary = 0;
@@ -50,14 +77,21 @@ function rewriteTrailingExpression(code: string): string {
     else if (ch === "}" || ch === ")" || ch === "]") depth--;
     else if (depth === 0 && (ch === ";" || ch === "\n")) lastBoundary = i + 1;
   }
-  let head = trimmed.slice(0, lastBoundary);
+  const head = trimmed.slice(0, lastBoundary);
   let tail = trimmed.slice(lastBoundary).trim();
   if (tail.endsWith(";")) tail = tail.slice(0, -1).trim();
   if (!tail) return code;
-  if (/^(const|let|var|if|for|while|do|switch|return|throw|try|function|class|\{|import|export)\b/.test(tail)) {
-    return code;
+  // If the tail is a plain expression (no leading keyword), return-wrap it.
+  if (!/^(const|let|var|if|for|while|do|switch|return|throw|try|function|class|\{|import|export)\b/.test(tail)) {
+    return `${head}return (${tail});`;
   }
-  return `${head}return (${tail});`;
+  // Special case: try/catch block ending with `} catch(...) { expr }` —
+  // rewrite the last expression inside the catch body.
+  if (/^try\b/.test(tail) && tail.endsWith("}")) {
+    const rewritten = rewriteLastExprInBlock(tail);
+    if (rewritten) return `${head}${rewritten}`;
+  }
+  return code;
 }
 
 export function wrapCode(userCode: string): WrapResult {
