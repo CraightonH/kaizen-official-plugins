@@ -1,8 +1,18 @@
 {
   "plugins": [
-    "official/llm-events@0.1.0",
+    "official/llm-events@0.2.0",
     "official/openai-llm@0.1.0",
+    "official/llm-tools-registry@0.1.0",
+    "official/llm-local-tools@0.1.0",
+    "official/llm-mcp-bridge@0.1.0",
+    "official/llm-skills@0.1.0",
+    "official/llm-memory@0.1.0",
+    "official/llm-agents@0.1.0",
+    "official/llm-slash-commands@0.1.0",
+    "official/llm-codemode-dispatch@0.1.0",
     "official/llm-driver@0.1.0",
+    "official/llm-status-items@0.1.0",
+    "official/llm-hooks-shell@0.1.0",
     "official/llm-tui@0.1.0"
   ]
 }

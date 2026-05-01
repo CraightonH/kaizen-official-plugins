@@ -97,6 +97,17 @@
         "typescript": "^5.4.0",
       },
     },
+    "plugins/llm-hooks-shell": {
+      "name": "llm-hooks-shell",
+      "version": "0.1.0",
+      "dependencies": {
+        "llm-events": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "typescript": "^5.4.0",
+      },
+    },
     "plugins/llm-local-tools": {
       "name": "llm-local-tools",
       "version": "0.1.0",
@@ -165,6 +176,17 @@
       "dependencies": {
         "llm-events": "workspace:*",
         "yaml": "^2.5.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "typescript": "^5.4.0",
+      },
+    },
+    "plugins/llm-status-items": {
+      "name": "llm-status-items",
+      "version": "0.1.0",
+      "dependencies": {
+        "llm-events": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -412,6 +434,8 @@
 
     "llm-events": ["llm-events@workspace:plugins/llm-events"],
 
+    "llm-hooks-shell": ["llm-hooks-shell@workspace:plugins/llm-hooks-shell"],
+
     "llm-local-tools": ["llm-local-tools@workspace:plugins/llm-local-tools"],
 
     "llm-mcp-bridge": ["llm-mcp-bridge@workspace:plugins/llm-mcp-bridge"],
@@ -423,6 +447,8 @@
     "llm-skills": ["llm-skills@workspace:plugins/llm-skills"],
 
     "llm-slash-commands": ["llm-slash-commands@workspace:plugins/llm-slash-commands"],
+
+    "llm-status-items": ["llm-status-items@workspace:plugins/llm-status-items"],
 
     "llm-tools-registry": ["llm-tools-registry@workspace:plugins/llm-tools-registry"],
 
