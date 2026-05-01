@@ -1,0 +1,21 @@
+{
+  "name": "llm-tui",
+  "version": "0.1.0",
+  "description": "Generic LLM chat TUI: input + output + completion popup + status bar (Ink).",
+  "type": "module",
+  "exports": { ".": "./index.tsx" },
+  "keywords": ["kaizen-plugin"],
+  "dependencies": {
+    "ink": "^7.0.1",
+    "ink-spinner": "^5.0.0",
+    "react": "^19.2.0",
+    "llm-events": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^20.0.0",
+    "@types/react": "^19.0.0",
+    "ink-testing-library": "^4.0.0",
+    "typescript": "^5.4.0"
+  }
+}
