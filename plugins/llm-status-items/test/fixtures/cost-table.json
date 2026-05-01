@@ -1,0 +1,6 @@
+{
+  "rates": {
+    "gpt-4.1-mini": { "promptCentsPerMTok": 15, "completionCentsPerMTok": 60 },
+    "gpt-4.1":      { "promptCentsPerMTok": 200, "completionCentsPerMTok": 800 }
+  }
+}
