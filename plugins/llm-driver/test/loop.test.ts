@@ -130,3 +130,90 @@ describe("runConversation (A-tier)", () => {
     expect(out.usage).toEqual({ promptTokens: 4, completionTokens: 2 });
   });
 });
+
+import type { ToolDispatchStrategy, ToolsRegistryService } from "../loop.ts";
+
+function makeRegistry(tools: any[] = []): ToolsRegistryService {
+  return {
+    list: () => tools as any,
+    invoke: async () => undefined,
+  } as any;
+}
+
+function makeStrategy(handlers: Array<(input: any) => Promise<ChatMessage[]>>): ToolDispatchStrategy & { calls: any[] } {
+  let i = 0;
+  const calls: any[] = [];
+  return {
+    calls,
+    prepareRequest: ({ availableTools }: any) => ({ tools: availableTools, systemPromptAppend: "[strategy]" }),
+    handleResponse: async (input: any) => {
+      calls.push(input);
+      const h = handlers[i++];
+      if (!h) return [];
+      return h(input);
+    },
+  } as any;
+}
+
+describe("runConversation (multi-step strategy)", () => {
+  it("strategy returns one tool message → second LLM call → empty appended → done", async () => {
+    const { emit, events } = makeEmit();
+    const llm = makeLlm([
+      [{ type: "done", response: { content: "use tool", finishReason: "tool_calls", toolCalls: [{ id: "c1", name: "f", arguments: {} }] } }],
+      [{ type: "done", response: { content: "final", finishReason: "stop" } }],
+    ]);
+    const strategy = makeStrategy([
+      async () => [{ role: "tool", content: "tool-result", toolCallId: "c1", name: "f" }],
+      async () => [], // terminal
+    ]);
+    const deps = makeDeps({ emit, llmComplete: llm, registry: makeRegistry(), strategy });
+    const out = await runConversation({
+      systemPrompt: "sys",
+      messages: [{ role: "user", content: "go" }],
+    }, deps);
+    expect(out.messages.map(m => m.role)).toEqual(["user", "assistant", "tool", "assistant"]);
+    expect((llm as any).calls.length).toBe(2);
+    // strategy.prepareRequest applied systemPromptAppend
+    expect((llm as any).calls[0].req.systemPrompt).toContain("[strategy]");
+    // strategy.tools forwarded
+    expect((llm as any).calls[0].req.tools).toEqual([]);
+  });
+
+  it("strategy.handleResponse throws → turn:error + turn:end{reason:error}", async () => {
+    const { emit, events } = makeEmit();
+    const llm = makeLlm([
+      [{ type: "done", response: { content: "x", finishReason: "tool_calls", toolCalls: [{ id: "c1", name: "f", arguments: {} }] } }],
+    ]);
+    const strategy = makeStrategy([
+      async () => { throw new Error("strategy boom"); },
+    ]);
+    const deps = makeDeps({ emit, llmComplete: llm, registry: makeRegistry(), strategy });
+    await expect(runConversation({
+      systemPrompt: "sys", messages: [{ role: "user", content: "x" }],
+    }, deps)).rejects.toThrow(/strategy boom/);
+    const endEv = events.find(e => e.name === "turn:end")!;
+    expect(endEv.payload.reason).toBe("error");
+  });
+
+  it("usage aggregated across multiple llm:done events", async () => {
+    const llm = makeLlm([
+      [{ type: "done", response: { content: "a", finishReason: "tool_calls", toolCalls: [{ id: "c1", name: "f", arguments: {} }], usage: { promptTokens: 10, completionTokens: 2 } } }],
+      [{ type: "done", response: { content: "b", finishReason: "stop", usage: { promptTokens: 12, completionTokens: 4 } } }],
+    ]);
+    const strategy = makeStrategy([
+      async () => [{ role: "tool", content: "r", toolCallId: "c1", name: "f" }],
+      async () => [],
+    ]);
+    const deps = makeDeps({ llmComplete: llm, registry: makeRegistry(), strategy });
+    const out = await runConversation({ systemPrompt: "sys", messages: [{ role: "user", content: "x" }] }, deps);
+    expect(out.usage).toEqual({ promptTokens: 22, completionTokens: 6 });
+  });
+
+  it("only registry present (no strategy) takes A-tier path (degenerate)", async () => {
+    const llm = makeLlm([[{ type: "done", response: { content: "ok", finishReason: "stop" } }]]);
+    const deps = makeDeps({ llmComplete: llm, registry: makeRegistry(), strategy: undefined });
+    const out = await runConversation({ systemPrompt: "sys", messages: [{ role: "user", content: "x" }] }, deps);
+    expect((llm as any).calls.length).toBe(1);
+    expect(out.messages.length).toBe(2);
+  });
+});
