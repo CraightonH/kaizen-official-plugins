@@ -41,6 +41,13 @@
     },
     {
       "kind": "plugin",
+      "name": "llm-tui",
+      "description": "Generic LLM chat TUI: input + output + completion popup + status bar (Ink). Provides llm-tui:channel, llm-tui:completion, llm-tui:status, llm-tui:theme.",
+      "categories": ["ui", "terminal"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-tui" } }]
+    },
+    {
+      "kind": "plugin",
       "name": "openai-llm",
       "description": "OpenAI-compatible LLM provider plugin (llm:complete service).",
       "categories": ["llm", "provider"],
