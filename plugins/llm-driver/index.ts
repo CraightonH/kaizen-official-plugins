@@ -155,7 +155,11 @@ const plugin: KaizenPlugin = {
             trigger: "user",
           }, buildDeps());
           state.messages = result.messages;
-          const text = typeof result.finalMessage.content === "string" ? result.finalMessage.content : "";
+          // Models sometimes emit leading/trailing whitespace in their reply
+          // (Qwen often prefixes with two newlines). Strip outer whitespace
+          // so the transcript spacing is driven by layout, not by the model.
+          const raw = typeof result.finalMessage.content === "string" ? result.finalMessage.content : "";
+          const text = raw.trim();
           if (text) ui.writeOutput(text);
           await ctx.emit("conversation:assistant-message", { message: result.finalMessage });
           await ctx.emit("turn:end", { turnId, reason: "complete" });
