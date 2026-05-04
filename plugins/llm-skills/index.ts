@@ -41,7 +41,15 @@ const plugin: KaizenPlugin = {
   name: "llm-skills",
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
-  services: { provides: ["skills:registry"] },
+  services: {
+    provides: ["skills:registry"],
+    // tools:registry is optional (A-tier harnesses may omit it), but if a
+    // provider IS in the harness we want to initialize after it so
+    // load_skill can register. Without this edge, kaizen's topo-sort has
+    // no reason to order us after llm-tools-registry and useService
+    // fails even though the registry is configured.
+    consumes: ["tools:registry"],
+  },
 
   async setup(ctx) {
     const projectRoot = resolveProjectRoot(ctx);
