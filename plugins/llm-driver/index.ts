@@ -156,7 +156,7 @@ const plugin: KaizenPlugin = {
           }, buildDeps());
           state.messages = result.messages;
           const text = typeof result.finalMessage.content === "string" ? result.finalMessage.content : "";
-          if (text) ui.writeOutput(text + "\n");
+          if (text) ui.writeOutput(text);
           await ctx.emit("conversation:assistant-message", { message: result.finalMessage });
           await ctx.emit("turn:end", { turnId, reason: "complete" });
         } catch (err: any) {
