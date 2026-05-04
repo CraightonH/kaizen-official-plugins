@@ -8,7 +8,15 @@ export type SandboxRunResult =
   | { ok: true; returnValue: unknown; stdout: string }
   | { ok: false; errorName: string; errorMessage: string; stdout: string };
 
-const ENTRY_URL = new URL("./sandbox-entry.ts", import.meta.url).href;
+// Resolve the worker entry. When this file is loaded as the bundled
+// dist/index.js, sandbox-entry.ts is one level up at the plugin root
+// (kaizen's installer leaves source files in place alongside dist/).
+// When loaded from source (tests, dev), it's a sibling.
+const ENTRY_URL = (() => {
+  const here = new URL(".", import.meta.url);
+  const root = here.pathname.endsWith("/dist/") ? new URL("..", here) : here;
+  return new URL("./sandbox-entry.ts", root).href;
+})();
 
 export async function runInSandbox(
   userCode: string,

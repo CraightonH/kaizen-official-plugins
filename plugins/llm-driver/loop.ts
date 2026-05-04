@@ -16,10 +16,9 @@ export interface ToolsRegistryService {
 }
 
 export interface ToolDispatchStrategy {
-  prepareRequest(input: { availableTools: ToolSchema[] }): {
-    tools?: ToolSchema[];
-    systemPromptAppend?: string;
-  };
+  prepareRequest(input: { availableTools: ToolSchema[] }):
+    | { tools?: ToolSchema[]; systemPromptAppend?: string }
+    | Promise<{ tools?: ToolSchema[]; systemPromptAppend?: string }>;
   handleResponse(input: {
     response: LLMResponse;
     registry: ToolsRegistryService;
@@ -93,8 +92,12 @@ export async function runConversation(
 
   try {
     // --- single LLM call (A-tier path) ---
+    // prepareRequest can be sync or async (codemode renders TS .d.ts and is
+    // genuinely async). Awaiting always is correct — sync return values
+    // unwrap fine. Reading .systemPromptAppend without await left it
+    // `undefined`, so the LLM never saw the kaizen.tools.* API.
     const additions = deps.strategy
-      ? deps.strategy.prepareRequest({
+      ? await deps.strategy.prepareRequest({
           availableTools: deps.registry ? deps.registry.list(input.toolFilter) : [],
         })
       : { tools: undefined as ToolSchema[] | undefined, systemPromptAppend: undefined };
@@ -192,7 +195,7 @@ export async function runConversation(
       workingMessages.push(...appended);
 
       // Next LLM call.
-      const additions2 = deps.strategy.prepareRequest({
+      const additions2 = await deps.strategy.prepareRequest({
         availableTools: deps.registry.list(input.toolFilter),
       });
       const request2: LLMRequest = {
