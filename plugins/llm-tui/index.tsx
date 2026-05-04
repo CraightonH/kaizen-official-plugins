@@ -92,9 +92,14 @@ const plugin: KaizenPlugin = {
       }
     };
 
+    // Hand the line to the driver via the readInput channel and let the
+    // driver own the input:submit emit. Emitting it here too creates a
+    // race: two parallel dispatches mean the slash-commands handler's
+    // reentrancy guard rejects one, and the driver's `await emit()` may
+    // return before the first dispatch fires `input:handled`, sending
+    // the slash command on to the LLM instead of short-circuiting.
     const onSubmit = (text: string) => {
       store.submit(text);
-      void ctx.emit("input:submit", { text });
     };
 
     const inkApp = render(

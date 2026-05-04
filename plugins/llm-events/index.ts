@@ -8,6 +8,7 @@ export const VOCAB: Vocab = Object.freeze({
   SESSION_START: "session:start",
   SESSION_END: "session:end",
   SESSION_ERROR: "session:error",
+  SESSION_EXIT_REQUESTED: "session:exit-requested",
   INPUT_SUBMIT: "input:submit",
   INPUT_HANDLED: "input:handled",
   CONVERSATION_USER_MESSAGE: "conversation:user-message",

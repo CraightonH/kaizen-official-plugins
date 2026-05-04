@@ -78,7 +78,11 @@ export function registerBuiltins(registry: SlashRegistryService): void {
   registry.register(
     { name: "exit", description: "End the session", source: "builtin" },
     async (ctx: SlashCommandContext) => {
-      await ctx.emit("session:end", {});
+      // Request a clean session shutdown. The driver listens for this
+      // and breaks its read-loop on the next iteration; session:end is
+      // the lifecycle-end notification the driver itself emits when it
+      // tears down, not a command other plugins can invoke.
+      await ctx.emit("session:exit-requested", {});
     },
   );
 }

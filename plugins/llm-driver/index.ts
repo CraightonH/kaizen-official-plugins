@@ -49,6 +49,14 @@ let buildDeps: (() => RunConversationDeps) | null = null;
 // line. The flag is set by a subscriber registered in setup() (kaizen forbids
 // ctx.on after init) and consumed/reset in start() per submit.
 let inputHandled = false;
+// `session:exit-requested` flips this so the next loop iteration breaks.
+// The /exit slash command (and anything else that wants a clean shutdown)
+// emits the event; the driver owns the actual loop termination.
+let exitRequested = false;
+// UI channel reference set in start(). Setup-time subscribers reach the UI
+// through this — kaizen forbids ctx.on after init, so listeners must be
+// registered in setup() but use the channel resolved later.
+let moduleUi: UiChannel | null = null;
 
 const plugin: KaizenPlugin = {
   name: "llm-driver",
@@ -81,11 +89,23 @@ const plugin: KaizenPlugin = {
     state.messages = [];
     state.systemPrompt = "";
     inputHandled = false;
+    exitRequested = false;
+    moduleUi = null;
 
     // Subscribers
     wireCancel(ctx as any, () => state.currentTurn);
     ctx.on("conversation:cleared", async () => { state.messages = []; });
     ctx.on("input:handled", () => { inputHandled = true; });
+    ctx.on("session:exit-requested", () => { exitRequested = true; });
+    // Bridge system messages (slash command output, plugin notices) to the
+    // UI so /help and friends are actually visible. Uses moduleUi resolved
+    // in start() because kaizen forbids ctx.on registration past setup().
+    ctx.on("conversation:system-message", (payload: any) => {
+      const text = payload?.message?.content;
+      if (typeof text === "string" && text && moduleUi) {
+        moduleUi.writeNotice(text);
+      }
+    });
 
     // Build the deps bag for runConversation. We resolve services lazily inside
     // each call so consumers that load after setup() (registry/strategy) are seen.
@@ -114,6 +134,7 @@ const plugin: KaizenPlugin = {
 
   async start(ctx) {
     const ui = ctx.useService<UiChannel>("llm-tui:channel")!;
+    moduleUi = ui;
     if (!buildDeps) {
       throw new Error("llm-driver.start() called before setup() — buildDeps not initialized");
     }
@@ -132,6 +153,7 @@ const plugin: KaizenPlugin = {
         // ctx.on after init).
         inputHandled = false;
         await ctx.emit("input:submit", { text: line });
+        if (exitRequested) break;
         if (inputHandled) continue;
 
         const userMsg: ChatMessage = { role: "user", content: line };

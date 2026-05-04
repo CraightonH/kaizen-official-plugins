@@ -4,6 +4,7 @@ export interface Vocab {
   readonly SESSION_START: "session:start";
   readonly SESSION_END: "session:end";
   readonly SESSION_ERROR: "session:error";
+  readonly SESSION_EXIT_REQUESTED: "session:exit-requested";
   readonly INPUT_SUBMIT: "input:submit";
   readonly INPUT_HANDLED: "input:handled";
   readonly CONVERSATION_USER_MESSAGE: "conversation:user-message";

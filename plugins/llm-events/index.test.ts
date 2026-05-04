@@ -50,6 +50,7 @@ describe("llm-events", () => {
       "session:start",
       "session:end",
       "session:error",
+      "session:exit-requested",
       "input:submit",
       "input:handled",
       "conversation:user-message",

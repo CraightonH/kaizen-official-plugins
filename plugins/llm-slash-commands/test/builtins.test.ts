@@ -24,12 +24,12 @@ describe("registerBuiltins", () => {
     expect(reg.get("help")!.manifest.source).toBe("builtin");
   });
 
-  it("/exit emits session:end exactly once with {}", async () => {
+  it("/exit emits session:exit-requested exactly once with {}", async () => {
     const reg = createRegistry();
     registerBuiltins(reg);
     const { ctx, emitted } = makeCtx();
     await reg.get("exit")!.handler(ctx as any);
-    expect(emitted).toEqual([{ event: "session:end", payload: {} }]);
+    expect(emitted).toEqual([{ event: "session:exit-requested", payload: {} }]);
   });
 
   it("/help with no args groups all registered commands", async () => {
