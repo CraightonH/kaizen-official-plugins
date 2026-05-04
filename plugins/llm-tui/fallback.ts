@@ -23,6 +23,7 @@ export function createFallbackChannel(): TuiChannelService {
   return {
     writeOutput(chunk) { process.stdout.write(chunk); },
     writeNotice(text) { process.stderr.write(`${text}\n`); },
+    writeUser(text) { process.stdout.write(`> ${text}\n`); },
     setBusy() { /* no-op in non-TTY mode */ },
     readInput() {
       ensureReader();

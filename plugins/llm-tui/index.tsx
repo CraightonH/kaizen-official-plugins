@@ -112,6 +112,7 @@ const plugin: KaizenPlugin = {
       readInput: () => store.awaitInput(),
       writeOutput: (chunk: string) => store.appendOutput(chunk),
       writeNotice: (text: string) => store.appendNotice(text),
+      writeUser: (text: string) => store.appendUser(text),
       setBusy: (busy: boolean, message?: string) => store.setBusy(busy, message),
     };
     ctx.provideService<TuiChannelService>("llm-tui:channel", channel);

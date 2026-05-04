@@ -1,4 +1,4 @@
-export type TranscriptKind = "output" | "notice";
+export type TranscriptKind = "output" | "notice" | "user";
 export interface TranscriptLine { id: number; kind: TranscriptKind; text: string; }
 export interface BusyState { active: boolean; message?: string; }
 export interface InputState { value: string; cursor: number; }
@@ -57,6 +57,11 @@ export class TuiStore {
 
   appendNotice(text: string): void {
     this._transcript = [...this._transcript, { id: ++this._seq, kind: "notice", text }];
+    this._emit();
+  }
+
+  appendUser(text: string): void {
+    this._transcript = [...this._transcript, { id: ++this._seq, kind: "user", text }];
     this._emit();
   }
 

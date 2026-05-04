@@ -25,11 +25,29 @@ export const App: React.FC<AppProps> = ({ store, registry, triggers, theme, onSu
   return (
     <Box flexDirection="column">
       <Static items={snap.transcript}>
-        {(e: TranscriptLine) => (
-          <Text key={e.id} color={e.kind === "notice" ? theme.noticeColor : theme.outputColor} dimColor={e.kind === "notice"}>
-            {e.text}
-          </Text>
-        )}
+        {(e: TranscriptLine) => {
+          if (e.kind === "user") {
+            // User messages: magenta `❯` gutter on every line of the body
+            // and a subtle background highlight so the turn boundary is
+            // visible against assistant replies.
+            const lines = e.text.split("\n");
+            return (
+              <Box key={e.id} flexDirection="column">
+                {lines.map((line, i) => (
+                  <Box key={i}>
+                    <Text color={theme.promptColor} bold>{"❯ "}</Text>
+                    <Text color={theme.outputColor} backgroundColor="#2a2a2a">{line || " "}</Text>
+                  </Box>
+                ))}
+              </Box>
+            );
+          }
+          return (
+            <Text key={e.id} color={e.kind === "notice" ? theme.noticeColor : theme.outputColor} dimColor={e.kind === "notice"}>
+              {e.text}
+            </Text>
+          );
+        }}
       </Static>
       {snap.busy.active && <SpinnerLine color={theme.busyColor} message={snap.busy.message} />}
       <InputBox

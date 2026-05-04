@@ -3,6 +3,12 @@ import type { TuiTheme } from "./theme/loader.ts";
 export interface TuiChannelService {
   writeOutput(chunk: string): void;
   writeNotice(text: string): void;
+  /**
+   * Append a user-authored message to the transcript. Rendered with the
+   * prompt accent (magenta `❯` gutter + subtle background highlight) so
+   * it visually anchors the start of a turn against the assistant reply.
+   */
+  writeUser(text: string): void;
   setBusy(state: boolean, message?: string): void;
   readInput(): Promise<string>;
 }

@@ -15,6 +15,7 @@ interface UiChannel {
   setBusy(b: boolean, msg?: string): void;
   writeOutput(s: string): void;
   writeNotice(s: string): void;
+  writeUser?(s: string): void;
 }
 
 interface DriverConfig {
@@ -136,6 +137,7 @@ const plugin: KaizenPlugin = {
         const userMsg: ChatMessage = { role: "user", content: line };
         const preTurnSnapshot = snapshotMessages(state.messages);
         state.messages.push(userMsg);
+        ui.writeUser?.(line);
         await ctx.emit("conversation:user-message", { message: userMsg });
 
         const turnId = newTurnId();
