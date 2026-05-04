@@ -42,6 +42,11 @@ const state: {
   model: "",
 };
 let buildDeps: (() => RunConversationDeps) | null = null;
+// `input:handled` short-circuit: subscribers (e.g. llm-slash-commands) emit
+// this to tell the driver to skip the LLM round-trip for the just-submitted
+// line. The flag is set by a subscriber registered in setup() (kaizen forbids
+// ctx.on after init) and consumed/reset in start() per submit.
+let inputHandled = false;
 
 const plugin: KaizenPlugin = {
   name: "llm-driver",
@@ -74,10 +79,12 @@ const plugin: KaizenPlugin = {
     state.messages = [];
     state.systemPrompt = "";
     state.model = "";
+    inputHandled = false;
 
     // Subscribers
     wireCancel(ctx as any, () => state.currentTurn);
     ctx.on("conversation:cleared", async () => { state.messages = []; });
+    ctx.on("input:handled", () => { inputHandled = true; });
 
     // Build the deps bag for runConversation. We resolve services lazily inside
     // each call so consumers that load after setup() (registry/strategy) are seen.
@@ -121,12 +128,12 @@ const plugin: KaizenPlugin = {
         const line = await ui.readInput();
         if (line === "") break;
 
-        // input:handled short-circuit. Subscribe before emit; flag flips synchronously.
-        let handled = false;
-        const off = ctx.on("input:handled", () => { handled = true; });
+        // input:handled short-circuit. Reset the flag, emit, then check.
+        // The subscription itself is registered in setup() (kaizen forbids
+        // ctx.on after init).
+        inputHandled = false;
         await ctx.emit("input:submit", { text: line });
-        off();
-        if (handled) continue;
+        if (inputHandled) continue;
 
         const userMsg: ChatMessage = { role: "user", content: line };
         const preTurnSnapshot = snapshotMessages(state.messages);
@@ -149,6 +156,8 @@ const plugin: KaizenPlugin = {
             trigger: "user",
           }, buildDeps());
           state.messages = result.messages;
+          const text = typeof result.finalMessage.content === "string" ? result.finalMessage.content : "";
+          if (text) ui.writeOutput(text + "\n");
           await ctx.emit("conversation:assistant-message", { message: result.finalMessage });
           await ctx.emit("turn:end", { turnId, reason: "complete" });
         } catch (err: any) {
