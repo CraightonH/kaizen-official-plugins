@@ -27,19 +27,16 @@ export const App: React.FC<AppProps> = ({ store, registry, triggers, theme, onSu
       <Static items={snap.transcript}>
         {(e: TranscriptLine) => {
           if (e.kind === "user") {
-            // User messages: magenta `❯` gutter on every line of the body
-            // and a subtle background highlight so the turn boundary is
-            // visible against assistant replies.
-            const lines = e.text.split("\n");
+            // User messages: magenta `❯` gutter (bold) and a subtle
+            // background highlight on the body so the turn boundary
+            // is visible against assistant replies. Rendered as a
+            // single Text — wrapping in <Box flexDirection="column">
+            // adds an extra row of layout height in Ink's Static.
             return (
-              <Box key={e.id} flexDirection="column">
-                {lines.map((line, i) => (
-                  <Box key={i}>
-                    <Text color={theme.promptColor} bold>{"❯ "}</Text>
-                    <Text color={theme.outputColor} backgroundColor="#2a2a2a">{line || " "}</Text>
-                  </Box>
-                ))}
-              </Box>
+              <Text key={e.id}>
+                <Text color={theme.promptColor} bold>{"❯ "}</Text>
+                <Text color={theme.outputColor} backgroundColor="#2a2a2a">{e.text}</Text>
+              </Text>
             );
           }
           return (
