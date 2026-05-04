@@ -115,7 +115,22 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
       return;
     }
 
-    if (key.return && !key.shift) {
+    // Newline-insert paths. Enter alone submits, but the user can request a
+    // soft newline three ways:
+    //   - Shift+Enter           — works when the terminal sends a distinct
+    //                             code (kitty keyboard protocol, iTerm2 with
+    //                             custom keymap). Stock macOS Terminal.app
+    //                             sends \r either way and CANNOT be detected.
+    //   - Option/Alt+Enter      — works on macOS in iTerm2/Terminal.app
+    //                             (the meta flag is reliable).
+    //   - Trailing backslash    — typing "\" then Enter is treated as a
+    //                             "soft enter": the backslash is consumed
+    //                             and a newline is inserted instead.
+    const wantsNewline =
+      (key.return && (key.shift || key.meta)) ||
+      (key.return && cursor > 0 && value[cursor - 1] === "\\");
+
+    if (key.return && !wantsNewline) {
       if (popup && popup.items.length > 0) { acceptPopup(); return; }
       if (popup && popup.items.length === 0) { store.closePopup(); submitLine(); return; }
       submitLine();
@@ -127,9 +142,17 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
       return;
     }
 
-    if (key.return && key.shift) {
-      const next = value.slice(0, cursor) + "\n" + value.slice(cursor);
-      setBuffer(next, cursor + 1);
+    if (wantsNewline) {
+      // Trailing-backslash path: replace the "\" with "\n" so it doesn't
+      // remain in the message. Otherwise just splice a "\n" at the cursor.
+      const trailingSlash = !key.shift && !key.meta;
+      if (trailingSlash) {
+        const next = value.slice(0, cursor - 1) + "\n" + value.slice(cursor);
+        setBuffer(next, cursor);
+      } else {
+        const next = value.slice(0, cursor) + "\n" + value.slice(cursor);
+        setBuffer(next, cursor + 1);
+      }
       return;
     }
 
@@ -240,22 +263,44 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
   const topLine = topPrefix + "─".repeat(Math.max(0, cols - topPrefix.length - 1));
   const bottomLine = "╰" + "─".repeat(Math.max(0, cols - 2));
 
-  // Visible block cursor: render the character at `cursor` with `inverse`,
-  // emulating Claude Code's filled-rectangle caret. When cursor sits past
-  // end-of-string, render an inverted space.
-  const before = value.slice(0, cursor);
-  const at = value[cursor] ?? " ";
-  const after = value.slice(cursor + 1);
+  // Multiline-aware render. Map the flat cursor offset into (row, col) over
+  // the value's logical lines, then render one row per line. The cursor is
+  // a filled inverse-color block at its column on its row.
+  const lines = value.split("\n");
+  let cursorRow = 0;
+  let cursorCol = cursor;
+  for (let i = 0; i < lines.length; i++) {
+    const len = lines[i]!.length;
+    if (cursorCol <= len) { cursorRow = i; break; }
+    cursorCol -= len + 1; // +1 for the consumed "\n"
+    cursorRow = i + 1;
+  }
 
   return (
     <Box flexDirection="column">
       <Text color={theme.promptColor}>{topLine}</Text>
-      <Box>
-        <Text color={theme.promptColor}>{"│ ❯ "}</Text>
-        <Text color={theme.outputColor}>{before}</Text>
-        <Text color={theme.outputColor} inverse>{at}</Text>
-        <Text color={theme.outputColor}>{after}</Text>
-      </Box>
+      {lines.map((line, i) => {
+        const prefix = i === 0 ? "│ ❯ " : "│   ";
+        if (i !== cursorRow) {
+          return (
+            <Box key={i}>
+              <Text color={theme.promptColor}>{prefix}</Text>
+              <Text color={theme.outputColor}>{line.length === 0 ? " " : line}</Text>
+            </Box>
+          );
+        }
+        const before = line.slice(0, cursorCol);
+        const at = line[cursorCol] ?? " ";
+        const after = line.slice(cursorCol + 1);
+        return (
+          <Box key={i}>
+            <Text color={theme.promptColor}>{prefix}</Text>
+            <Text color={theme.outputColor}>{before}</Text>
+            <Text color={theme.outputColor} inverse>{at}</Text>
+            <Text color={theme.outputColor}>{after}</Text>
+          </Box>
+        );
+      })}
       <Text color={theme.promptColor}>{bottomLine}</Text>
       {popup && <CompletionPopup popup={popup} noticeColor={theme.noticeColor} />}
     </Box>
