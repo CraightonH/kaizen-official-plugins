@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput, useStdout } from "ink";
 import { useSyncExternalStore } from "react";
 import type { TuiStore } from "../state/store.ts";
 import type { CompletionRegistry } from "../completion/registry.ts";
@@ -231,12 +231,32 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
     }
   });
 
+  // Open-on-the-right framed prompt with embedded label, drawn manually so
+  // the label sits in the top border instead of inside the box.
+  const { stdout } = useStdout();
+  const cols = Math.max(20, stdout?.columns ?? 80);
+  const labelSeg = ` ${theme.promptLabel} `;
+  const topPrefix = `╭───${labelSeg}`;
+  const topLine = topPrefix + "─".repeat(Math.max(0, cols - topPrefix.length - 1));
+  const bottomLine = "╰" + "─".repeat(Math.max(0, cols - 2));
+
+  // Visible block cursor: render the character at `cursor` with `inverse`,
+  // emulating Claude Code's filled-rectangle caret. When cursor sits past
+  // end-of-string, render an inverted space.
+  const before = value.slice(0, cursor);
+  const at = value[cursor] ?? " ";
+  const after = value.slice(cursor + 1);
+
   return (
     <Box flexDirection="column">
-      <Box borderStyle="round" borderColor={theme.promptColor} paddingX={1}>
-        <Text color={theme.promptColor}>{`${theme.promptLabel} ❯ `}</Text>
-        <Text color={theme.outputColor}>{value || " "}</Text>
+      <Text color={theme.promptColor}>{topLine}</Text>
+      <Box>
+        <Text color={theme.promptColor}>{"│ ❯ "}</Text>
+        <Text color={theme.outputColor}>{before}</Text>
+        <Text color={theme.outputColor} inverse>{at}</Text>
+        <Text color={theme.outputColor}>{after}</Text>
       </Box>
+      <Text color={theme.promptColor}>{bottomLine}</Text>
       {popup && <CompletionPopup popup={popup} noticeColor={theme.noticeColor} />}
     </Box>
   );

@@ -69,8 +69,8 @@ describe("llm-tui plugin", () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
     const t = (ctx.provided["llm-tui:theme"] as any).current();
-    expect(t.promptLabel).toBe("llm");
-    expect(t.promptColor).toBe("cyan");
+    expect(t.promptLabel).toBe("kaizen");
+    expect(t.promptColor).toBe("magenta");
   });
 
   it("status:item-update updates the channel-visible status (verified via theme/store wiring)", async () => {

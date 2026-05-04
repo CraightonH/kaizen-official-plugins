@@ -22,8 +22,8 @@ describe("App", () => {
       <App store={ctx.store} registry={ctx.reg} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={() => {}} />,
     );
     await tick();
-    expect(lastFrame()).toContain("llm");
-    expect(lastFrame()).toMatch(/[╭╮╯╰]/);
+    expect(lastFrame()).toContain("kaizen");
+    expect(lastFrame()).toMatch(/[╭╰]/);
   });
 
   it("appendOutput shows in the transcript", async () => {

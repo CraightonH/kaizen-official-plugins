@@ -10,8 +10,8 @@ export interface TuiTheme {
 }
 
 export const DEFAULT_THEME: TuiTheme = Object.freeze({
-  promptLabel: "llm",
-  promptColor: "cyan",
+  promptLabel: "kaizen",
+  promptColor: "magenta",
   outputColor: "white",
   noticeColor: "yellow",
   busyColor: "magenta",

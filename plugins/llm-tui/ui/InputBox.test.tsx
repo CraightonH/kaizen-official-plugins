@@ -25,7 +25,7 @@ describe("InputBox", () => {
     await tick();
     stdin.write("hello");
     await tick();
-    expect(lastFrame()).toContain("llm");
+    expect(lastFrame()).toContain("kaizen");
     expect(lastFrame()).toContain("hello");
   });
 

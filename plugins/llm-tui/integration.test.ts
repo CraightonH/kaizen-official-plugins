@@ -62,7 +62,7 @@ describe("llm-tui integration (non-TTY)", () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
     const theme = (ctx.provided["llm-tui:theme"] as any).current();
-    expect(theme.promptLabel).toBe("llm");
+    expect(theme.promptLabel).toBe("kaizen");
     expect(theme.outputColor).toBe("white");
   });
 });
