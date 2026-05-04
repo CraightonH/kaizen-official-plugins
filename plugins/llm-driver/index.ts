@@ -160,7 +160,10 @@ const plugin: KaizenPlugin = {
           // so the transcript spacing is driven by layout, not by the model.
           const raw = typeof result.finalMessage.content === "string" ? result.finalMessage.content : "";
           const text = raw.trim();
-          if (text) ui.writeOutput(text);
+          // One blank line before and after each assistant turn — leading
+          // breathing room from the user message, trailing room before the
+          // input box reappears.
+          if (text) ui.writeOutput("\n" + text + "\n");
           await ctx.emit("conversation:assistant-message", { message: result.finalMessage });
           await ctx.emit("turn:end", { turnId, reason: "complete" });
         } catch (err: any) {
