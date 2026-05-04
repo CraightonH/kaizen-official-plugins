@@ -18,28 +18,29 @@ interface UiChannel {
 }
 
 interface DriverConfig {
-  defaultModel?: string;
   defaultSystemPrompt?: string;
 }
 
 const DEFAULTS = {
-  defaultModel: "local-model",
   defaultSystemPrompt: "",
 } as const;
 
 // Plugin-scoped state. setup() and start() receive different ctx instances
 // (kaizen creates a fresh ctx for the driver's start phase), so state must
 // live here rather than stashed on the setup-ctx.
+//
+// The driver does not track or default a model name. Model selection lives
+// with the LLM provider plugin (e.g. openai-llm), which fills in its own
+// configured default when a request omits `model`. Per-call overrides flow
+// through `runConversation(input.model)`.
 const state: {
   currentTurn: CurrentTurn | null;
   messages: ChatMessage[];
   systemPrompt: string;
-  model: string;
 } = {
   currentTurn: null,
   messages: [],
   systemPrompt: "",
-  model: "",
 };
 let buildDeps: (() => RunConversationDeps) | null = null;
 // `input:handled` short-circuit: subscribers (e.g. llm-slash-commands) emit
@@ -78,7 +79,6 @@ const plugin: KaizenPlugin = {
     state.currentTurn = null;
     state.messages = [];
     state.systemPrompt = "";
-    state.model = "";
     inputHandled = false;
 
     // Subscribers
@@ -100,7 +100,6 @@ const plugin: KaizenPlugin = {
       strategy: safeUse<ToolDispatchStrategy>("tool-dispatch:strategy"),
       log: ctx.log.bind(ctx),
       idGen: newTurnId,
-      defaultModel: state.model || (ctx.config as DriverConfig)?.defaultModel || DEFAULTS.defaultModel,
       defaultSystemPrompt: state.systemPrompt || (ctx.config as DriverConfig)?.defaultSystemPrompt || DEFAULTS.defaultSystemPrompt,
     });
 
@@ -120,7 +119,6 @@ const plugin: KaizenPlugin = {
 
     const cfg = (ctx.config ?? {}) as DriverConfig;
     state.systemPrompt = cfg.defaultSystemPrompt ?? DEFAULTS.defaultSystemPrompt;
-    state.model = cfg.defaultModel ?? DEFAULTS.defaultModel;
 
     await ctx.emit("session:start");
     try {
@@ -150,7 +148,6 @@ const plugin: KaizenPlugin = {
           const result = await runConversation({
             systemPrompt: state.systemPrompt,
             messages: state.messages,
-            model: state.model,
             signal: controller.signal,
             externalTurnId: turnId,
             trigger: "user",

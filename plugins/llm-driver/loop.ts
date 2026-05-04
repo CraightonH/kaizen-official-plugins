@@ -54,7 +54,6 @@ export interface RunConversationDeps {
   strategy: ToolDispatchStrategy | undefined;
   log: (msg: string) => void;
   idGen: () => string;
-  defaultModel: string;
   defaultSystemPrompt: string;
 }
 
@@ -101,7 +100,7 @@ export async function runConversation(
       : { tools: undefined as ToolSchema[] | undefined, systemPromptAppend: undefined };
 
     const request: LLMRequest = {
-      model: input.model ?? deps.defaultModel,
+      model: input.model,
       messages: workingMessages.slice(),
       systemPrompt: appendSystemAppend(input.systemPrompt, additions.systemPromptAppend),
       tools: additions.tools,
@@ -197,7 +196,7 @@ export async function runConversation(
         availableTools: deps.registry.list(input.toolFilter),
       });
       const request2: LLMRequest = {
-        model: input.model ?? deps.defaultModel,
+        model: input.model,
         messages: workingMessages.slice(),
         systemPrompt: appendSystemAppend(input.systemPrompt, additions2.systemPromptAppend),
         tools: additions2.tools,

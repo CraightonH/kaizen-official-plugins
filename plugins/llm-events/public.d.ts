@@ -63,7 +63,12 @@ export interface ModelInfo {
 }
 
 export interface LLMRequest {
-  model: string;
+  /**
+   * Optional. When omitted, the LLM provider plugin substitutes its own
+   * configured default model. Callers (drivers, agents) only set this to
+   * override the provider default for a specific call.
+   */
+  model?: string;
   messages: ChatMessage[];
   systemPrompt?: string;
   tools?: ToolSchema[];

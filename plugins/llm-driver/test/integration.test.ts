@@ -23,7 +23,7 @@ describe("llm-driver integration (synthetic llm:complete)", () => {
     };
     const ctx: any = {
       log: () => {},
-      config: { defaultModel: "m", defaultSystemPrompt: "sp" },
+      config: { defaultSystemPrompt: "sp" },
       defineService: () => {},
       provideService: () => {},
       consumeService: () => {},

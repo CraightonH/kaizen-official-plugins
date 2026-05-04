@@ -31,7 +31,7 @@ function makeCtx(deps: { ui: any; llm: any; cleared?: () => Promise<void>; cfg?:
   const provided: Record<string, unknown> = {};
   return {
     log: mock(() => {}),
-    config: deps.cfg ?? { defaultModel: "m", defaultSystemPrompt: "sp" },
+    config: deps.cfg ?? { defaultSystemPrompt: "sp" },
     defineService: mock(() => {}),
     provideService: (name: string, impl: unknown) => { provided[name] = impl; },
     consumeService: mock(() => {}),

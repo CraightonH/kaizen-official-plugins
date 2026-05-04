@@ -36,7 +36,6 @@ function makeDeps(overrides: Partial<RunConversationDeps> = {}): RunConversation
     strategy: undefined,
     log: mock(() => {}),
     idGen: makeIdGen(["turn_test_1", "turn_test_2"]),
-    defaultModel: "default-model",
     defaultSystemPrompt: "default-sp",
     ...overrides,
   };
@@ -75,11 +74,11 @@ describe("runConversation (A-tier)", () => {
     expect(typeof startEv.payload.turnId).toBe("string");
   });
 
-  it("uses defaultModel when input.model is undefined", async () => {
+  it("passes input.model through unchanged (provider fills in default when undefined)", async () => {
     const llm = makeLlm([[{ type: "done", response: { content: "", finishReason: "stop" } }]]);
     const deps = makeDeps({ llmComplete: llm });
     await runConversation({ systemPrompt: "sys", messages: [] }, deps);
-    expect((llm as any).calls[0].req.model).toBe("default-model");
+    expect((llm as any).calls[0].req.model).toBeUndefined();
   });
 
   it("does not mutate caller-supplied messages array", async () => {
