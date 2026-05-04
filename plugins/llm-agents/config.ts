@@ -43,14 +43,17 @@ function resolveDir(p: string, home: string, cwd: string): string {
 }
 
 export async function loadConfig(deps: ConfigDeps): Promise<AgentsConfig> {
-  const path = deps.env.KAIZEN_LLM_AGENTS_CONFIG ?? defaultPath(deps.home);
+  const userOverridePath = deps.env.KAIZEN_LLM_AGENTS_CONFIG;
+  const path = userOverridePath ?? defaultPath(deps.home);
   let file: AgentsConfigFile = {};
   try {
     const raw = await deps.readFile(path);
     try { file = JSON.parse(raw) as AgentsConfigFile; }
     catch (err) { throw new Error(`llm-agents config at ${path} malformed: ${(err as Error).message}`); }
   } catch (err: any) {
-    if (err?.code === "ENOENT") deps.log(`llm-agents: no config at ${path}; using defaults`);
+    if (err?.code === "ENOENT") {
+      if (userOverridePath) deps.log(`llm-agents: KAIZEN_LLM_AGENTS_CONFIG=${path} not found; using defaults`);
+    }
     else if (err?.message?.startsWith("llm-agents config")) throw err;
     else throw err;
   }

@@ -40,13 +40,19 @@ function validate(cfg: CodeModeConfig): void {
 }
 
 export async function loadConfig(deps: ConfigDeps): Promise<CodeModeConfig> {
-  const path = deps.env.KAIZEN_LLM_CODEMODE_CONFIG ?? defaultConfigPath(deps.home);
+  const userOverridePath = deps.env.KAIZEN_LLM_CODEMODE_CONFIG;
+  const path = userOverridePath ?? defaultConfigPath(deps.home);
   let raw: string;
   try {
     raw = await deps.readFile(path);
   } catch (err: any) {
     if (err?.code === "ENOENT") {
-      deps.log(`llm-codemode-dispatch: no config at ${path}; using defaults`);
+      // Only log when the user explicitly pointed at a path that isn't
+      // there. Missing default path == "happy path, use defaults" and
+      // shouldn't add to startup noise.
+      if (userOverridePath) {
+        deps.log(`llm-codemode-dispatch: KAIZEN_LLM_CODEMODE_CONFIG=${path} not found; using defaults`);
+      }
       return { ...DEFAULT_CONFIG };
     }
     throw err;

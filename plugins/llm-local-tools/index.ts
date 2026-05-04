@@ -25,7 +25,6 @@ const plugin: KaizenPlugin = {
     for (const tool of ALL_TOOLS) {
       unregisters.push(registry.register(tool.schema, tool.handler));
     }
-    ctx.log?.(`llm-local-tools: registered ${ALL_TOOLS.length} tools`);
 
     return {
       async teardown() {

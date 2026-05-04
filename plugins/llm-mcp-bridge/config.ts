@@ -165,7 +165,7 @@ export async function loadConfig(deps: ConfigDeps): Promise<ConfigLoadResult> {
   const servers = new Map<string, ResolvedServerConfig>();
 
   if (reads.length === 0) {
-    deps.log("llm-mcp-bridge: no MCP config files found; registering zero MCP servers");
+    // No MCP config files is the common default — stay silent.
     return { servers, warnings };
   }
 

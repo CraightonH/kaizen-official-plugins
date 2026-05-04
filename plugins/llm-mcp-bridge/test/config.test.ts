@@ -18,11 +18,11 @@ function makeDeps(overrides: Partial<Parameters<typeof loadConfig>[0]> = {}) {
 }
 
 describe("loadConfig", () => {
-  it("returns empty map and logs info when no files exist", async () => {
+  it("returns empty map silently when no config files exist", async () => {
     const deps = makeDeps();
     const result = await loadConfig(deps);
     expect(result.servers.size).toBe(0);
-    expect(deps._logs.some((l) => l.includes("no MCP config"))).toBe(true);
+    expect(deps._logs).toEqual([]);
   });
 
   it("loads user file when only ~/.kaizen/mcp/servers.json exists", async () => {

@@ -54,13 +54,16 @@ function validate(cfg: OpenAILLMConfig): void {
 }
 
 export async function loadConfig(deps: ConfigDeps): Promise<OpenAILLMConfig> {
-  const path = deps.env.KAIZEN_OPENAI_LLM_CONFIG ?? defaultConfigPath(deps.home);
+  const userOverridePath = deps.env.KAIZEN_OPENAI_LLM_CONFIG;
+  const path = userOverridePath ?? defaultConfigPath(deps.home);
   let raw: string | null = null;
   try {
     raw = await deps.readFile(path);
   } catch (err: any) {
     if (err?.code === "ENOENT") {
-      deps.log(`openai-llm: no config at ${path}; using defaults`);
+      if (userOverridePath) {
+        deps.log(`openai-llm: KAIZEN_OPENAI_LLM_CONFIG=${path} not found; using defaults`);
+      }
       return { ...DEFAULT_CONFIG, retry: { ...DEFAULT_CONFIG.retry }, extraHeaders: {} };
     }
     throw err;

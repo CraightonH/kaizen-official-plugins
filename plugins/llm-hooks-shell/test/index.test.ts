@@ -56,11 +56,11 @@ function makeCtx(opts: {
 }
 
 describe("llm-hooks-shell setup", () => {
-  it("no config files → no subscriptions, single info log", async () => {
+  it("no config files → no subscriptions and no startup log noise", async () => {
     const ctx = makeCtx({});
     await plugin.setup(ctx);
     expect(ctx.subscribed).toEqual([]);
-    expect(ctx.logs.length).toBeGreaterThan(0);
+    expect(ctx.logs).toEqual([]);
   });
 
   it("subscribes to the union of event names from the merged config", async () => {

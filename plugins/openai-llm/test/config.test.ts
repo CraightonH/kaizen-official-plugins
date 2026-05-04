@@ -12,13 +12,24 @@ function makeDeps(overrides: Partial<ConfigDeps> = {}): ConfigDeps {
 }
 
 describe("loadConfig", () => {
-  it("returns defaults when file is absent and logs the expected path", async () => {
+  it("returns defaults silently when default-path file is absent", async () => {
     const log = mock(() => {});
     const cfg = await loadConfig(makeDeps({ log }));
     expect(cfg).toEqual(DEFAULT_CONFIG);
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("logs when KAIZEN_OPENAI_LLM_CONFIG points at a missing path", async () => {
+    const log = mock(() => {});
+    const cfg = await loadConfig(makeDeps({
+      log,
+      env: { KAIZEN_OPENAI_LLM_CONFIG: "/etc/missing.json" },
+      readFile: async () => { const e: any = new Error("ENOENT"); e.code = "ENOENT"; throw e; },
+    }));
+    expect(cfg).toEqual(DEFAULT_CONFIG);
     expect(log).toHaveBeenCalled();
     const arg = (log.mock.calls[0]?.[0] ?? "") as string;
-    expect(arg).toContain("/home/u/.kaizen/plugins/openai-llm/config.json");
+    expect(arg).toContain("/etc/missing.json");
   });
 
   it("honors KAIZEN_OPENAI_LLM_CONFIG env override", async () => {

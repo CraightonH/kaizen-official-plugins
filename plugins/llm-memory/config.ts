@@ -56,13 +56,16 @@ function validate(cfg: MemoryConfig): void {
 }
 
 export async function loadConfig(deps: ConfigDeps): Promise<MemoryConfig> {
-  const path = deps.env.KAIZEN_LLM_MEMORY_CONFIG ?? defaultConfigPath(deps.home);
+  const userOverridePath = deps.env.KAIZEN_LLM_MEMORY_CONFIG;
+  const path = userOverridePath ?? defaultConfigPath(deps.home);
   let raw: string | null = null;
   try {
     raw = await deps.readFile(path);
   } catch (err: any) {
     if (err?.code === "ENOENT") {
-      deps.log(`llm-memory: no config at ${path}; using defaults`);
+      if (userOverridePath) {
+        deps.log(`llm-memory: KAIZEN_LLM_MEMORY_CONFIG=${path} not found; using defaults`);
+      }
       return { ...DEFAULT_CONFIG, extractTriggers: [...DEFAULT_CONFIG.extractTriggers], denyTypes: [] };
     }
     throw err;

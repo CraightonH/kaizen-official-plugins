@@ -106,7 +106,7 @@ export async function runConversation(
       tools: additions.tools,
     };
 
-    await deps.emit("llm:before-call", { request });
+    await deps.emit("llm:before-call", { request, turnId });
     if (request.cancelled === true) {
       const finalMessage = workingMessages[workingMessages.length - 1] ?? {
         role: "assistant" as const, content: "",
@@ -201,7 +201,7 @@ export async function runConversation(
         systemPrompt: appendSystemAppend(input.systemPrompt, additions2.systemPromptAppend),
         tools: additions2.tools,
       };
-      await deps.emit("llm:before-call", { request: request2 });
+      await deps.emit("llm:before-call", { request: request2, turnId });
       if (request2.cancelled === true) {
         const finalMessage = workingMessages[workingMessages.length - 1]!;
         const output: RunConversationOutput = {

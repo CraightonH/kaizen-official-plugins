@@ -27,7 +27,9 @@ const plugin: KaizenPlugin = {
     for (const w of warnings) ctx.log(w);
 
     if (entries.length === 0) {
-      ctx.log("llm-hooks-shell: no hooks configured (looked at ~/.kaizen/hooks/hooks.json and <cwd>/.kaizen/hooks/hooks.json). Plugin loaded as a no-op.");
+      // No hooks configured is the default state — stay silent rather than
+      // adding to startup noise. Real warnings (parse errors, etc.) are
+      // already logged via the `warnings` loop above.
       return;
     }
 
