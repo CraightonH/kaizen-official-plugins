@@ -1,4 +1,3 @@
-import { homedir } from "node:os";
 import type { KaizenPlugin } from "kaizen/types";
 import type { SystemPromptService } from "llm-system-prompt/public";
 import { loadConfig, realDeps } from "./config.ts";
@@ -22,7 +21,7 @@ const plugin: KaizenPlugin = {
     const log = (m: string) => ctx.log(m);
     const config = await loadConfig(realDeps(log));
     const { globalDir, projectDir } = resolveDirs({
-      home: homedir(),
+      home: process.env.HOME ?? "/",
       cwd: process.cwd(),
       config: { globalDir: config.globalDir, projectDir: config.projectDir },
     });
