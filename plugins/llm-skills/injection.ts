@@ -6,11 +6,16 @@ function singleLine(s: string): string {
   return s.replace(/\s*\n\s*/g, " ");
 }
 
-export function buildSkillsSection(list: SkillManifest[]): string {
+/**
+ * Renders the skills list as a block suitable for a prompt:system section.
+ * The section title ("## Available skills") is provided by the section registration,
+ * so this block intentionally does NOT include a heading.
+ *
+ * Returns "" when the list is empty — the system-prompt registry drops empty sections.
+ */
+export function buildSkillsBlock(list: SkillManifest[]): string {
   if (list.length === 0) return "";
   const lines: string[] = [];
-  lines.push("## Available skills");
-  lines.push("");
   lines.push(PREAMBLE);
   lines.push("");
   for (const m of list) {
@@ -18,15 +23,4 @@ export function buildSkillsSection(list: SkillManifest[]): string {
     lines.push(`- ${m.name} (~${tokens} tokens): ${singleLine(m.description)}`);
   }
   return lines.join("\n");
-}
-
-export function applyInjection(request: { systemPrompt?: string }, list: SkillManifest[]): void {
-  const section = buildSkillsSection(list);
-  if (!section) return;
-  const current = request.systemPrompt;
-  if (current && current.length > 0) {
-    request.systemPrompt = `${current}\n\n${section}`;
-  } else {
-    request.systemPrompt = section;
-  }
 }

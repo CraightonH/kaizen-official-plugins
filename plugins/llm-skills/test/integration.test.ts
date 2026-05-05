@@ -11,6 +11,10 @@ const FIXTURES = join(import.meta.dir, "fixtures");
 function fakeToolsRegistry(emit: (e: string, p: unknown) => Promise<void>) {
   const tools = new Map<string, { schema: any; handler: any }>();
   return {
+    registerWith(reg: any) {
+      tools.set(reg.schema.name, { schema: reg.schema, handler: reg.handler });
+      return () => { tools.delete(reg.schema.name); };
+    },
     register(schema: any, handler: any) {
       tools.set(schema.name, { schema, handler });
       return () => { tools.delete(schema.name); };
@@ -37,8 +41,24 @@ function fakeToolsRegistry(emit: (e: string, p: unknown) => Promise<void>) {
   };
 }
 
+function fakePromptSystem() {
+  const sections: any[] = [];
+  return {
+    service: {
+      register: (section: any) => {
+        sections.push(section);
+        return { bumpGeneration: () => {}, unregister: () => {} };
+      },
+      assemble: async () => "",
+      list: () => sections.map(s => ({ id: s.id, priority: s.priority, title: s.title })),
+      generation: () => 0,
+    },
+    sections,
+  };
+}
+
 describe("integration — llm-skills against a fake tools:registry", () => {
-  it("injects prompt and dispatches load_skill end-to-end", async () => {
+  it("dispatches load_skill end-to-end and emits events in order", async () => {
     const subscribers: Record<string, Function[]> = {};
     const emittedOrder: string[] = [];
     const emit = async (name: string, payload: unknown) => {
@@ -46,6 +66,7 @@ describe("integration — llm-skills against a fake tools:registry", () => {
       for (const fn of subscribers[name] ?? []) await fn(payload);
     };
     const tools = fakeToolsRegistry(emit);
+    const ps = fakePromptSystem();
 
     const ctx: any = {
       cwd: "/does-not-exist",
@@ -57,19 +78,27 @@ describe("integration — llm-skills against a fake tools:registry", () => {
       defineService: () => {},
       provideService: () => {},
       consumeService: () => {},
-      useService: (name: string) => (name === "tools:registry" ? tools : undefined),
+      useService: (name: string) => {
+        if (name === "tools:registry") return tools;
+        if (name === "prompt:system") return ps.service;
+        return undefined;
+      },
       secrets: { get: async () => undefined, refresh: async () => undefined },
     };
 
     await plugin.setup(ctx);
 
-    // 1. llm:before-call mutates request.systemPrompt.
-    const req: any = { systemPrompt: "you are a helper", model: "x", messages: [] };
-    await emit("llm:before-call", { request: req });
-    expect(req.systemPrompt).toContain("## Available skills");
-    expect(req.systemPrompt).toContain("- git-rebase");
+    // 1. prompt:system section is registered (no llm:before-call injection).
+    const section = ps.sections.find((s: any) => s.id === "llm-skills:available");
+    expect(section).toBeDefined();
+    const rendered = await section.render();
+    expect(rendered).toContain("- git-rebase");
+    expect(rendered.includes("## Available skills")).toBe(false);
 
-    // 2. Invoke load_skill via the registry.
+    // 2. No llm:before-call subscriber.
+    expect(subscribers["llm:before-call"]).toBeUndefined();
+
+    // 3. Invoke load_skill via the registry.
     const result = await tools.invoke("load_skill", { name: "git-rebase" }, {
       signal: new AbortController().signal,
       callId: "call-1",
@@ -77,7 +106,7 @@ describe("integration — llm-skills against a fake tools:registry", () => {
     });
     expect(result).toMatchObject({ name: "git-rebase", body: expect.stringContaining("Step 1") });
 
-    // 3. Event ordering: before-execute → execute → skill:loaded → tool:result.
+    // 4. Event ordering: before-execute → execute → skill:loaded → tool:result.
     const idxBefore = emittedOrder.indexOf("tool:before-execute");
     const idxExec = emittedOrder.indexOf("tool:execute");
     const idxLoaded = emittedOrder.indexOf("skill:loaded");
@@ -96,6 +125,7 @@ describe("integration — llm-skills against a fake tools:registry", () => {
       for (const fn of subscribers[name] ?? []) await fn(payload);
     };
     const tools = fakeToolsRegistry(emit);
+    const ps = fakePromptSystem();
     const ctx: any = {
       cwd: "/does-not-exist",
       env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
@@ -106,7 +136,11 @@ describe("integration — llm-skills against a fake tools:registry", () => {
       defineService: () => {},
       provideService: () => {},
       consumeService: () => {},
-      useService: (name: string) => (name === "tools:registry" ? tools : undefined),
+      useService: (name: string) => {
+        if (name === "tools:registry") return tools;
+        if (name === "prompt:system") return ps.service;
+        return undefined;
+      },
       secrets: { get: async () => undefined, refresh: async () => undefined },
     };
     await plugin.setup(ctx);

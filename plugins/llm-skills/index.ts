@@ -1,9 +1,10 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { SkillsRegistryService, ToolSchema } from "llm-events/public";
+import type { SkillsRegistryService, ToolsRegistryService } from "llm-events/public";
+import type { SystemPromptService } from "llm-system-prompt/public";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { makeRegistry, type SkillsRegistryServiceImpl } from "./registry.ts";
-import { applyInjection } from "./injection.ts";
+import { buildSkillsBlock } from "./injection.ts";
 import { LOAD_SKILL_SCHEMA, makeLoadSkillHandler } from "./tool.ts";
 
 const DEFAULT_RESCAN_MS = 30000;
@@ -48,7 +49,7 @@ const plugin: KaizenPlugin = {
     // load_skill can register. Without this edge, kaizen's topo-sort has
     // no reason to order us after llm-tools-registry and useService
     // fails even though the registry is configured.
-    consumes: ["tools:registry"],
+    consumes: ["tools:registry", "prompt:system"],
   },
 
   async setup(ctx) {
@@ -56,11 +57,16 @@ const plugin: KaizenPlugin = {
     const userRoot = resolveUserRoot(ctx);
     const interval = rescanIntervalMs(ctx);
 
+    // Resolve prompt:system early so onChange can call bumpGeneration.
+    const promptSystem = ctx.useService<SystemPromptService>("prompt:system");
+    let sectionHandle: { bumpGeneration(): void; unregister(): void } | undefined;
+
     const registry: SkillsRegistryServiceImpl = makeRegistry({
       projectRoot,
       userRoot,
       warn: (m) => ctx.log(m),
       error: (m) => { void ctx.emit("session:error", { message: m }); },
+      onChange: () => { sectionHandle?.bumpGeneration(); },
     });
 
     // Initial scan.
@@ -71,10 +77,19 @@ const plugin: KaizenPlugin = {
 
     void ctx.emit("skill:available-changed", { count: initial.count });
 
-    // System-prompt injection.
-    ctx.on("llm:before-call", async (payload: { request: { systemPrompt?: string } }) => {
-      applyInjection(payload.request, registry.list());
-    });
+    // Register prompt:system section for available skills.
+    if (promptSystem) {
+      sectionHandle = promptSystem.register({
+        id: "llm-skills:available",
+        priority: 160,
+        title: "Available skills",
+        render: () => buildSkillsBlock(registry.list()),
+      });
+      // Bump after initial scan so generation is fresh.
+      sectionHandle.bumpGeneration();
+    } else {
+      void ctx.emit("session:error", { message: "llm-skills: missing required service(s): prompt:system; available-skills section disabled" });
+    }
 
     // Throttled rescan on turn:start.
     let lastScanAt = Date.now();
@@ -85,28 +100,33 @@ const plugin: KaizenPlugin = {
       const r = await registry.rescan();
       if (r.changed) {
         void ctx.emit("skill:available-changed", { count: r.count });
+        sectionHandle?.bumpGeneration();
       }
     });
 
     // Register load_skill into tools:registry if available.
-    let tools:
-      | { register: (s: ToolSchema, h: (a: unknown, c: any) => Promise<unknown>) => () => void }
-      | undefined;
+    let tools: ToolsRegistryService | undefined;
     try {
       tools = ctx.useService("tools:registry");
     } catch {
       tools = undefined;
     }
     let unregisterTool: (() => void) | undefined;
-    if (tools && typeof tools.register === "function") {
+    if (tools && typeof tools.registerWith === "function") {
       const handler = makeLoadSkillHandler(registry, (event, payload) => ctx.emit(event, payload));
-      unregisterTool = tools.register(LOAD_SKILL_SCHEMA, handler);
+      unregisterTool = tools.registerWith({ schema: LOAD_SKILL_SCHEMA, handler, source: { kind: "skill" } });
+    } else if (tools && typeof (tools as any).register === "function") {
+      const handler = makeLoadSkillHandler(registry, (event, payload) => ctx.emit(event, payload));
+      unregisterTool = (tools as any).register(LOAD_SKILL_SCHEMA, handler);
     } else {
       ctx.log("[llm-skills] tools:registry not available; load_skill not registered");
     }
 
     // Optional teardown if the harness calls stop().
-    (plugin as any)._stop = () => { unregisterTool?.(); };
+    (plugin as any)._stop = () => {
+      unregisterTool?.();
+      sectionHandle?.unregister();
+    };
   },
 
   async stop() {

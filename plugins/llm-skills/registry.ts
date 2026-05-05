@@ -8,6 +8,8 @@ export interface RegistryDeps {
   userRoot?: string;        // ~/.kaizen/skills
   warn: (msg: string) => void;
   error: (msg: string) => void;
+  /** Called whenever a programmatic register/unregister changes the registry. */
+  onChange?: () => void;
 }
 
 interface Entry {
@@ -102,7 +104,11 @@ export function makeRegistry(deps: RegistryDeps): SkillsRegistryServiceImpl {
         loader,
         source: "programmatic",
       });
-      return () => { programmatic.delete(manifest.name); };
+      deps.onChange?.();
+      return () => {
+        programmatic.delete(manifest.name);
+        deps.onChange?.();
+      };
     },
 
     async rescan(): Promise<RescanResult> {
