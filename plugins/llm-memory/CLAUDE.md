@@ -44,7 +44,7 @@ Boundaries:
 - **Catalog is ground truth, derived.** `regenerateIndex` reads all entry frontmatter and rewrites the block between markers; user content above is preserved byte-for-byte. Do not cache catalog state in memory.
 - **Markers are appended, never injected mid-document.** Hand-authored `MEMORY.md` without markers gets the catalog block appended at the end on first write. Do not move existing content around.
 - **`created` is preserved across overwrites; `updated` is refreshed on every put.** `store.put` reads the existing file first to recover `created`. Tests rely on this — don't simplify.
-- **Injection is append-only.** `llm:before-call` mutates `request.systemPrompt` by appending the block after a single blank line if non-empty. Never replace, never prepend, never touch `messages[]`.
+- **Memory contributes via `prompt:system`.** The section renders the existing self-contained block (with `<system-reminder>` wrapper and `# Persistent memory` heading); no system-prompt mutation occurs in the plugin. Empty render (both layers empty) returns `""` and the registry drops the section for that call. Never mutate `request.systemPrompt` directly or touch `messages[]`.
 - **No-op when empty.** If both layers have no `MEMORY.md` and no entries, `buildMemoryBlock` returns `null` and the listener makes no mutation. No empty `<system-reminder>` blocks.
 - **`denyTypes` filters both injection AND `memory_recall` results.** Keep the two paths in sync. Tests assert this.
 - **Project shadows global on collision** in `get()` with no scope and in `memory_recall({ names })`. Don't reorder the scope-walk.

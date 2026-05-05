@@ -10,7 +10,8 @@
     "kaizen-plugin"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.10.1"
+    "@modelcontextprotocol/sdk": "1.10.1",
+    "llm-tools-registry": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest",

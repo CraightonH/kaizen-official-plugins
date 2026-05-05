@@ -84,6 +84,7 @@ describe("llm-events", () => {
       "prompt:reload",
       "tools:registered",
       "tools:unregistered",
+      "mcp:registration-conflict",
     ]);
     const actual = new Set(Object.values(VOCAB));
     for (const name of expected) expect(actual.has(name)).toBe(true);
@@ -247,6 +248,10 @@ describe("llm-events", () => {
   it("VOCAB includes tools:registered and tools:unregistered", () => {
     expect(VOCAB.TOOLS_REGISTERED).toBe("tools:registered");
     expect(VOCAB.TOOLS_UNREGISTERED).toBe("tools:unregistered");
+  });
+
+  it("VOCAB includes mcp:registration-conflict", () => {
+    expect(VOCAB.MCP_REGISTRATION_CONFLICT).toBe("mcp:registration-conflict");
   });
 
   it("provides llm-events:vocabulary and defines every event name", async () => {

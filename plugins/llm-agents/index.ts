@@ -1,10 +1,11 @@
 import type { KaizenPlugin } from "kaizen/types";
 import type { AgentsRegistryService, DriverService, ToolsRegistryService } from "llm-events/public";
+import type { SystemPromptService } from "llm-system-prompt/public";
 import { loadConfig, realDeps } from "./config.ts";
 import { loadFromDirs } from "./loader.ts";
 import { makeRegistry, makeRegistryHandle } from "./registry.ts";
 import { makeTurnTracker } from "./turn-tracker.ts";
-import { makeInjector } from "./injector.ts";
+import { makeInjector, buildAgentsBlock } from "./injector.ts";
 import { makeDispatchTool } from "./dispatch.ts";
 import { readdir, stat as fsStat, realpath as fsRealpath, readFile as fsReadFile } from "node:fs/promises";
 
@@ -14,7 +15,7 @@ const plugin: KaizenPlugin = {
   permissions: { tier: "unscoped" },
   services: {
     provides: ["agents:registry"],
-    consumes: ["tools:registry", "driver:run-conversation", "llm-events:vocabulary"],
+    consumes: ["tools:registry", "driver:run-conversation", "llm-events:vocabulary", "prompt:system"],
   },
 
   async setup(ctx) {
@@ -51,7 +52,21 @@ const plugin: KaizenPlugin = {
         if (!ready) throw new Error("Agent registry still loading; retry");
         return realHandler(args, tCtx);
       };
-      tools.register(dispatch.schema, guardedHandler);
+      tools.registerWith({ schema: dispatch.schema, handler: guardedHandler, source: { kind: "agent" } });
+    }
+
+    // Register prompt:system section for available agents.
+    const promptSystem = ctx.useService<SystemPromptService>("prompt:system");
+    let sectionHandle: { bumpGeneration(): void; unregister(): void } | undefined;
+    if (promptSystem) {
+      sectionHandle = promptSystem.register({
+        id: "llm-agents:available",
+        priority: 150,
+        title: "Available agents",
+        render: () => buildAgentsBlock(handle.service.list()),
+      });
+    } else {
+      void ctx.emit("session:error", { message: "llm-agents: missing required service(s): prompt:system; available-agents section disabled" });
     }
 
     // Discovery in a microtask — does not block setup().
@@ -67,7 +82,7 @@ const plugin: KaizenPlugin = {
             readFile: (p) => fsReadFile(p, "utf8"),
           },
         });
-        handle.setInner(makeRegistry(result.manifests));
+        handle.setInner(makeRegistry(result.manifests, () => sectionHandle?.bumpGeneration()), () => sectionHandle?.bumpGeneration());
         ready = true;
         for (const e of result.errors) {
           await ctx.emit("session:error", { message: `llm-agents: ${e.path}: ${e.message}` });

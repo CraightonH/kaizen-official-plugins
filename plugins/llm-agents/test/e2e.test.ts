@@ -24,9 +24,16 @@ function makeCtx(opts: { tools?: any; driver?: any } = {}) {
     useService: (name: string) => {
       if (name === "tools:registry") return {
         register: (s: any, h: any) => { registeredTool = s; registeredHandler = h; return () => {}; },
+        registerWith: (reg: any) => { registeredTool = reg.schema; registeredHandler = reg.handler; return () => {}; },
         list: () => [], invoke: async () => {},
       };
       if (name === "driver:run-conversation") return opts.driver;
+      if (name === "prompt:system") return {
+        register: () => ({ unregister: () => {}, bumpGeneration: () => {} }),
+        assemble: async () => "",
+        list: () => [],
+        generation: () => 0,
+      };
       return undefined;
     },
     secrets: { get: async () => undefined, refresh: async () => undefined },

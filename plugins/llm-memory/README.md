@@ -7,7 +7,7 @@ File-backed persistent memory for the openai-compatible harness. Reads and write
 - Maintains two memory layers on disk:
   - **Project:** `<cwd>/.kaizen/memory/` (created lazily; can be disabled via config).
   - **Global:** `~/.kaizen/memory/` (always on).
-- On every LLM call, appends a fenced `<system-reminder>` block to `request.systemPrompt` containing:
+- Registers a `prompt:system` section (id `"llm-memory:auto"`, priority `170`, no title — the block is self-titled with a `# Persistent memory` heading inside a `<system-reminder>` wrapper) that contributes on every LLM call:
   - The user-authored prelude of each layer's `MEMORY.md`.
   - A catalog of available entries (`scope:name — description`) loadable on demand via tool.
   - Truncates per-layer index bodies and the catalog (oldest-first) to a configurable byte cap.
@@ -63,7 +63,7 @@ If `tools:registry` is absent, the service still works; the tools are simply not
 
 ### Consumes
 
-- **Event** — `llm:before-call` (mutable). Mutates `payload.request.systemPrompt` in place, appending the memory block (separated from existing content by a single blank line). Skipped when both layers are empty.
+- **Event** — `prompt:system`. Contributes the memory block via a registered section (id `"llm-memory:auto"`, priority `170`). Generation is bumped via `onChange` on every `store.put` and `store.remove` so the rendered block stays current. Skipped (returns `""`) when both layers are empty, causing the registry to drop the section for that call.
 - **Event** — `turn:end` (only when `autoExtract: true`). Reads `{ reason, lastUserMessage, turnId }`; runs the trigger heuristic and, on hit, issues the side conversation.
 - **Service** — `tools:registry` (optional). When present, registers `memory_recall` and `memory_save`.
 - **Service** — `driver:run-conversation` (optional, only when `autoExtract: true`). Used to issue a tool-gated side conversation for extraction; missing service logs and skips.

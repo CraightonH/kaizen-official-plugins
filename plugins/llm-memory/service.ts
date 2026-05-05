@@ -6,6 +6,8 @@ export interface MemoryServiceDeps {
   globalDir: string;
   projectDir: string | null;
   log: (msg: string) => void;
+  /** Called after any successful put or remove so callers can bump caches. */
+  onChange?: () => void;
 }
 
 export function makeMemoryStore(deps: MemoryServiceDeps): MemoryStoreService {
@@ -14,5 +16,6 @@ export function makeMemoryStore(deps: MemoryServiceDeps): MemoryStoreService {
     projectDir: deps.projectDir,
     regenerateIndex: (dir: string) => regenerateIndex(dir),
     log: deps.log,
+    onChange: deps.onChange,
   });
 }

@@ -38,6 +38,7 @@ export interface Vocab {
   readonly PROMPT_RELOAD: "prompt:reload";
   readonly TOOLS_REGISTERED: "tools:registered";
   readonly TOOLS_UNREGISTERED: "tools:unregistered";
+  readonly MCP_REGISTRATION_CONFLICT: "mcp:registration-conflict";
 }
 export type EventName = Vocab[keyof Vocab];
 

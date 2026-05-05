@@ -6,7 +6,7 @@ export interface AgentsRegistry {
   getInternal(name: string): InternalAgentManifest | undefined;
 }
 
-export function makeRegistry(initial: InternalAgentManifest[]): AgentsRegistry {
+export function makeRegistry(initial: InternalAgentManifest[], onChange?: () => void): AgentsRegistry {
   const map = new Map<string, InternalAgentManifest>();
   for (const m of initial) map.set(m.name, m);
 
@@ -32,7 +32,11 @@ export function makeRegistry(initial: InternalAgentManifest[]): AgentsRegistry {
         scope: "user",
       };
       map.set(manifest.name, internal);
-      return () => { map.delete(manifest.name); };
+      onChange?.();
+      return () => {
+        map.delete(manifest.name);
+        onChange?.();
+      };
     },
   };
 
@@ -45,7 +49,7 @@ export function makeRegistry(initial: InternalAgentManifest[]): AgentsRegistry {
 export interface RegistryHandle {
   service: AgentsRegistryService;
   getInternal(name: string): InternalAgentManifest | undefined;
-  setInner(next: AgentsRegistry): void;
+  setInner(next: AgentsRegistry, onChange?: () => void): void;
 }
 
 export function makeRegistryHandle(initial: AgentsRegistry): RegistryHandle {
@@ -58,6 +62,9 @@ export function makeRegistryHandle(initial: AgentsRegistry): RegistryHandle {
       } as AgentsRegistryService;
     },
     getInternal(name) { return inner.getInternal(name); },
-    setInner(next) { inner = next; },
+    setInner(next, onChange) {
+      inner = next;
+      onChange?.();
+    },
   } as RegistryHandle;
 }

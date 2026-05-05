@@ -6,8 +6,9 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 
 ```
 index.ts          Plugin lifecycle: resolves roots, builds registry, runs initial scan,
-                  provides skills:registry, subscribes to llm:before-call and turn:start,
-                  registers load_skill into tools:registry. The only file that touches `ctx`.
+                  provides skills:registry, registers a prompt:system section and subscribes
+                  to turn:start, registers load_skill into tools:registry. The only file that
+                  touches `ctx`.
 registry.ts       makeRegistry({ projectRoot, userRoot, warn, error }) → SkillsRegistryServiceImpl.
                   Pure logic. Owns three layered maps (project / user / programmatic) and a
                   snapshot string for change detection. Conflict resolution lives here.
@@ -17,8 +18,8 @@ scan.ts           scanRoot(absRoot) → ScannedFile[]. Pure I/O. Walks a directo
 frontmatter.ts    parseFrontmatter(text) → { ok, manifest, body } | { ok: false, error }.
                   Hand-rolled YAML-ish parser (no dependency). Recognises name, description,
                   tokens; rejects unknown keys silently; requires single-line values.
-injection.ts      buildSkillsSection(list) and applyInjection(request, list). Pure string
-                  builders for the system-prompt section.
+injection.ts      buildSkillsBlock(list). Pure string builder for the prompt:system section
+                  body. Returns "" when list is empty (the registry drops empty sections).
 tool.ts           LOAD_SKILL_SCHEMA and makeLoadSkillHandler(registry, emit). Pure factory;
                   no state.
 tokens.ts         estimateTokens(body) → ceil(len / 4). One line; the heuristic.
@@ -37,8 +38,8 @@ Boundaries:
 - **Path-derived name is canonical.** Frontmatter `name` is informational only — if it disagrees with the relative path, the path wins and a warning is logged. The LLM-visible identifier must be predictable from disk layout.
 - **Project beats user beats programmatic.** Conflict resolution is fixed; do not reorder. Masking emits a `warn` (config-time concern), not an event.
 - **Scan failures are non-fatal.** Bad frontmatter, unreadable files, duplicate names within a layer all skip the offending entry and emit `session:error` (or `warn` for masking). The scan must never throw.
-- **Empty registry → no section.** `applyInjection` is a no-op when `list()` is empty. Don't emit an empty `## Available skills` header.
-- **System-prompt mutation is in-place.** `applyInjection` mutates `request.systemPrompt`. Spec 0 declares the `llm:before-call` payload mutable; rely on it.
+- **Empty registry → no section.** `buildSkillsBlock` returns `""` for an empty list; the `prompt:system` registry's "empty sections are dropped" invariant ensures no `## Available skills` header appears.
+- **Skills contribute via `prompt:system`.** A section with id `"llm-skills:available"` and priority 160 is registered at setup. Its title is "Available skills". Generation is bumped after any rescan-changed event and after programmatic register/unregister calls.
 - **Tokens are cached at registration.** `manifest.tokens` is computed once (heuristic or frontmatter override) and never recomputed by `list()`. The `load_skill` handler recomputes only as a fallback when `list()` doesn't carry a token count for the loaded skill.
 - **`load_skill` is registered late and unregistered on stop.** The `services.consumes: ["tools:registry"]` declaration is what guarantees topological ordering — without it, `useService("tools:registry")` may run before the registry is ready.
 - **Rescan throttling is wall-clock based.** `lastScanAt` is captured by the `turn:start` closure. If `KAIZEN_LLM_SKILLS_RESCAN_MS` is invalid or non-positive, fall back to the 30 s default. Never treat 0 as "always rescan".

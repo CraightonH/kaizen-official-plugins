@@ -1,5 +1,5 @@
-import { describe, it, expect } from "bun:test";
-import { makeRegistry } from "../registry.ts";
+import { describe, it, expect, mock } from "bun:test";
+import { makeRegistry, makeRegistryHandle } from "../registry.ts";
 import type { InternalAgentManifest } from "../frontmatter.ts";
 
 const m: InternalAgentManifest = {
@@ -43,5 +43,31 @@ describe("makeRegistry", () => {
     expect(r.service.list().some((x) => x.name === "runtime:adhoc")).toBe(true);
     off();
     expect(r.service.list().some((x) => x.name === "runtime:adhoc")).toBe(false);
+  });
+});
+
+describe("makeRegistry onChange callback", () => {
+  it("register(runtime: agent) invokes onChange once", () => {
+    const onChange = mock(() => {});
+    const r = makeRegistry([], onChange);
+    r.service.register({ name: "runtime:test", description: "d", systemPrompt: "p" });
+    expect(onChange.mock.calls.length).toBe(1);
+  });
+
+  it("returned unregister closure invokes onChange again", () => {
+    const onChange = mock(() => {});
+    const r = makeRegistry([], onChange);
+    const off = r.service.register({ name: "runtime:test", description: "d", systemPrompt: "p" });
+    onChange.mockClear();
+    off();
+    expect(onChange.mock.calls.length).toBe(1);
+  });
+
+  it("RegistryHandle.setInner invokes onChange once on swap", () => {
+    const onChange = mock(() => {});
+    const handle = makeRegistryHandle(makeRegistry([]));
+    const next = makeRegistry([]);
+    handle.setInner(next, onChange);
+    expect(onChange.mock.calls.length).toBe(1);
   });
 });

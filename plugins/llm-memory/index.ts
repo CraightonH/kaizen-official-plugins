@@ -1,6 +1,5 @@
-import { homedir } from "node:os";
 import type { KaizenPlugin } from "kaizen/types";
-import type { LLMRequest } from "llm-events/public";
+import type { SystemPromptService } from "llm-system-prompt/public";
 import { loadConfig, realDeps } from "./config.ts";
 import { resolveDirs, ensureDir, sweepStaleTempFiles } from "./paths.ts";
 import { makeMemoryStore } from "./service.ts";
@@ -15,14 +14,14 @@ const plugin: KaizenPlugin = {
   permissions: { tier: "unscoped" },
   services: {
     provides: ["memory:store"],
-    consumes: ["llm-events:vocabulary", "tools:registry", "driver:run-conversation"],
+    consumes: ["llm-events:vocabulary", "tools:registry", "driver:run-conversation", "prompt:system"],
   },
 
   async setup(ctx) {
     const log = (m: string) => ctx.log(m);
     const config = await loadConfig(realDeps(log));
     const { globalDir, projectDir } = resolveDirs({
-      home: homedir(),
+      home: process.env.HOME ?? "/",
       cwd: process.cwd(),
       config: { globalDir: config.globalDir, projectDir: config.projectDir },
     });
@@ -35,31 +34,51 @@ const plugin: KaizenPlugin = {
     await sweepStaleTempFiles(globalDir, config.staleTempMs);
     if (projectDir) await sweepStaleTempFiles(projectDir, config.staleTempMs);
 
-    const store = makeMemoryStore({ globalDir, projectDir, log });
+    // Resolve prompt:system before creating the store so onChange can bump generation.
+    const promptSystem = ctx.useService<SystemPromptService>("prompt:system");
+    let sectionHandle: { bumpGeneration(): void; unregister(): void } | undefined;
+
+    const store = makeMemoryStore({
+      globalDir,
+      projectDir,
+      log,
+      onChange: () => { sectionHandle?.bumpGeneration(); },
+    });
     ctx.defineService("memory:store", { description: "File-backed persistent memory store." });
     ctx.provideService<MemoryStoreService>("memory:store", store);
 
-    // Injection hook: append a memory block to request.systemPrompt.
-    ctx.on("llm:before-call", async (payload: { request: LLMRequest }) => {
-      const projectIdx = projectDir ? await store.readIndex("project") : "";
-      const globalIdx = await store.readIndex("global");
-      const denyTypes = new Set(config.denyTypes);
-      const projectEntries = projectDir
-        ? (await store.list({ scope: "project" })).filter((e) => !denyTypes.has(e.type))
-        : [];
-      const globalEntries = (await store.list({ scope: "global" })).filter((e) => !denyTypes.has(e.type));
-      const block = buildMemoryBlock({
-        projectIndex: projectIdx,
-        globalIndex: globalIdx,
-        projectEntries,
-        globalEntries,
-        projectPath: projectDir ?? "(disabled)",
-        byteCap: config.injectionByteCap,
+    // Register prompt:system section for saved memories.
+    // Approach A: no title field — the existing buildMemoryBlock returns a self-contained block
+    // with its own <system-reminder> wrapper and "# Persistent memory" heading. Adding a section
+    // title would produce redundant double headers ("## Saved memories\n# Persistent memory").
+    // We omit the title and pass the block verbatim; "" replaces null for an empty result so the
+    // registry drops this section cleanly when there is nothing to inject.
+    if (promptSystem) {
+      sectionHandle = promptSystem.register({
+        id: "llm-memory:auto",
+        priority: 170,
+        render: async () => {
+          const projectIdx = projectDir ? await store.readIndex("project") : "";
+          const globalIdx = await store.readIndex("global");
+          const denyTypes = new Set(config.denyTypes);
+          const projectEntries = projectDir
+            ? (await store.list({ scope: "project" })).filter((e) => !denyTypes.has(e.type))
+            : [];
+          const globalEntries = (await store.list({ scope: "global" })).filter((e) => !denyTypes.has(e.type));
+          const block = buildMemoryBlock({
+            projectIndex: projectIdx,
+            globalIndex: globalIdx,
+            projectEntries,
+            globalEntries,
+            projectPath: projectDir ?? "(disabled)",
+            byteCap: config.injectionByteCap,
+          });
+          return block ?? "";
+        },
       });
-      if (!block) return;
-      const prev = payload.request.systemPrompt ?? "";
-      payload.request.systemPrompt = prev.length === 0 ? block : `${prev}\n\n${block}`;
-    });
+    } else {
+      void ctx.emit("session:error", { message: "llm-memory: missing required service(s): prompt:system; saved-memories section disabled" });
+    }
 
     // Tools registration (best-effort; the tools registry may not exist in A-tier harnesses).
     const registry = ctx.useService<any>("tools:registry");

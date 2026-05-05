@@ -42,6 +42,7 @@ export const VOCAB: Vocab = Object.freeze({
   PROMPT_RELOAD: "prompt:reload",
   TOOLS_REGISTERED: "tools:registered",
   TOOLS_UNREGISTERED: "tools:unregistered",
+  MCP_REGISTRATION_CONFLICT: "mcp:registration-conflict",
 } as const);
 
 const plugin: KaizenPlugin = {

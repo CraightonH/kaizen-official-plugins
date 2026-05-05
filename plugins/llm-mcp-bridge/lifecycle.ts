@@ -3,9 +3,11 @@ import type { McpClientLike, CreateClientResult } from "./client.ts";
 import { computeBackoffMs as defaultBackoff, RETRY_BUDGET as DEFAULT_BUDGET } from "./backoff.ts";
 import { toToolRegistration } from "./registration.ts";
 import type { ServerInfo, ServerStatus } from "./public.d.ts";
+import type { ToolRegistration } from "llm-tools-registry/public";
 
 export interface RegistryLike {
-  register(schema: { name: string; description: string; parameters: object; tags?: string[] }, handler: (args: unknown, ctx: any) => Promise<unknown>): () => void;
+  register(schema: { name: string; description: string; parameters: object; tags?: string[] }, handler: (args: unknown, ctx: any) => Promise<unknown>): () => void; // legacy, kept for transition
+  registerWith(reg: ToolRegistration): () => void;
 }
 
 export interface LifecycleDeps {
@@ -235,7 +237,11 @@ export class ServerLifecycle {
         this.registered.delete(t.name);
       }
       try {
-        const unregister = this.deps.registry.register(newReg.schema, newReg.handler);
+        const unregister = this.deps.registry.registerWith({
+          schema: newReg.schema,
+          handler: newReg.handler,
+          source: { kind: "mcp", server: this.deps.cfg.name },
+        });
         this.registered.set(t.name, { mcpName: t.name, schema: newReg.schema, unregister });
       } catch (err) {
         this.deps.log(`mcp:${this.deps.cfg.name}: register ${newReg.schema.name} failed: ${(err as Error).message}`);

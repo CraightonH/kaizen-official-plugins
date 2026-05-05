@@ -3,10 +3,12 @@ import type { McpClientLike, CreateClientResult } from "./client.ts";
 import { ServerLifecycle, type LifecycleDeps, type RegistryLike } from "./lifecycle.ts";
 import { makeReadMcpResourceTool, makeListMcpResourcesTool, type NamedClient } from "./registration.ts";
 import type { ServerInfo, McpBridgeService } from "./public.d.ts";
+import { detectConflicts } from "./names.ts";
 
 export interface BridgeDeps {
   registry: RegistryLike;
   log: (msg: string) => void;
+  emit?: (event: string, payload: unknown) => void | Promise<void>;
   createClient: (cfg: ResolvedServerConfig) => CreateClientResult;
   initialServers: Map<string, ResolvedServerConfig>;
   // Test injection points; default to globalThis equivalents.
@@ -51,8 +53,8 @@ export function makeBridgeService(deps: BridgeDeps): InternalBridge {
   };
   const readReg = makeReadMcpResourceTool(getClientByServer);
   const listReg = makeListMcpResourcesTool(getHealthyClients);
-  const unregisterRead = deps.registry.register(readReg.schema as any, readReg.handler as any);
-  const unregisterList = deps.registry.register(listReg.schema as any, listReg.handler as any);
+  const unregisterRead = deps.registry.registerWith({ schema: readReg.schema as any, handler: readReg.handler as any, source: { kind: "local" } });
+  const unregisterList = deps.registry.registerWith({ schema: listReg.schema as any, handler: listReg.handler as any, source: { kind: "local" } });
 
   // Start initial set.
   for (const [name, cfg] of deps.initialServers) {
@@ -60,6 +62,16 @@ export function makeBridgeService(deps: BridgeDeps): InternalBridge {
     lifecycles.set(name, lc);
     lc.start();
   }
+
+  // Emit conflict events for any normalized-name collisions.
+  function emitConflicts(): void {
+    const conflicts = detectConflicts([...lifecycles.keys()]);
+    for (const c of conflicts) {
+      void deps.emit?.("mcp:registration-conflict", { normalized: c.normalized, servers: c.servers });
+    }
+  }
+
+  emitConflicts();
 
   function configsEqual(a: ResolvedServerConfig, b: ResolvedServerConfig): boolean {
     return JSON.stringify(a) === JSON.stringify(b);
@@ -104,6 +116,7 @@ export function makeBridgeService(deps: BridgeDeps): InternalBridge {
           }
         }
       }
+      emitConflicts();
       return { added, removed, updated };
     },
     async shutdown(name: string) {

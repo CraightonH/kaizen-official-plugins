@@ -12,6 +12,9 @@ describe("llm-memory metadata", () => {
   it("provides memory:store", () => {
     expect(plugin.services?.provides).toContain("memory:store");
   });
+  it("consumes prompt:system", () => {
+    expect(plugin.services?.consumes).toContain("prompt:system");
+  });
 });
 
 import { mkdtempSync } from "node:fs";
@@ -19,9 +22,25 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mock } from "bun:test";
 
-function makeCtx(env: Record<string, string | undefined> = {}) {
+function makePromptSystem() {
+  const sections: any[] = [];
+  return {
+    svc: {
+      register: mock((section: any) => {
+        sections.push(section);
+        const handle = { bumpGeneration: mock(() => {}), unregister: mock(() => {}) };
+        return handle;
+      }),
+      assemble: mock(async () => ""),
+    },
+    sections,
+  };
+}
+
+function makeCtx(promptSystemSvc?: any, env: Record<string, string | undefined> = {}) {
   const services: Record<string, unknown> = {};
   const handlers: Record<string, Function[]> = {};
+  if (promptSystemSvc) services["prompt:system"] = promptSystemSvc;
   return {
     log: mock(() => {}),
     defineService: mock(() => {}),
@@ -38,25 +57,108 @@ function makeCtx(env: Record<string, string | undefined> = {}) {
 }
 
 describe("llm-memory setup wiring", () => {
-  it("provides memory:store and subscribes llm:before-call", async () => {
+  it("provides memory:store and registers prompt:system section (id=llm-memory:auto, priority=170)", async () => {
     const home = mkdtempSync(join(tmpdir(), "llm-memory-home-"));
     const orig = process.env.HOME;
     process.env.HOME = home;
     try {
-      const ctx = makeCtx();
+      const { svc, sections } = makePromptSystem();
+      const ctx = makeCtx(svc);
       await plugin.setup(ctx);
       expect(ctx.services["memory:store"]).toBeTruthy();
-      expect(ctx.handlers["llm:before-call"]?.length).toBe(1);
+      expect(sections.length).toBe(1);
+      expect(sections[0].id).toBe("llm-memory:auto");
+      expect(sections[0].priority).toBe(170);
     } finally {
       if (orig !== undefined) process.env.HOME = orig;
     }
   });
+
+  it("section has no title (approach A: block carries its own structure)", async () => {
+    const home = mkdtempSync(join(tmpdir(), "llm-memory-home-"));
+    const orig = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      const { svc, sections } = makePromptSystem();
+      const ctx = makeCtx(svc);
+      await plugin.setup(ctx);
+      expect(sections[0].title).toBeUndefined();
+    } finally {
+      if (orig !== undefined) process.env.HOME = orig;
+    }
+  });
+
+  it("does NOT subscribe llm:before-call", async () => {
+    const home = mkdtempSync(join(tmpdir(), "llm-memory-home-"));
+    const orig = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      const { svc } = makePromptSystem();
+      const ctx = makeCtx(svc);
+      await plugin.setup(ctx);
+      expect(ctx.handlers["llm:before-call"]).toBeUndefined();
+    } finally {
+      if (orig !== undefined) process.env.HOME = orig;
+    }
+  });
+
+  it("emits session:error when prompt:system unavailable", async () => {
+    const home = mkdtempSync(join(tmpdir(), "llm-memory-home-"));
+    const orig = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      const ctx = makeCtx(undefined); // no prompt:system
+      await plugin.setup(ctx);
+      const calls: any[] = (ctx.emit as any).mock.calls;
+      const errorCall = calls.find(([evt]: [string]) => evt === "session:error");
+      expect(errorCall).toBeTruthy();
+      expect(errorCall[1].message).toMatch(/prompt:system/);
+      expect(errorCall[1].message).toMatch(/saved-memories section disabled/);
+    } finally {
+      if (orig !== undefined) process.env.HOME = orig;
+    }
+  });
+
+  it("section render returns empty string (not null) when no memories exist", async () => {
+    const home = mkdtempSync(join(tmpdir(), "llm-memory-home-"));
+    const orig = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      const { svc, sections } = makePromptSystem();
+      const ctx = makeCtx(svc);
+      await plugin.setup(ctx);
+      const result = await sections[0].render();
+      expect(result).toBe("");
+    } finally {
+      if (orig !== undefined) process.env.HOME = orig;
+    }
+  });
+
+  it("bumpGeneration is called after store.put (via onChange)", async () => {
+    const home = mkdtempSync(join(tmpdir(), "llm-memory-home-"));
+    const orig = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      const { svc, sections } = makePromptSystem();
+      const ctx = makeCtx(svc);
+      await plugin.setup(ctx);
+      const store = ctx.services["memory:store"] as any;
+      const handle = (svc.register as any).mock.results[0].value;
+      const bumpBefore = (handle.bumpGeneration as any).mock.calls.length;
+      await store.put({ name: "x", description: "d", type: "user", scope: "global", body: "B" });
+      expect((handle.bumpGeneration as any).mock.calls.length).toBeGreaterThan(bumpBefore);
+    } finally {
+      if (orig !== undefined) process.env.HOME = orig;
+    }
+  });
+
   it("does not subscribe turn:end when autoExtract default (false)", async () => {
     const home = mkdtempSync(join(tmpdir(), "llm-memory-home-"));
     const orig = process.env.HOME;
     process.env.HOME = home;
     try {
-      const ctx = makeCtx();
+      const { svc } = makePromptSystem();
+      const ctx = makeCtx(svc);
       await plugin.setup(ctx);
       expect(ctx.handlers["turn:end"]).toBeUndefined();
     } finally {

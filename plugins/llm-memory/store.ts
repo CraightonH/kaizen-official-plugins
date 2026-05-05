@@ -13,6 +13,8 @@ export interface StoreDeps {
   log: (msg: string) => void;
   /** Override-able clock for tests. Returns ISO-8601 string. */
   now?: () => string;
+  /** Called after any successful put or remove so callers can bump caches (e.g. prompt:system generation). */
+  onChange?: () => void;
 }
 
 function nowIso(): string {
@@ -103,6 +105,7 @@ export function makeStore(deps: StoreDeps): MemoryStoreService {
     const text = renderEntry(finalEntry);
     await atomicWrite(dir, `${entry.name}.md`, text);
     await deps.regenerateIndex(dir);
+    deps.onChange?.();
   }
 
   async function remove(name: string, scope: MemoryScope): Promise<void> {
@@ -116,6 +119,7 @@ export function makeStore(deps: StoreDeps): MemoryStoreService {
       return;
     }
     await deps.regenerateIndex(dir);
+    deps.onChange?.();
   }
 
   async function readIndex(scope: MemoryScope): Promise<string> {

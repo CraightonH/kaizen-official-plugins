@@ -4,15 +4,20 @@ import type { ResolvedServerConfig } from "../config.ts";
 import { makeMockClient, type MockClient } from "./mockServer.ts";
 
 class FakeRegistry {
-  registered = new Map<string, { schema: any; handler: any; unregistered: boolean }>();
+  registered = new Map<string, { schema: any; handler: any; source: any; unregistered: boolean }>();
   register(schema: any, handler: any) {
+    return this.registerWith({ schema, handler, source: { kind: "local" } });
+  }
+  registerWith(reg: { schema: any; handler: any; source: any }) {
+    const { schema, handler, source } = reg;
     if (this.registered.has(schema.name) && !this.registered.get(schema.name)!.unregistered) {
       throw new Error(`duplicate: ${schema.name}`);
     }
-    this.registered.set(schema.name, { schema, handler, unregistered: false });
+    this.registered.set(schema.name, { schema, handler, source, unregistered: false });
     return () => { this.registered.get(schema.name)!.unregistered = true; };
   }
   liveSchemas() { return [...this.registered.values()].filter((v) => !v.unregistered).map((v) => v.schema); }
+  liveRegistrations() { return [...this.registered.values()].filter((v) => !v.unregistered); }
 }
 
 class FakeTimers {
@@ -263,6 +268,69 @@ describe("ServerLifecycle — disabled config", () => {
     await tick(); await tick();
     expect(lc.info().status).toBe("disabled");
     expect(created).toBe(0);
+  });
+});
+
+describe("ServerLifecycle — registerWith source tagging", () => {
+  it("registers MCP tools with source: { kind: 'mcp', server: <name> }", async () => {
+    const c = makeMockClient({
+      capabilities: { tools: {} },
+      tools: [{ name: "search", description: "Search.", inputSchema: { type: "object", properties: {} } }],
+    });
+    const reg = new FakeRegistry();
+    const t = new FakeTimers();
+    const lc = new ServerLifecycle({
+      cfg: baseCfg({ name: "github" }),
+      registry: reg,
+      log: () => {},
+      createClient: () => ({ client: c }),
+      setTimeout: (cb, ms) => t.set(cb, ms),
+      clearTimeout: (h) => t.clear(h),
+      now: () => t.nowMs,
+    });
+    lc.start();
+    await tick(); await tick();
+    expect(lc.info().status).toBe("connected");
+    const registrations = reg.liveRegistrations();
+    expect(registrations.length).toBe(1);
+    const toolReg = registrations.find((r) => r.schema.name === "mcp:github:search");
+    expect(toolReg).toBeDefined();
+    expect(toolReg!.source).toEqual({ kind: "mcp", server: "github" });
+  });
+
+  it("tools from different servers get their respective server names in source", async () => {
+    const reg = new FakeRegistry();
+    const t = new FakeTimers();
+    const cfgA = baseCfg({ name: "serverA" });
+    const cfgB = baseCfg({ name: "serverB" });
+
+    const makeLC = (cfg: ResolvedServerConfig, toolName: string) => {
+      const c = makeMockClient({
+        capabilities: { tools: {} },
+        tools: [{ name: toolName, description: "", inputSchema: { type: "object" } }],
+      });
+      return new ServerLifecycle({
+        cfg,
+        registry: reg,
+        log: () => {},
+        createClient: () => ({ client: c }),
+        setTimeout: (cb, ms) => t.set(cb, ms),
+        clearTimeout: (h) => t.clear(h),
+        now: () => t.nowMs,
+      });
+    };
+
+    const lcA = makeLC(cfgA, "tool1");
+    const lcB = makeLC(cfgB, "tool2");
+    lcA.start();
+    lcB.start();
+    await tick(); await tick();
+
+    const regs = reg.liveRegistrations();
+    const regA = regs.find((r) => r.schema.name === "mcp:serverA:tool1");
+    const regB = regs.find((r) => r.schema.name === "mcp:serverB:tool2");
+    expect(regA!.source).toEqual({ kind: "mcp", server: "serverA" });
+    expect(regB!.source).toEqual({ kind: "mcp", server: "serverB" });
   });
 });
 
