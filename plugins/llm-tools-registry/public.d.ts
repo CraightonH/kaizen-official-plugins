@@ -15,3 +15,19 @@ export type {
   ToolHandler,
   ToolExecutionContext,
 } from "./registry";
+
+import type { ToolSchema as _ToolSchema } from "llm-events/public";
+import type { ToolHandler as _ToolHandler } from "./registry";
+
+export type ToolSource =
+  | { kind: "local" }
+  | { kind: "mcp"; server: string }
+  | { kind: "agent" }
+  | { kind: "skill" }
+  | { kind: "memory" };
+
+export interface ToolRegistration {
+  schema: _ToolSchema;
+  handler: _ToolHandler;
+  source: ToolSource;
+}

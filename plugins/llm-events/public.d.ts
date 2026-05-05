@@ -36,6 +36,8 @@ export interface Vocab {
   readonly STATUS_ITEM_CLEAR: "status:item-clear";
   readonly PROMPT_REBUILT: "prompt:rebuilt";
   readonly PROMPT_RELOAD: "prompt:reload";
+  readonly TOOLS_REGISTERED: "tools:registered";
+  readonly TOOLS_UNREGISTERED: "tools:unregistered";
 }
 export type EventName = Vocab[keyof Vocab];
 

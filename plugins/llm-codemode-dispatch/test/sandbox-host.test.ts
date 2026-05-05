@@ -1,12 +1,19 @@
 import { describe, it, expect } from "bun:test";
 import { runInSandbox, type SandboxRunResult } from "../sandbox-host.ts";
-import type { ToolsRegistryService, ToolSchema } from "llm-events/public";
+import type { ToolSchema } from "llm-events/public";
 
-function mockRegistry(handlers: Record<string, (args: any) => Promise<unknown> | unknown>): ToolsRegistryService {
+function mockRegistry(handlers: Record<string, (args: any) => Promise<unknown> | unknown>): any {
   return {
     register: () => () => {},
+    registerWith: () => () => {},
     list: () => [] as ToolSchema[],
-    invoke: async (name, args, _ctx) => {
+    listRegistrations: () =>
+      Object.keys(handlers).map((name) => ({
+        schema: { name, description: "", parameters: { type: "object", properties: {} } as any },
+        handler: async () => null,
+        source: { kind: "local" as const },
+      })),
+    invoke: async (name: string, args: unknown, _ctx: any) => {
       const h = handlers[name];
       if (!h) throw new Error(`unknown tool: ${name}`);
       return await h(args);

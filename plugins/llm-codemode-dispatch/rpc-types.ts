@@ -1,9 +1,22 @@
 // Messages exchanged between sandbox-host (in main process) and sandbox-entry (in Bun Worker).
+// Serializable subset of ToolRegistration for postMessage transport.
+// (Handlers/functions can't cross the worker boundary.)
+export interface RegistrationMeta {
+  name: string;
+  source:
+    | { kind: "local" }
+    | { kind: "mcp"; server: string }
+    | { kind: "agent" }
+    | { kind: "skill" }
+    | { kind: "memory" };
+}
+
 // host → worker
 export interface InitMsg {
   type: "init";
   wrappedCode: string;        // already wrapped by sandbox-host using wrapCode()
   maxStdoutBytes: number;
+  registrations: RegistrationMeta[];
 }
 export interface ToolResultMsg {
   type: "tool-result";

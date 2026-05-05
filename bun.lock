@@ -64,6 +64,7 @@
       "version": "0.1.0",
       "dependencies": {
         "json-schema-to-typescript": "^15.0.3",
+        "llm-tools-registry": "workspace:*",
         "mdast-util-from-markdown": "^2.0.2",
         "mdast-util-to-string": "^4.0.0",
       },
@@ -165,9 +166,20 @@
         "typescript": "^5.4.0",
       },
     },
+    "plugins/llm-system-prompt": {
+      "name": "llm-system-prompt",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/bun": "latest",
+        "typescript": "^5.4.0",
+      },
+    },
     "plugins/llm-tools-registry": {
       "name": "llm-tools-registry",
       "version": "0.1.0",
+      "dependencies": {
+        "llm-events": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "latest",
         "@types/json-schema": "^7.0.15",
@@ -415,6 +427,8 @@
     "llm-slash-commands": ["llm-slash-commands@workspace:plugins/llm-slash-commands"],
 
     "llm-status-items": ["llm-status-items@workspace:plugins/llm-status-items"],
+
+    "llm-system-prompt": ["llm-system-prompt@workspace:plugins/llm-system-prompt"],
 
     "llm-tools-registry": ["llm-tools-registry@workspace:plugins/llm-tools-registry"],
 

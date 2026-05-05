@@ -1,3 +1,8 @@
+// Legacy fallback path for harnesses that ship without llm-system-prompt.
+// When prompt:system is provided, index.ts skips this and contributes the
+// API surface via the section registry instead. Remove this file once
+// llm-system-prompt is universal in the harness manifest.
+
 import type { ToolSchema } from "llm-events/public";
 import { renderDts } from "./dts-render.ts";
 

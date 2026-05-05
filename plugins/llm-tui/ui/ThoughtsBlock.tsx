@@ -3,8 +3,7 @@ import { Box, Text } from "ink";
 
 /**
  * Collapsed-by-default Thoughts block rendered in the transcript between a
- * user turn and the assistant reply. Toggle the most recent block with
- * Ctrl+R.
+ * user turn and the assistant reply. Ctrl+R toggles all blocks together.
  */
 export const ThoughtsBlock: React.FC<{ text: string; expanded: boolean; color: string }> = ({ text, expanded, color }) => {
   const lineCount = text.split("\n").filter((l) => l.length > 0).length || 1;
@@ -12,7 +11,7 @@ export const ThoughtsBlock: React.FC<{ text: string; expanded: boolean; color: s
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={color} paddingX={1}>
       <Text color={color} dimColor>
-        {`${caret} 💭 Thoughts (${lineCount} line${lineCount === 1 ? "" : "s"})${expanded ? "" : "  — Ctrl+R to expand"}`}
+        {`${caret} 💭 Thoughts (${lineCount} line${lineCount === 1 ? "" : "s"})${expanded ? "  — Ctrl+R to collapse all" : "  — Ctrl+R to expand all"}`}
       </Text>
       {expanded && (
         <Box flexDirection="column" marginTop={0}>

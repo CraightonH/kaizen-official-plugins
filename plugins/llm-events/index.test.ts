@@ -82,6 +82,8 @@ describe("llm-events", () => {
       "status:item-clear",
       "prompt:rebuilt",
       "prompt:reload",
+      "tools:registered",
+      "tools:unregistered",
     ]);
     const actual = new Set(Object.values(VOCAB));
     for (const name of expected) expect(actual.has(name)).toBe(true);
@@ -240,6 +242,11 @@ describe("llm-events", () => {
   it("VOCAB includes prompt:rebuilt and prompt:reload", () => {
     expect(VOCAB.PROMPT_REBUILT).toBe("prompt:rebuilt");
     expect(VOCAB.PROMPT_RELOAD).toBe("prompt:reload");
+  });
+
+  it("VOCAB includes tools:registered and tools:unregistered", () => {
+    expect(VOCAB.TOOLS_REGISTERED).toBe("tools:registered");
+    expect(VOCAB.TOOLS_UNREGISTERED).toBe("tools:unregistered");
   });
 
   it("provides llm-events:vocabulary and defines every event name", async () => {

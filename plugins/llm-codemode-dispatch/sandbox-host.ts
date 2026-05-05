@@ -1,8 +1,75 @@
-import type { ToolsRegistryService } from "llm-events/public";
+import type { ToolsRegistryService as EventsRegistry } from "llm-events/public";
+import type { ToolsRegistryService as FullRegistry, ToolRegistration } from "llm-tools-registry/public";
+
+// The host needs both `invoke` (events surface) and `listRegistrations`
+// (full registry surface) so the worker can build a grouped kaizen global.
+type SandboxRegistry = EventsRegistry & Pick<FullRegistry, "listRegistrations">;
 import type { CodeModeConfig } from "./config.ts";
-import type { HostToWorker, WorkerToHost, InitMsg, ToolResultMsg } from "./rpc-types.ts";
+import type { HostToWorker, WorkerToHost, InitMsg, ToolResultMsg, RegistrationMeta } from "./rpc-types.ts";
 import { wrapCode } from "./wrapper.ts";
 import { truncate } from "./serialize.ts";
+import { normalizeServerName } from "./assembler.ts";
+
+/**
+ * Build the `kaizen` global object exposed inside the sandbox.
+ *
+ * Tools are grouped by source:
+ *   - local  → kaizen.tools.<name>
+ *   - mcp    → kaizen.mcp.<normalizedServer>.<name>
+ *   - agent  → kaizen.agents.<name>
+ *   - skill  → kaizen.skills.<name>
+ *   - memory → kaizen.memory.<name>
+ *
+ * Empty groups are omitted so the surface only advertises what's actually
+ * registered.
+ */
+export interface BuildKaizenGlobalArgs {
+  registrations: ReadonlyArray<Pick<ToolRegistration, "schema" | "source">>;
+  invoke: (name: string, args: unknown) => Promise<unknown>;
+}
+
+export function buildKaizenGlobal(args: BuildKaizenGlobalArgs): {
+  tools?: Record<string, (a: unknown) => Promise<unknown>>;
+  mcp?: Record<string, Record<string, (a: unknown) => Promise<unknown>>>;
+  agents?: Record<string, (a: unknown) => Promise<unknown>>;
+  skills?: Record<string, (a: unknown) => Promise<unknown>>;
+  memory?: Record<string, (a: unknown) => Promise<unknown>>;
+} {
+  const { registrations, invoke } = args;
+  const out: Record<string, unknown> = {};
+  const ensure = (k: string): Record<string, unknown> => {
+    if (!out[k]) out[k] = {};
+    return out[k] as Record<string, unknown>;
+  };
+  const fn = (name: string) => (a: unknown) => invoke(name, a);
+
+  for (const r of registrations) {
+    const name = r.schema.name;
+    const s = r.source;
+    switch (s.kind) {
+      case "local":
+        ensure("tools")[name] = fn(name);
+        break;
+      case "mcp": {
+        const server = normalizeServerName(s.server);
+        const ns = ensure("mcp");
+        if (!ns[server]) ns[server] = {};
+        (ns[server] as Record<string, unknown>)[name] = fn(name);
+        break;
+      }
+      case "agent":
+        ensure("agents")[name] = fn(name);
+        break;
+      case "skill":
+        ensure("skills")[name] = fn(name);
+        break;
+      case "memory":
+        ensure("memory")[name] = fn(name);
+        break;
+    }
+  }
+  return out as ReturnType<typeof buildKaizenGlobal>;
+}
 
 export type SandboxRunResult =
   | { ok: true; returnValue: unknown; stdout: string }
@@ -20,7 +87,7 @@ const ENTRY_URL = (() => {
 
 export async function runInSandbox(
   userCode: string,
-  registry: ToolsRegistryService,
+  registry: SandboxRegistry,
   signal: AbortSignal,
   config: CodeModeConfig,
   emit?: (event: string, payload: unknown) => Promise<void>,
@@ -124,7 +191,16 @@ export async function runInSandbox(
       resolve({ ok: false, errorName: "WorkerCrash", errorMessage: e?.message ?? "worker crashed", stdout });
     };
 
-    const init: InitMsg = { type: "init", wrappedCode: wrap.wrapped, maxStdoutBytes: config.maxStdoutBytes };
+    const regs: RegistrationMeta[] = (registry.listRegistrations?.() ?? []).map((r) => ({
+      name: r.schema.name,
+      source: r.source,
+    }));
+    const init: InitMsg = {
+      type: "init",
+      wrappedCode: wrap.wrapped,
+      maxStdoutBytes: config.maxStdoutBytes,
+      registrations: regs,
+    };
     worker.postMessage(init satisfies HostToWorker);
   });
 }

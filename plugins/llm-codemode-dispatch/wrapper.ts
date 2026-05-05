@@ -98,10 +98,16 @@ export function wrapCode(userCode: string): WrapResult {
   const forbidden = checkForbidden(userCode);
   if (forbidden) return { wrapped: "", transpileError: forbidden };
 
-  const syn = trySyntaxCheck(userCode);
-  if (syn) return { wrapped: "", transpileError: syn };
-
+  // Wrap first, then syntax-check the wrapped string. The user's code runs
+  // inside `(async () => { ... })()`, where top-level `return` is legal.
+  // Checking the raw input as a module would reject those returns even
+  // though they'll execute fine — and the system prompt explicitly promises
+  // top-level `return` works as a tool result.
   const rewritten = rewriteTrailingExpression(userCode);
   const wrapped = `(async () => {\n${rewritten}\n})()`;
+
+  const syn = trySyntaxCheck(wrapped);
+  if (syn) return { wrapped: "", transpileError: syn };
+
   return { wrapped };
 }
