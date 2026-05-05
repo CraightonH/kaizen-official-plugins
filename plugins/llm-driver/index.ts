@@ -9,6 +9,7 @@ import { snapshotMessages, type CurrentTurn } from "./state.ts";
 import { newTurnId } from "./ids.ts";
 import { wireCancel } from "./cancel.ts";
 import { pickBusyMessage } from "./busy-messages.ts";
+import { pickDoneMessage } from "./done-messages.ts";
 
 interface UiChannel {
   readInput(): Promise<string>;
@@ -187,11 +188,12 @@ const plugin: KaizenPlugin = {
           // breathing room from the user message, trailing room before the
           // input box reappears.
           if (text) ui.writeOutput("\n" + text + "\n");
-          // Mirror Claude Code's "✻ Cooked for Ns" line: post a notice with the
-          // wall-clock duration of the turn so the user can see how long the
-          // assistant took without having to watch a stopwatch.
+          // Post a notice with the wall-clock duration of the turn so the
+          // user can see how long the assistant took without watching a
+          // stopwatch. Verb is randomized (see done-messages.ts) so the line
+          // doesn't read like a stuck template.
           const elapsedSec = Math.max(0, Math.round((Date.now() - turnStartedAt) / 1000));
-          ui.writeNotice(`✻ Cooked for ${elapsedSec}s`);
+          ui.writeNotice(`✻ ${pickDoneMessage()} for ${elapsedSec}s`);
           await ctx.emit("conversation:assistant-message", { message: result.finalMessage });
           await ctx.emit("turn:end", { turnId, reason: "complete", durationMs: Date.now() - turnStartedAt });
         } catch (err: any) {

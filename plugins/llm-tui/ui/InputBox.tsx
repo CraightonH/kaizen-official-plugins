@@ -198,6 +198,13 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
       return;
     }
 
+    // Ctrl chords (e.g. Ctrl+R toggling a Thoughts block) deliver the bare
+    // letter as `input` alongside `key.ctrl`. Without this guard the letter
+    // would also be inserted into the prompt buffer. Meta is intentionally
+    // not blocked — on macOS Option produces special unicode like ´/ƒ and
+    // some users actually want to type those.
+    if (key.ctrl) return;
+
     if (input && input.length > 0) {
       // Process character by character to detect trigger characters embedded in
       // multi-char pastes (ink-testing-library sends multi-char strings as one event).
