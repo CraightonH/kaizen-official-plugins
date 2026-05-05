@@ -13,7 +13,7 @@ Owns skill discovery and on-demand loading. Scans markdown files with YAML front
 - Path-derived name always wins over a mismatched frontmatter `name` (with a warning).
 - Caches token counts at registration; default heuristic is `Math.ceil(body.length / 4)`. Frontmatter `tokens:` overrides the heuristic.
 - Initial scan at setup; subsequent scans are throttled and run on `turn:start` (default interval 30 s, configurable).
-- On `llm:before-call`, mutates `request.systemPrompt` in place to append an `## Available skills` section (one bullet per skill, with `~N tokens` and the description). Empty registry → no section.
+- Registers a `prompt:system` section (id `llm-skills:available`, priority 160, title "Available skills") listing one bullet per skill with `~N tokens` and the description. Empty registry → section is dropped by the `prompt:system` registry.
 - Registers `load_skill` into `tools:registry`. Handler returns `{ name, tokens, body }` so the dispatch layer hands the body back as a tool message on the next turn.
 - Bad frontmatter / unreadable files are skipped non-fatally; a `session:error` is emitted so they surface in the UI.
 
@@ -63,8 +63,8 @@ Handler returns `{ name, tokens, body }`. Errors (missing/empty `name`, unknown 
 
 ### Consumes
 
-- **Service** — `tools:registry` (optional, declared in `services.consumes` so topo-sort orders this plugin after the registry's provider when present). Without it, `load_skill` is not registered and the plugin logs a warning; the system-prompt section still appears but the LLM cannot pull bodies.
-- **Event** — `llm:before-call` (mutable payload). Subscriber appends the `## Available skills` section to `request.systemPrompt`. If the prompt is empty/undefined, the section becomes the whole prompt (no leading blank line). Otherwise a blank line separates existing content from the section.
+- **Service** — `tools:registry` (optional, declared in `services.consumes` so topo-sort orders this plugin after the registry's provider when present). Without it, `load_skill` is not registered and the plugin logs a warning; the `prompt:system` section still appears but the LLM cannot pull bodies.
+- **Service** — `prompt:system`. Section id `llm-skills:available`, priority 160, title "Available skills". Registered at setup; generation bumped on rescan-changed and on programmatic register/unregister.
 - **Event** — `turn:start`. Drives throttled rescans.
 
 ### Events emitted
