@@ -1,0 +1,12 @@
+{
+  "name": "llm-system-prompt",
+  "version": "0.1.0",
+  "description": "System-prompt assembler service (prompt:system) for the openai-compatible harness",
+  "type": "module",
+  "exports": { ".": "./index.ts" },
+  "keywords": ["kaizen-plugin"],
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.4.0"
+  }
+}
