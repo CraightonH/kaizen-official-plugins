@@ -71,6 +71,7 @@ const plugin: KaizenPlugin = {
       "llm:complete",
       "tools:registry",
       "tool-dispatch:strategy",
+      "prompt:system",
     ],
     provides: ["driver:run-conversation"],
   },
@@ -79,6 +80,12 @@ const plugin: KaizenPlugin = {
     ctx.consumeService("llm-events:vocabulary");
     ctx.consumeService("llm-tui:channel");
     ctx.consumeService("llm:complete");
+    // Optional: when llm-system-prompt is loaded, runConversation pulls
+    // systemPrompt from prompt:system.assemble() with a generation-keyed
+    // cache (see loop.ts assemblyCache). No prompt:rebuilt listener needed —
+    // we re-check generation each turn, so any registry mutation flows in
+    // automatically on the next call.
+    ctx.consumeService("prompt:system");
 
     ctx.defineService("driver:run-conversation", {
       description: "Run a (possibly nested) conversation against the LLM with optional tool dispatch.",
@@ -115,15 +122,24 @@ const plugin: KaizenPlugin = {
     const safeUse = <T>(name: string): T | undefined => {
       try { return ctx.useService<T>(name); } catch { return undefined; }
     };
-    buildDeps = (): RunConversationDeps => ({
-      emit: ctx.emit.bind(ctx),
-      llmComplete: ctx.useService<LLMCompleteService>("llm:complete")!,
-      registry: safeUse<ToolsRegistryService>("tools:registry"),
-      strategy: safeUse<ToolDispatchStrategy>("tool-dispatch:strategy"),
-      log: ctx.log.bind(ctx),
-      idGen: newTurnId,
-      defaultSystemPrompt: state.systemPrompt || (ctx.config as DriverConfig)?.defaultSystemPrompt || DEFAULTS.defaultSystemPrompt,
-    });
+    // Memoize the deps bag so the loop's per-deps WeakMap cache for
+    // prompt:system assembly survives across turns. A fresh object every
+    // call would defeat the cache (key would never match).
+    let depsCache: RunConversationDeps | null = null;
+    buildDeps = (): RunConversationDeps => {
+      if (depsCache) return depsCache;
+      depsCache = {
+        emit: ctx.emit.bind(ctx),
+        llmComplete: ctx.useService<LLMCompleteService>("llm:complete")!,
+        registry: safeUse<ToolsRegistryService>("tools:registry"),
+        strategy: safeUse<ToolDispatchStrategy>("tool-dispatch:strategy"),
+        log: ctx.log.bind(ctx),
+        idGen: newTurnId,
+        defaultSystemPrompt: state.systemPrompt || (ctx.config as DriverConfig)?.defaultSystemPrompt || DEFAULTS.defaultSystemPrompt,
+        promptSystem: safeUse<{ assemble(): Promise<string>; generation(): number }>("prompt:system"),
+      };
+      return depsCache;
+    };
 
     const driverService: DriverService = {
       async runConversation(input: RunConversationInput): Promise<RunConversationOutput> {

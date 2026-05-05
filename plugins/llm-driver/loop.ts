@@ -46,6 +46,11 @@ export interface RunConversationOutput {
   usage: { promptTokens: number; completionTokens: number };
 }
 
+export interface PromptSystemServiceLike {
+  assemble(): Promise<string>;
+  generation(): number;
+}
+
 export interface RunConversationDeps {
   emit: (name: string, payload?: unknown) => Promise<void>;
   llmComplete: LLMCompleteService;
@@ -54,6 +59,12 @@ export interface RunConversationDeps {
   log: (msg: string) => void;
   idGen: () => string;
   defaultSystemPrompt: string;
+  /** Optional prompt:system service. When present, all LLM-call systemPrompts
+   * come from `assemble()` and the legacy input.systemPrompt + strategy
+   * append path is bypassed. Generation-keyed cache (see assemblyCache)
+   * avoids re-assembling on every turn — listening to prompt:rebuilt is
+   * unnecessary because we re-check generation each turn. */
+  promptSystem?: PromptSystemServiceLike;
 }
 
 function deepFreeze<T>(o: T): T {
@@ -68,6 +79,34 @@ function appendSystemAppend(sp: string | undefined, append: string | undefined):
   if (!append) return sp;
   if (!sp) return append;
   return `${sp}\n\n${append}`;
+}
+
+interface AssemblyCache {
+  generation: number;
+  prompt: string;
+}
+// Per-deps WeakMap cache keyed on the deps bag (one bag per driver instance).
+// Re-checked each turn against promptSystem.generation(); on mismatch we
+// re-assemble. This avoids needing a prompt:rebuilt subscription — generation
+// is the source of truth.
+const assemblyCache = new WeakMap<RunConversationDeps, AssemblyCache>();
+
+async function resolveSystemPrompt(
+  input: RunConversationInput,
+  deps: RunConversationDeps,
+  legacyAppend: string | undefined,
+): Promise<string | undefined> {
+  if (deps.promptSystem) {
+    const gen = deps.promptSystem.generation();
+    const cached = assemblyCache.get(deps);
+    if (!cached || cached.generation !== gen) {
+      const prompt = await deps.promptSystem.assemble();
+      assemblyCache.set(deps, { generation: gen, prompt });
+      return prompt;
+    }
+    return cached.prompt;
+  }
+  return appendSystemAppend(input.systemPrompt, legacyAppend);
 }
 
 export async function runConversation(
@@ -105,7 +144,7 @@ export async function runConversation(
     const request: LLMRequest = {
       model: input.model,
       messages: workingMessages.slice(),
-      systemPrompt: appendSystemAppend(input.systemPrompt, additions.systemPromptAppend),
+      systemPrompt: await resolveSystemPrompt(input, deps, additions.systemPromptAppend),
       tools: additions.tools,
     };
 
@@ -203,7 +242,7 @@ export async function runConversation(
       const request2: LLMRequest = {
         model: input.model,
         messages: workingMessages.slice(),
-        systemPrompt: appendSystemAppend(input.systemPrompt, additions2.systemPromptAppend),
+        systemPrompt: await resolveSystemPrompt(input, deps, additions2.systemPromptAppend),
         tools: additions2.tools,
       };
       await deps.emit("llm:before-call", { request: request2, turnId });
