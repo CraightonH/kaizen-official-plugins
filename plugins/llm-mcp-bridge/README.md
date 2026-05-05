@@ -1,41 +1,112 @@
 # llm-mcp-bridge
 
-Bridge MCP (Model Context Protocol) servers into the kaizen openai-compatible
-harness. v0 surfaces **tools and resources only** — prompts are deferred to v1.
+Owns the lifecycle of one or more Model Context Protocol (MCP) servers and re-publishes their tools and resources into kaizen's registries so the LLM sees them as native tools.
 
-Pinned SDK: `@modelcontextprotocol/sdk@1.10.1`
+## What it does
 
-## Dependencies
+- Reads MCP server config from disk (project, user, and `${KAIZEN_MCP_CONFIG}` paths) and resolves env interpolation (`${env:VAR}`).
+- For each enabled server, runs a state machine: `connecting` → `connected` → `reconnecting` → `quarantined` (or `disabled`).
+  - **Connect:** stdio subprocess (`StdioClientTransport`), SSE (`SSEClientTransport`), or streamable HTTP (`StreamableHTTPClientTransport`).
+  - **Handshake:** MCP `initialize`, then `tools/list` + `resources/list` based on advertised capabilities.
+  - **Health:** periodic MCP `ping` every `healthCheckMs` (default 60s); failure ⇒ reconnect.
+  - **Reconnect:** exponential backoff 1s/2s/4s/8s/16s, capped at 60s. After 5 consecutive failures the server is **quarantined**; tool handlers fast-fail with `mcp_server_unavailable: <name>` until a manual reconnect.
+  - **Shutdown:** on session end, close transports, SIGTERM stdio (force-kill after 5s), unregister tools.
+- Translates server capabilities into registry entries:
+  - **Tools** — each MCP tool registered as `mcp:<server>:<toolname>` with tags `["mcp", "mcp:<server>"]`. MCP `inputSchema` is used verbatim as the JSONSchema7 `parameters`. Text-only result content is flattened to a string; mixed/binary content passes through as the structured array.
+  - **Resources** — not enumerated. Two global tools are registered once: `read_mcp_resource({ server, uri })` and `list_mcp_resources({ server? })`.
+  - **Prompts** — **ignored in v0** (logged at debug). Reserved for v1 → namespaced slash commands.
+- Reconciles tool sets on reconnect and on `notifications/tools/list_changed` (register added, unregister removed, replace changed schemas).
+- Pinned SDK: `@modelcontextprotocol/sdk@1.10.1`.
 
-- Hard: `@modelcontextprotocol/sdk@1.10.1`, `llm-events`,
-  `tools:registry` (provided by `llm-tools-registry`).
-- Soft: `slash:registry` (provided by `llm-slash-commands`). If absent,
-  `/mcp:*` commands are not registered; tool surfacing still works.
+## Wiring
 
-## Trust
+### Provides
 
-MCP servers run with the **same privileges as the harness**. There is no
-sandboxing. Before adding a server, audit:
+**Service** — `mcp:bridge`
 
-- `command` and `args` (especially `npx ...` packages — pin a specific version
-  via `@<version>` to prevent silent upgrades).
-- The scope of the package; prefer `@modelcontextprotocol/*` and other vetted
-  publishers.
-- Any environment variables you grant via `env`.
+```typescript
+type ServerStatus =
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "quarantined"
+  | "disabled";
+
+interface ServerInfo {
+  name: string;
+  transport: "stdio" | "sse" | "http";
+  status: ServerStatus;
+  toolCount: number;
+  resourceCount: number;     // -1 until first listing succeeds
+  promptCount: number;       // always 0 in v0
+  lastError?: string;
+  connectedAt?: number;
+  reconnectAttempts: number;
+}
+
+interface McpBridgeService {
+  list(): ServerInfo[];
+  get(name: string): ServerInfo | undefined;
+  reconnect(name: string): Promise<void>;     // clears quarantine
+  reload(newConfig?: Map<string, ResolvedServerConfig>): Promise<{ added: string[]; removed: string[]; updated: string[] }>;
+  shutdown(name: string): Promise<void>;       // stop one server
+}
+```
+
+Semantics:
+- `list()` returns one `ServerInfo` per configured server (including `disabled`/`quarantined` ones).
+- `reconnect(name)` aborts current timers, closes the client, resets the attempt counter, and re-runs Phase 1 → Phase 2.
+- `reload()` diffs the new config against the running set: shuts down removed servers, starts new ones, restarts changed ones (any field differs ⇒ shutdown + start).
+- Tools belonging to a quarantined server stay registered; their handlers throw `mcp_server_unavailable: <name>`.
+
+**Tools** registered into `tools:registry`:
+
+| Tool name | Source | Notes |
+|---|---|---|
+| `mcp:<server>:<toolname>` | each MCP tool from each connected server | tags `["mcp", "mcp:<server>"]` |
+| `read_mcp_resource` | bridge | `{ server: string, uri: string }` |
+| `list_mcp_resources` | bridge | `{ server?: string }` |
+
+**Slash commands** registered into `slash:registry` (when present), all with `source: "plugin"` (Spec 8 namespacing required):
+
+| Command | Behavior |
+|---|---|
+| `/mcp:list` | Print a status table (name, transport, status, tools, resources, lastError). |
+| `/mcp:reload` | Re-read config from disk and apply the diff. |
+| `/mcp:reconnect <server>` | Force reconnect one server (clears quarantine). |
+| `/mcp:disable <server>` | Shutdown one server until next `/mcp:reload`. |
+
+### Consumes
+
+**Services**
+- `tools:registry` — **hard.** Without it the bridge installs a no-op `mcp:bridge` and registers nothing.
+- `llm-events:vocabulary` — for the shared event names emitted/listened to.
+- `slash:registry` — **soft.** If absent, the `/mcp:*` commands are not registered; tool surfacing still works.
+
+**Events listened to**
+- `session:end` — runs graceful shutdown for every server (cancel timers, close transports, unregister tools, force-kill stdio after 5s).
+
+**Events emitted**
+- `status:item-update` — `{ key: "mcp", value: "<connected>/<total>[ ⚠]" }`. Refreshed on a 5s tick. The warning marker is appended whenever any server is quarantined.
+- `status:item-clear` — `{ key: "mcp" }`. Emitted when there are zero configured servers and on `session:end`.
+- `conversation:system-message` — `{ content: string }`. Emitted from `/mcp:*` slash command handlers to write status output back to the conversation.
+- `tool:error` — emitted indirectly: MCP-backed tool handlers throw, and `tools:registry.invoke` surfaces the error through the standard event. The bridge does not emit `tool:error` itself.
+
+This plugin defines no event vocabulary of its own.
 
 ## Configuration
 
-The bridge reads, in this priority order (later sources override earlier):
+Files (resolved in order; later overrides earlier on key collisions, with a warning):
 
-1. `~/.kaizen/mcp/servers.json` (user-scoped)
-2. `<project>/.kaizen/mcp/servers.json` (project-scoped, overrides user)
-3. `${KAIZEN_MCP_CONFIG}` (full path; overrides both, intended for CI)
+1. `~/.kaizen/mcp/servers.json` (user)
+2. `<cwd>/.kaizen/mcp/servers.json` (project)
+3. `${KAIZEN_MCP_CONFIG}` (full path; CI/one-off)
 
-If no file exists, the plugin logs an info line and registers zero MCP tools.
+Absence of all three is not an error.
 
 ### Schema
 
-The format mirrors Claude Code's MCP config so entries copy across:
+Mirrors Claude Code's MCP config so entries copy across:
 
 ```jsonc
 {
@@ -64,77 +135,23 @@ The format mirrors Claude Code's MCP config so entries copy across:
 }
 ```
 
-- `transport` is inferred when omitted: `command` => `stdio`, `url` only => `http`.
-  Use `"sse"` explicitly for Server-Sent-Events transports.
-- `${env:VAR}` is interpolated at load time. If `VAR` is unset, the server is
-  skipped with a warning and the rest continue.
-- Server names must match `/^[a-z0-9][a-z0-9_-]*$/` because they participate in
-  tool names (`mcp:<server>:<tool>`).
+Inference rules:
+- `command` present ⇒ `stdio`.
+- `url` present, no `command` ⇒ `http`.
+- `"sse"` must be set explicitly.
 
-## What gets registered
+`${env:VAR}` is interpolated at load time on every string value. Missing vars skip that one server with a warning; others continue.
 
-- **Tools.** Each MCP tool the server reports is registered as
-  `mcp:<server>:<toolname>` with tags `["mcp", "mcp:<server>"]`. The MCP
-  `inputSchema` is used verbatim as the kaizen `parameters` JSONSchema.
-- **Resources** — _not enumerated._ Two universal tools are registered once
-  globally:
-  - `read_mcp_resource({ server, uri })` proxies to `resources/read`.
-  - `list_mcp_resources({ server? })` aggregates `resources/list` across all
-    healthy servers (or one).
-  This keeps the LLM's tool budget bounded regardless of how many resources a
-  server exposes.
-- **Prompts** — _not surfaced in v0._ If a server's `initialize` advertises
-  `prompts: {}`, the capability is ignored (logged at debug). v1 will register
-  prompts as `/mcp:<server>:<prompt>` slash commands; **not** as skills.
+Server names must match `/^[a-z0-9][a-z0-9_-]*$/` because they appear in tool names.
 
-## Slash commands
+## Permissions
 
-If `slash:registry` is provided by `llm-slash-commands`, four namespaced
-plugin commands are registered (Spec 8 mandates the namespace prefix):
+`tier: unscoped`. The bridge spawns arbitrary subprocesses (stdio transport), opens user-supplied URLs (sse/http), reads env vars for auth, and registers arbitrary tool schemas the LLM can invoke.
 
-- `/mcp:list` — status table of all configured servers.
-- `/mcp:reload` — re-read config from disk and apply the diff (no file watch).
-- `/mcp:reconnect <server>` — force reconnect; clears quarantine.
-- `/mcp:disable <server>` — shut down and unregister tools until next reload.
+## Trust
 
-## Lifecycle
+MCP servers run with the **same privileges as the harness** — there is no sandboxing. Before adding a server, audit:
 
-Each server is owned end-to-end by the bridge:
-
-1. **Connect** — spawn subprocess (stdio) / open EventSource (sse) / nothing
-   persistent (http).
-2. **Handshake** — `initialize`; capabilities recorded.
-3. **Health** — `ping` every `healthCheckMs` (default 60s). Failures are
-   treated as disconnects.
-4. **Reconnect** — exponential backoff `1s, 2s, 4s, 8s, 16s` capped at 60s; 5
-   attempts before quarantine.
-5. **Shutdown** — on `session:end`, SIGTERM stdio (force-kill after 5s), close
-   transports, unregister tools.
-
-Tools registered by a quarantined server **remain in the registry** with their
-handlers fast-failing (`mcp_server_unavailable: <name>`) — this avoids
-tool-list churn for the LLM. `/mcp:reconnect <name>` revives the server.
-
-## Status bar
-
-If a status-items service is present, the bridge publishes
-`status:item-update { key: "mcp", value: "mcp: 3/4" }` (warning marker
-appended on quarantine).
-
-## Testing
-
-```sh
-bun test plugins/llm-mcp-bridge/
-```
-
-The integration test against the SDK's reference server is gated:
-
-```sh
-KAIZEN_INTEGRATION=1 bun test plugins/llm-mcp-bridge/test/integration/
-```
-
-## v1 plan (deferred)
-
-Prompts will register into `slash:registry` as `/mcp:<server>:<prompt>` with
-`key=value` argument parsing, calling `prompts/get` and injecting the rendered
-messages via the driver's `runConversation`. See Spec 11 for the design.
+- `command` and `args` (pin `npx` packages with `@<version>` to prevent silent upgrades).
+- The package's publisher; prefer `@modelcontextprotocol/*` and other reputable scopes.
+- Env vars granted via `env`.
