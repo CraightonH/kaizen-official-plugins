@@ -52,14 +52,19 @@ const plugin: KaizenPlugin = {
       log("llm-mcp-bridge: slash:registry not present; /mcp:* commands not registered");
     }
 
-    // Status-bar integration (best-effort).
+    // Status-bar integration (best-effort). Hide the item entirely when no
+    // servers are configured — emitting an empty value still renders the
+    // bare key in the status bar ("mcp " with nothing after it).
     const updateStatus = () => {
       const rows = svc.list();
       const total = rows.length;
+      if (total === 0) {
+        void ctx.emit("status:item-clear", { key: "mcp" });
+        return;
+      }
       const connected = rows.filter((r: ServerInfo) => r.status === "connected").length;
       const quarantined = rows.some((r: ServerInfo) => r.status === "quarantined");
-      const value = total === 0 ? "" : `mcp: ${connected}/${total}${quarantined ? " ⚠" : ""}`;
-      void ctx.emit("status:item-update", { key: "mcp", value });
+      void ctx.emit("status:item-update", { key: "mcp", value: `${connected}/${total}${quarantined ? " ⚠" : ""}` });
     };
     // Recompute on a 5s tick rather than wiring per-lifecycle callbacks (simpler; status bar already debounces).
     const statusTimer = setInterval(updateStatus, 5000);

@@ -12,6 +12,10 @@ export interface StatusState {
   turnStartCompletion: number;
   /** wall-clock ms when the current turn started; used to compute tok/s. */
   turnStartedAt: number | null;
+  /** Resolved context-window ceiling for the active model; null until listModels() reports back (or returns nothing). */
+  contextLength: number | null;
+  /** promptTokens from the most recent llm:done — what the model actually saw on its last call. */
+  lastPromptTokens: number;
 }
 
 export function initialState(): StatusState {
@@ -26,6 +30,8 @@ export function initialState(): StatusState {
     tokensPerSec: null,
     turnStartCompletion: 0,
     turnStartedAt: null,
+    contextLength: null,
+    lastPromptTokens: 0,
   };
 }
 
@@ -74,6 +80,10 @@ export function applyEvent(prev: StatusState, name: string, payload: any): Statu
       if (usage && typeof usage.promptTokens === "number" && typeof usage.completionTokens === "number") {
         s.promptTokens += usage.promptTokens;
         s.completionTokens += usage.completionTokens;
+        // Track the most recent call's prompt size separately from the running
+        // total. The context-window bar denominates against per-call prompt
+        // (rebuilt each turn), not cumulative session tokens.
+        s.lastPromptTokens = usage.promptTokens;
       }
       // Do NOT flip turnInFlight here — turn:end is the authoritative end signal.
       return recompute(s);
@@ -98,6 +108,9 @@ export function applyEvent(prev: StatusState, name: string, payload: any): Statu
       s.completionTokens = 0;
       s.tokensPerSec = null;
       s.turnStartCompletion = 0;
+      s.lastPromptTokens = 0;
+      // contextLength is a property of the model, not the conversation —
+      // keep the cached value across `/clear` so we don't re-list models.
       s.cleared = true;
       return recompute(s);
 

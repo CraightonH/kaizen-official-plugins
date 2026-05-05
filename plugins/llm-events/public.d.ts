@@ -60,7 +60,17 @@ export interface ToolSchema {
 
 export interface ModelInfo {
   id: string;
+  /**
+   * Generic context window. Most hosted providers return only this (or none).
+   * Prefer `loadedContextLength` when populated — local runtimes (LM Studio,
+   * vLLM, llama.cpp) let the operator load a model with a window smaller than
+   * its advertised max, and that runtime ceiling is what callers care about.
+   */
   contextLength?: number;
+  /** Runtime-configured context window — what the loaded model will actually accept on this call. */
+  loadedContextLength?: number;
+  /** Advertised maximum the architecture supports, regardless of how it's loaded. */
+  maxContextLength?: number;
   description?: string;
 }
 

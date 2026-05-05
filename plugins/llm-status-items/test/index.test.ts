@@ -30,13 +30,14 @@ function makeCtx(opts: { rateTable?: Record<string, any> } = {}) {
 }
 
 describe("llm-status-items setup", () => {
-  it("subscribes to exactly the 8 spec'd events", async () => {
+  it("subscribes to exactly the spec'd events", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
     expect(ctx.subscribed.sort()).toEqual([
       "conversation:cleared",
       "llm:before-call",
       "llm:done",
+      "session:start",
       "tool:before-execute",
       "tool:error",
       "tool:result",
@@ -60,10 +61,8 @@ describe("llm-status-items setup", () => {
     await ctx.handlers["llm:done"]!({ response: { content: "", finishReason: "stop", usage: { promptTokens: 300, completionTokens: 150 } } });
     const lastIn = [...ctx.emits].reverse().find((e: Emit) => e.event === "status:item-update" && e.payload?.key === "in");
     const lastOut = [...ctx.emits].reverse().find((e: Emit) => e.event === "status:item-update" && e.payload?.key === "out");
-    const lastTotal = [...ctx.emits].reverse().find((e: Emit) => e.event === "status:item-update" && e.payload?.key === "total");
     expect(lastIn?.payload.value).toBe("400");
     expect(lastOut?.payload.value).toBe("200");
-    expect(lastTotal?.payload.value).toBe("600");
   });
 
   it("conversation:cleared emits status:item-clear for token items (and cost-estimate if active)", async () => {
@@ -75,7 +74,6 @@ describe("llm-status-items setup", () => {
     const clears = ctx.emits.filter((e: Emit) => e.event === "status:item-clear").map((e: Emit) => e.payload.key);
     expect(clears).toContain("in");
     expect(clears).toContain("out");
-    expect(clears).toContain("total");
     expect(clears).toContain("cost-estimate");
   });
 
