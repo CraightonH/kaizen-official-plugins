@@ -20,8 +20,8 @@ registry.ts     makeRegistry(initial) and makeRegistryHandle(initial). The handl
                 Public list() strips internal fields; register() restricts to `runtime:` names.
 turn-tracker.ts makeTurnTracker() — Map<turnId, TurnRecord> driven by turn:start / turn:end.
                 Source of truth for depth and "is top-level".
-injector.ts     makeInjector({ ctx, registry, tracker }) — subscribes to turn:start/end and
-                llm:before-call; mutates request.systemPrompt once per top-level turn.
+injector.ts     makeInjector({ ctx, tracker }) — subscribes to turn:start/end to drive the
+                turn tracker. Also exports buildAgentsBlock for the prompt:system section.
 depth.ts        computeDepth(records, turnId) — counts agent-trigger ancestors back to
                 the user turn. 1024-iteration safety guard.
 tool-filter.ts  Glob matcher for manifest `tools` patterns and toolMatches() helper. Pure.

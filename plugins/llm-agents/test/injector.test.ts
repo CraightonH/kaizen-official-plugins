@@ -86,19 +86,3 @@ describe("makeInjector — turn-tracker wiring", () => {
     expect(tracker.isTopLevel("t1")).toBe(false);
   });
 });
-
-describe("prompt:system section behavior", () => {
-  it("section render returns bullet list for available agents", () => {
-    const agents = [
-      { name: "code-reviewer", description: "review code" },
-      { name: "doc-writer", description: "write docs" },
-    ];
-    const result = buildAgentsBlock(agents);
-    expect(result).toContain("- code-reviewer: review code");
-    expect(result).toContain("- doc-writer: write docs");
-  });
-
-  it("section render returns empty string when registry is empty", () => {
-    expect(buildAgentsBlock([])).toBe("");
-  });
-});

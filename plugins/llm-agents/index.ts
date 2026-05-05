@@ -65,6 +65,8 @@ const plugin: KaizenPlugin = {
         title: "Available agents",
         render: () => buildAgentsBlock(handle.service.list()),
       });
+    } else {
+      void ctx.emit("session:error", { message: "llm-agents: missing required service(s): prompt:system; available-agents section disabled" });
     }
 
     // Discovery in a microtask — does not block setup().
