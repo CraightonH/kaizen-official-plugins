@@ -129,6 +129,8 @@ export async function runConversation(
       for await (const ev of deps.llmComplete.complete(request, { signal })) {
         if (ev.type === "token") {
           await deps.emit("llm:token", { delta: ev.delta });
+        } else if (ev.type === "reasoning") {
+          await deps.emit("llm:reasoning", { delta: ev.delta });
         } else if (ev.type === "tool-call") {
           await deps.emit("llm:tool-call", { toolCall: ev.toolCall });
         } else if (ev.type === "done") {
@@ -221,6 +223,8 @@ export async function runConversation(
       for await (const ev of deps.llmComplete.complete(request2, { signal })) {
         if (ev.type === "token") {
           await deps.emit("llm:token", { delta: ev.delta });
+        } else if (ev.type === "reasoning") {
+          await deps.emit("llm:reasoning", { delta: ev.delta });
         } else if (ev.type === "tool-call") {
           await deps.emit("llm:tool-call", { toolCall: ev.toolCall });
         } else if (ev.type === "done") {

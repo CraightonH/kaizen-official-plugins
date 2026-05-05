@@ -1,5 +1,6 @@
 export type ParsedChunk =
   | { kind: "content"; delta: string }
+  | { kind: "reasoning"; delta: string }
   | { kind: "tool-fragment"; fragments: { index: number; id?: string; name?: string; argsDelta?: string }[] }
   | { kind: "finish"; reason: "stop" | "length" | "tool_calls" | "content_filter" | string }
   | { kind: "usage"; usage: { promptTokens: number; completionTokens: number } }
@@ -30,6 +31,20 @@ export function parseChunk(raw: string): ParsedChunk {
       argsDelta: tc.function?.arguments != null ? String(tc.function.arguments) : undefined,
     }));
     return { kind: "tool-fragment", fragments };
+  }
+
+  // Reasoning/thinking deltas. Different OpenAI-compatible providers use
+  // different field names: DeepSeek-R1 sends `reasoning_content`, others
+  // send `reasoning`. Surface both as a single `reasoning` chunk kind.
+  const reasoning =
+    (typeof delta.reasoning_content === "string" && delta.reasoning_content.length > 0
+      ? delta.reasoning_content
+      : undefined) ??
+    (typeof delta.reasoning === "string" && delta.reasoning.length > 0
+      ? delta.reasoning
+      : undefined);
+  if (reasoning) {
+    return { kind: "reasoning", delta: reasoning };
   }
 
   if (typeof delta.content === "string" && delta.content.length > 0) {

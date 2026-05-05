@@ -1,11 +1,13 @@
 import React, { useSyncExternalStore } from "react";
-import { Box, Static, Text } from "ink";
+import { Box, Text, useInput } from "ink";
 import type { TuiStore, TranscriptLine } from "../state/store.ts";
 import type { CompletionRegistry } from "../completion/registry.ts";
 import type { TuiTheme } from "../theme/loader.ts";
 import { SpinnerLine } from "./SpinnerLine.tsx";
 import { StatusBar } from "./StatusBar.tsx";
 import { InputBox } from "./InputBox.tsx";
+import { ThinkingBox } from "./ThinkingBox.tsx";
+import { ThoughtsBlock } from "./ThoughtsBlock.tsx";
 
 export interface AppProps {
   store: TuiStore;
@@ -22,30 +24,45 @@ export const App: React.FC<AppProps> = ({ store, registry, triggers, theme, onSu
     () => store.snapshot(),
   );
 
+  // Ctrl+R toggles the most recent Thoughts block. The InputBox handles
+  // its own useInput; ink dispatches to all hooks, so a second hook here
+  // for a chord that the input doesn't claim is safe.
+  useInput((input, key) => {
+    if (key.ctrl && (input === "r" || input === "R")) {
+      store.toggleLatestThoughts();
+    }
+  });
+
   return (
     <Box flexDirection="column">
-      <Static items={snap.transcript}>
-        {(e: TranscriptLine) => {
-          if (e.kind === "user") {
-            // User messages: magenta `❯` gutter (bold) and a subtle
-            // background highlight on the body so the turn boundary
-            // is visible against assistant replies. Rendered as a
-            // single Text — wrapping in <Box flexDirection="column">
-            // adds an extra row of layout height in Ink's Static.
-            return (
-              <Text key={e.id}>
-                <Text color={theme.promptColor} bold>{"❯ "}</Text>
-                <Text color={theme.outputColor} backgroundColor="#2a2a2a">{e.text}</Text>
-              </Text>
-            );
-          }
+      {snap.transcript.map((e: TranscriptLine) => {
+        if (e.kind === "user") {
           return (
-            <Text key={e.id} color={e.kind === "notice" ? theme.noticeColor : theme.outputColor} dimColor={e.kind === "notice"}>
-              {e.text}
+            <Text key={e.id}>
+              <Text color={theme.promptColor} bold>{"❯ "}</Text>
+              <Text color={theme.outputColor} backgroundColor="#2a2a2a">{e.text}</Text>
             </Text>
           );
-        }}
-      </Static>
+        }
+        if (e.kind === "thoughts") {
+          return (
+            <ThoughtsBlock
+              key={e.id}
+              text={e.text}
+              expanded={e.expanded ?? false}
+              color={theme.noticeColor}
+            />
+          );
+        }
+        return (
+          <Text key={e.id} color={e.kind === "notice" ? theme.noticeColor : theme.outputColor} dimColor={e.kind === "notice"}>
+            {e.text}
+          </Text>
+        );
+      })}
+      {snap.busy.active && snap.liveThinking && (
+        <ThinkingBox text={snap.liveThinking} color={theme.noticeColor} />
+      )}
       {snap.busy.active && <SpinnerLine color={theme.busyColor} message={snap.busy.message} />}
       <InputBox
         store={store}

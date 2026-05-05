@@ -18,6 +18,7 @@ export interface Vocab {
   readonly LLM_BEFORE_CALL: "llm:before-call";
   readonly LLM_REQUEST: "llm:request";
   readonly LLM_TOKEN: "llm:token";
+  readonly LLM_REASONING: "llm:reasoning";
   readonly LLM_TOOL_CALL: "llm:tool-call";
   readonly LLM_DONE: "llm:done";
   readonly LLM_ERROR: "llm:error";
@@ -98,6 +99,7 @@ export interface LLMResponse {
 
 export type LLMStreamEvent =
   | { type: "token"; delta: string }
+  | { type: "reasoning"; delta: string }
   | { type: "tool-call"; toolCall: ToolCall }
   | { type: "done"; response: LLMResponse }
   | { type: "error"; message: string; cause?: unknown };

@@ -28,6 +28,10 @@ export async function* runStream(
       yield { type: "token", delta: c.delta };
       continue;
     }
+    if (c.kind === "reasoning") {
+      yield { type: "reasoning", delta: c.delta };
+      continue;
+    }
     if (c.kind === "tool-fragment") {
       for (const f of c.fragments) {
         const s = tools.get(f.index) ?? { name: "", argsJson: "" };

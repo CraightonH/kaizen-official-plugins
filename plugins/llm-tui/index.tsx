@@ -66,6 +66,23 @@ const plugin: KaizenPlugin = {
       };
     };
 
+    // Reasoning events → live thinking buffer; finalize when the LLM call ends.
+    ctx.on("llm:reasoning", async (payload: any) => {
+      const delta = typeof payload?.delta === "string" ? payload.delta : "";
+      if (delta) store.appendReasoning(delta);
+    });
+    ctx.on("llm:done", async () => {
+      // Move accumulated reasoning into the transcript as a Thoughts block,
+      // sitting between the user message and the assistant reply.
+      store.finalizeReasoning();
+    });
+    ctx.on("turn:end", async () => {
+      // Belt-and-suspenders: if a turn ended without an llm:done (e.g. tool
+      // dispatch errored mid-stream), drop any in-flight reasoning so the
+      // box doesn't linger above the next prompt.
+      store.clearLiveThinking();
+    });
+
     // Status events → store.
     ctx.on("status:item-update", async (payload: any) => {
       if (!payload || typeof payload.key !== "string") return;
@@ -119,6 +136,9 @@ const plugin: KaizenPlugin = {
       writeNotice: (text: string) => store.appendNotice(text),
       writeUser: (text: string) => store.appendUser(text),
       setBusy: (busy: boolean, message?: string) => store.setBusy(busy, message),
+      appendReasoning: (delta: string) => store.appendReasoning(delta),
+      finalizeReasoning: () => store.finalizeReasoning(),
+      clearLiveThinking: () => store.clearLiveThinking(),
     };
     ctx.provideService<TuiChannelService>("llm-tui:channel", channel);
 

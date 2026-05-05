@@ -34,7 +34,10 @@ const plugin: KaizenPlugin = {
 
     let lastEmitted = {
       model: null as string | null,
-      tokens: null as string | null,
+      tokensIn: null as string | null,
+      tokensOut: null as string | null,
+      tokensTotal: null as string | null,
+      tokensPerSec: null as string | null,
       turnState: null as string | null,
       cost: null as string | null,
     };
@@ -45,15 +48,41 @@ const plugin: KaizenPlugin = {
         await ctx.emit("status:item-update", { key: "model", value: state.model });
         lastEmitted.model = state.model;
       }
-      // tokens
-      const total = state.promptTokens + state.completionTokens;
-      const tokensValue = `${state.promptTokens}+${state.completionTokens} = ${total}`;
-      if (state.cleared && lastEmitted.tokens !== null) {
-        await ctx.emit("status:item-clear", { key: "tokens" });
-        lastEmitted.tokens = null;
-      } else if (!state.cleared && tokensValue !== lastEmitted.tokens && (state.promptTokens > 0 || state.completionTokens > 0)) {
-        await ctx.emit("status:item-update", { key: "tokens", value: tokensValue });
-        lastEmitted.tokens = tokensValue;
+      // tokens — separate in / out / total status items so the bar reads
+      // clearly (no math, no ambiguity about which number is which).
+      const inV = String(state.promptTokens);
+      const outV = String(state.completionTokens);
+      const totalV = String(state.promptTokens + state.completionTokens);
+      const haveTokens = state.promptTokens > 0 || state.completionTokens > 0;
+      if (state.cleared) {
+        for (const key of ["in", "out", "total", "tok/s"] as const) {
+          if (lastEmitted[key === "in" ? "tokensIn" : key === "out" ? "tokensOut" : key === "total" ? "tokensTotal" : "tokensPerSec"] !== null) {
+            await ctx.emit("status:item-clear", { key });
+          }
+        }
+        lastEmitted.tokensIn = lastEmitted.tokensOut = lastEmitted.tokensTotal = lastEmitted.tokensPerSec = null;
+      } else if (haveTokens) {
+        if (inV !== lastEmitted.tokensIn) {
+          await ctx.emit("status:item-update", { key: "in", value: inV });
+          lastEmitted.tokensIn = inV;
+        }
+        if (outV !== lastEmitted.tokensOut) {
+          await ctx.emit("status:item-update", { key: "out", value: outV });
+          lastEmitted.tokensOut = outV;
+        }
+        if (totalV !== lastEmitted.tokensTotal) {
+          await ctx.emit("status:item-update", { key: "total", value: totalV });
+          lastEmitted.tokensTotal = totalV;
+        }
+      }
+      if (state.tokensPerSec !== null) {
+        const tps = state.tokensPerSec >= 10
+          ? state.tokensPerSec.toFixed(0)
+          : state.tokensPerSec.toFixed(1);
+        if (tps !== lastEmitted.tokensPerSec) {
+          await ctx.emit("status:item-update", { key: "tok/s", value: tps });
+          lastEmitted.tokensPerSec = tps;
+        }
       }
       // turn-state
       if (state.turnState !== lastEmitted.turnState) {

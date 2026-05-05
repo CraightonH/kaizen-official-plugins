@@ -6,6 +6,12 @@ export interface StatusState {
   currentTool: string | null;
   turnState: "ready" | "thinking" | string; // also "calling <tool>"
   cleared: boolean; // one-shot flag — driver clears after emitting status:item-clear
+  /** Tokens-per-second for the most recently completed turn; null until first measurement. */
+  tokensPerSec: number | null;
+  /** completionTokens snapshot at turn:start, used to compute per-turn delta. */
+  turnStartCompletion: number;
+  /** wall-clock ms when the current turn started; used to compute tok/s. */
+  turnStartedAt: number | null;
 }
 
 export function initialState(): StatusState {
@@ -17,6 +23,9 @@ export function initialState(): StatusState {
     currentTool: null,
     turnState: "ready",
     cleared: false,
+    tokensPerSec: null,
+    turnStartCompletion: 0,
+    turnStartedAt: null,
   };
 }
 
@@ -38,6 +47,8 @@ export function applyEvent(prev: StatusState, name: string, payload: any): Statu
     case "turn:start":
       s.turnInFlight = true;
       s.currentTool = null;
+      s.turnStartedAt = Date.now();
+      s.turnStartCompletion = s.completionTokens;
       return recompute(s);
 
     case "llm:before-call": {
@@ -68,14 +79,25 @@ export function applyEvent(prev: StatusState, name: string, payload: any): Statu
       return recompute(s);
     }
 
-    case "turn:end":
+    case "turn:end": {
+      const durationMs = typeof payload?.durationMs === "number" && payload.durationMs > 0
+        ? payload.durationMs
+        : (s.turnStartedAt ? Math.max(1, Date.now() - s.turnStartedAt) : 0);
+      const completionDelta = Math.max(0, s.completionTokens - s.turnStartCompletion);
+      if (durationMs > 0 && completionDelta > 0) {
+        s.tokensPerSec = (completionDelta * 1000) / durationMs;
+      }
       s.turnInFlight = false;
       s.currentTool = null;
+      s.turnStartedAt = null;
       return recompute(s);
+    }
 
     case "conversation:cleared":
       s.promptTokens = 0;
       s.completionTokens = 0;
+      s.tokensPerSec = null;
+      s.turnStartCompletion = 0;
       s.cleared = true;
       return recompute(s);
 

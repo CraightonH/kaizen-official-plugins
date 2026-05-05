@@ -64,6 +64,7 @@ describe("llm-events", () => {
       "llm:before-call",
       "llm:request",
       "llm:token",
+      "llm:reasoning",
       "llm:tool-call",
       "llm:done",
       "llm:error",

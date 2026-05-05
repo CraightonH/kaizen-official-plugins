@@ -1,5 +1,11 @@
-export type TranscriptKind = "output" | "notice" | "user";
-export interface TranscriptLine { id: number; kind: TranscriptKind; text: string; }
+export type TranscriptKind = "output" | "notice" | "user" | "thoughts";
+export interface TranscriptLine {
+  id: number;
+  kind: TranscriptKind;
+  text: string;
+  /** thoughts kind: whether the block is currently expanded. Toggleable via Ctrl+R for the most recent block. */
+  expanded?: boolean;
+}
 export interface BusyState { active: boolean; message?: string; }
 export interface InputState { value: string; cursor: number; }
 
@@ -27,6 +33,8 @@ export interface TuiSnapshot {
   popup: PopupState | null;
   status: Record<string, string>;
   history: string[];
+  /** Live reasoning text accumulating during the current turn; null when idle. */
+  liveThinking: string | null;
 }
 
 export class TuiStore {
@@ -36,6 +44,7 @@ export class TuiStore {
   private _popup: PopupState | null = null;
   private _status: Record<string, string> = {};
   private _history: string[] = [];
+  private _liveThinking: string | null = null;
   private _seq = 0;
 
   private _pending: ((line: string) => void) | null = null;
@@ -62,6 +71,47 @@ export class TuiStore {
 
   appendUser(text: string): void {
     this._transcript = [...this._transcript, { id: ++this._seq, kind: "user", text }];
+    this._emit();
+  }
+
+  appendReasoning(delta: string): void {
+    this._liveThinking = (this._liveThinking ?? "") + delta;
+    this._emit();
+  }
+
+  /** Move the accumulated reasoning into the transcript as a collapsed thoughts block. */
+  finalizeReasoning(): void {
+    if (!this._liveThinking) { this._liveThinking = null; return; }
+    const text = this._liveThinking.trim();
+    this._liveThinking = null;
+    if (!text) { this._emit(); return; }
+    this._transcript = [
+      ...this._transcript,
+      { id: ++this._seq, kind: "thoughts", text, expanded: false },
+    ];
+    this._emit();
+  }
+
+  clearLiveThinking(): void {
+    if (this._liveThinking === null) return;
+    this._liveThinking = null;
+    this._emit();
+  }
+
+  toggleLatestThoughts(): void {
+    // Walk transcript from the end and flip the most recent thoughts block.
+    let idx = -1;
+    for (let i = this._transcript.length - 1; i >= 0; i--) {
+      if (this._transcript[i]!.kind === "thoughts") { idx = i; break; }
+    }
+    if (idx < 0) return;
+    const cur = this._transcript[idx]!;
+    const next = { ...cur, expanded: !(cur.expanded ?? false) };
+    this._transcript = [
+      ...this._transcript.slice(0, idx),
+      next,
+      ...this._transcript.slice(idx + 1),
+    ];
     this._emit();
   }
 
@@ -149,6 +199,7 @@ export class TuiStore {
       popup: this._popup,
       status: this._status,
       history: this._history,
+      liveThinking: this._liveThinking,
     };
   }
 

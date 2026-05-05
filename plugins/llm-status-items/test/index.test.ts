@@ -58,18 +58,24 @@ describe("llm-status-items setup", () => {
     await plugin.setup(ctx);
     await ctx.handlers["llm:done"]!({ response: { content: "", finishReason: "stop", usage: { promptTokens: 100, completionTokens: 50 } } });
     await ctx.handlers["llm:done"]!({ response: { content: "", finishReason: "stop", usage: { promptTokens: 300, completionTokens: 150 } } });
-    const last = [...ctx.emits].reverse().find((e: Emit) => e.event === "status:item-update" && e.payload?.key === "tokens");
-    expect(last?.payload.value).toBe("400+200 = 600");
+    const lastIn = [...ctx.emits].reverse().find((e: Emit) => e.event === "status:item-update" && e.payload?.key === "in");
+    const lastOut = [...ctx.emits].reverse().find((e: Emit) => e.event === "status:item-update" && e.payload?.key === "out");
+    const lastTotal = [...ctx.emits].reverse().find((e: Emit) => e.event === "status:item-update" && e.payload?.key === "total");
+    expect(lastIn?.payload.value).toBe("400");
+    expect(lastOut?.payload.value).toBe("200");
+    expect(lastTotal?.payload.value).toBe("600");
   });
 
-  it("conversation:cleared emits status:item-clear for tokens (and cost-estimate if active)", async () => {
+  it("conversation:cleared emits status:item-clear for token items (and cost-estimate if active)", async () => {
     const ctx = makeCtx({ rateTable: { "gpt-4.1-mini": { promptCentsPerMTok: 15, completionCentsPerMTok: 60 } } });
     await plugin.setup(ctx);
     await ctx.handlers["llm:before-call"]!({ request: { model: "gpt-4.1-mini", messages: [] } });
     await ctx.handlers["llm:done"]!({ response: { content: "", finishReason: "stop", usage: { promptTokens: 100, completionTokens: 50 } } });
     await ctx.handlers["conversation:cleared"]!({});
     const clears = ctx.emits.filter((e: Emit) => e.event === "status:item-clear").map((e: Emit) => e.payload.key);
-    expect(clears).toContain("tokens");
+    expect(clears).toContain("in");
+    expect(clears).toContain("out");
+    expect(clears).toContain("total");
     expect(clears).toContain("cost-estimate");
   });
 

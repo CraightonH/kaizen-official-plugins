@@ -11,6 +11,12 @@ export interface TuiChannelService {
   writeUser(text: string): void;
   setBusy(state: boolean, message?: string): void;
   readInput(): Promise<string>;
+  /** Append a reasoning/thinking delta to the live thinking buffer (rendered above input while busy). */
+  appendReasoning(delta: string): void;
+  /** Move accumulated reasoning into the transcript as a collapsed Thoughts block. */
+  finalizeReasoning(): void;
+  /** Discard accumulated reasoning without writing a transcript entry. */
+  clearLiveThinking(): void;
 }
 
 export interface CompletionItem {

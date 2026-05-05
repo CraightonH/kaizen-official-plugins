@@ -22,6 +22,7 @@ export const VOCAB: Vocab = Object.freeze({
   LLM_BEFORE_CALL: "llm:before-call",
   LLM_REQUEST: "llm:request",
   LLM_TOKEN: "llm:token",
+  LLM_REASONING: "llm:reasoning",
   LLM_TOOL_CALL: "llm:tool-call",
   LLM_DONE: "llm:done",
   LLM_ERROR: "llm:error",

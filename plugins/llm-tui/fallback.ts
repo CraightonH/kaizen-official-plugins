@@ -25,6 +25,9 @@ export function createFallbackChannel(): TuiChannelService {
     writeNotice(text) { process.stderr.write(`${text}\n`); },
     writeUser(text) { process.stdout.write(`> ${text}\n`); },
     setBusy() { /* no-op in non-TTY mode */ },
+    appendReasoning() { /* no-op: thinking deltas are dropped in non-TTY mode */ },
+    finalizeReasoning() { /* no-op */ },
+    clearLiveThinking() { /* no-op */ },
     readInput() {
       ensureReader();
       if (queued.length > 0) {

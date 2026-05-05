@@ -166,6 +166,7 @@ const plugin: KaizenPlugin = {
         const controller = new AbortController();
         state.currentTurn = { id: turnId, controller };
         ui.setBusy(true, pickBusyMessage());
+        const turnStartedAt = Date.now();
         await ctx.emit("turn:start", { turnId, trigger: "user" });
 
         try {
@@ -186,8 +187,13 @@ const plugin: KaizenPlugin = {
           // breathing room from the user message, trailing room before the
           // input box reappears.
           if (text) ui.writeOutput("\n" + text + "\n");
+          // Mirror Claude Code's "✻ Cooked for Ns" line: post a notice with the
+          // wall-clock duration of the turn so the user can see how long the
+          // assistant took without having to watch a stopwatch.
+          const elapsedSec = Math.max(0, Math.round((Date.now() - turnStartedAt) / 1000));
+          ui.writeNotice(`✻ Cooked for ${elapsedSec}s`);
           await ctx.emit("conversation:assistant-message", { message: result.finalMessage });
-          await ctx.emit("turn:end", { turnId, reason: "complete" });
+          await ctx.emit("turn:end", { turnId, reason: "complete", durationMs: Date.now() - turnStartedAt });
         } catch (err: any) {
           const isAbort = err?.name === "AbortError" || controller.signal.aborted;
           if (isAbort) {
