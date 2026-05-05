@@ -34,6 +34,8 @@ export interface Vocab {
   readonly SKILL_AVAILABLE_CHANGED: "skill:available-changed";
   readonly STATUS_ITEM_UPDATE: "status:item-update";
   readonly STATUS_ITEM_CLEAR: "status:item-clear";
+  readonly PROMPT_REBUILT: "prompt:rebuilt";
+  readonly PROMPT_RELOAD: "prompt:reload";
 }
 export type EventName = Vocab[keyof Vocab];
 

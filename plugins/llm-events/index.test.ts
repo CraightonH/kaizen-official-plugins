@@ -80,6 +80,8 @@ describe("llm-events", () => {
       "skill:available-changed",
       "status:item-update",
       "status:item-clear",
+      "prompt:rebuilt",
+      "prompt:reload",
     ]);
     const actual = new Set(Object.values(VOCAB));
     for (const name of expected) expect(actual.has(name)).toBe(true);
@@ -233,6 +235,11 @@ describe("llm-events", () => {
   it("CODEMODE_CANCEL_SENTINEL is the well-known string", async () => {
     const mod = await import("./index.ts");
     expect(mod.CODEMODE_CANCEL_SENTINEL).toBe("__kaizen_cancel__");
+  });
+
+  it("VOCAB includes prompt:rebuilt and prompt:reload", () => {
+    expect(VOCAB.PROMPT_REBUILT).toBe("prompt:rebuilt");
+    expect(VOCAB.PROMPT_RELOAD).toBe("prompt:reload");
   });
 
   it("provides llm-events:vocabulary and defines every event name", async () => {
