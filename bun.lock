@@ -64,6 +64,7 @@
       "version": "0.1.0",
       "dependencies": {
         "json-schema-to-typescript": "^15.0.3",
+        "llm-tools-registry": "workspace:*",
         "mdast-util-from-markdown": "^2.0.2",
         "mdast-util-to-string": "^4.0.0",
       },
