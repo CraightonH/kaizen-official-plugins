@@ -38,6 +38,8 @@ export const VOCAB: Vocab = Object.freeze({
   SKILL_AVAILABLE_CHANGED: "skill:available-changed",
   STATUS_ITEM_UPDATE: "status:item-update",
   STATUS_ITEM_CLEAR: "status:item-clear",
+  PROMPT_REBUILT: "prompt:rebuilt",
+  PROMPT_RELOAD: "prompt:reload",
 } as const);
 
 const plugin: KaizenPlugin = {
