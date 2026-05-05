@@ -38,9 +38,7 @@ const plugin: KaizenPlugin = {
 
   async setup(ctx) {
     ctx.consumeService("slash:registry");
-
-    ctx.defineEvent("prompt:rebuilt");
-    ctx.defineEvent("prompt:reload");
+    // prompt:rebuilt / prompt:reload are defined by llm-events (canonical VOCAB owner).
 
     const registry: SystemPromptServiceImpl = createRegistry({
       emit: (event, payload) => ctx.emit(event, payload),

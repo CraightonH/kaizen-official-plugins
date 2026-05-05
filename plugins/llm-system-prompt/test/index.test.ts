@@ -81,11 +81,11 @@ describe("index.ts — plugin lifecycle", () => {
     expect("prompt:system" in ctx.provided).toBe(true);
   });
 
-  it("setup defines prompt:rebuilt and prompt:reload events", async () => {
+  it("setup does not redefine prompt:rebuilt / prompt:reload (owned by llm-events VOCAB)", async () => {
     const ctx = makeFakeCtx();
     await plugin.setup!(ctx as any);
-    expect(ctx.events).toContain("prompt:rebuilt");
-    expect(ctx.events).toContain("prompt:reload");
+    expect(ctx.events).not.toContain("prompt:rebuilt");
+    expect(ctx.events).not.toContain("prompt:reload");
   });
 
   it("setup registers identity section at priority 10", async () => {
