@@ -1,5 +1,35 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { ChatMessage, LLMRequest, ToolSchema } from "llm-events/public";
 import type { OpenAILLMConfig } from "./config.ts";
+
+function dumpRequest(req: LLMRequest, body: Record<string, unknown>): void {
+  if (process.env.KAIZEN_DEBUG_REQUESTS !== "1") return;
+  try {
+    const dir = join(homedir(), ".kaizen", "debug");
+    mkdirSync(dir, { recursive: true });
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const lines: string[] = [];
+    lines.push(`# kaizen llm request — ${new Date().toISOString()}`);
+    lines.push(`# model: ${body.model}`);
+    lines.push(`# messages: ${(body.messages as unknown[]).length}  (system present: ${Boolean(req.systemPrompt)})`);
+    lines.push("");
+    lines.push("=== SYSTEM PROMPT ===");
+    lines.push(req.systemPrompt ?? "(none)");
+    lines.push("");
+    lines.push("=== MESSAGES (role + content preview) ===");
+    for (const m of body.messages as Array<{ role: string; content?: string }>) {
+      const preview = typeof m.content === "string" ? m.content.slice(0, 500) : JSON.stringify(m.content)?.slice(0, 500) ?? "";
+      lines.push(`[${m.role}] ${preview}${(typeof m.content === "string" ? m.content.length : 0) > 500 ? " …(truncated)" : ""}`);
+    }
+    const out = lines.join("\n") + "\n";
+    writeFileSync(join(dir, `request-${ts}.txt`), out);
+    writeFileSync(join(dir, "last-request.txt"), out);
+  } catch {
+    // Best-effort; debug only.
+  }
+}
 
 export function buildHeaders(cfg: OpenAILLMConfig, version: string): Record<string, string> {
   const base: Record<string, string> = {
@@ -68,5 +98,6 @@ export function buildChatBody(req: LLMRequest, cfg: OpenAILLMConfig): Record<str
     }
     Object.assign(body, req.extra);
   }
+  dumpRequest(req, body);
   return body;
 }
