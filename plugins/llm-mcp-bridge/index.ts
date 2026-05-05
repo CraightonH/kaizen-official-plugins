@@ -37,7 +37,10 @@ const plugin: KaizenPlugin = {
     }
 
     const svc = makeBridgeService({
-      registry: { register: (s, h) => registry.register(s as any, h as any) },
+      registry: {
+        register: (s, h) => registry.register(s as any, h as any),
+        registerWith: (reg) => registry.registerWith(reg),
+      },
       log,
       createClient: (cfg) => createClient(cfg, { log, version: VERSION }),
       initialServers: initial.servers,

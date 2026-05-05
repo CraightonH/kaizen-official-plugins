@@ -25,6 +25,34 @@ const baseCfg = (name: string, overrides: Partial<ResolvedServerConfig> = {}): R
   name, transport: "stdio", enabled: true, timeoutMs: 30000, healthCheckMs: 60000, command: "true", ...overrides,
 });
 
+describe("adapter: forwarding registerWith (regression for index.ts inline adapter)", () => {
+  // Simulates the inline adapter in index.ts that wraps a ToolsRegistryService.
+  // If registerWith is not forwarded, MCP tool registration throws at runtime.
+  it("adapter with registerWith forwarding allows MCP tool registration", async () => {
+    const underlying = new FakeRegistry();
+    // Inline adapter mirroring what index.ts does (after the fix)
+    const adapter = {
+      register: (s: any, h: any) => underlying.register(s, h),
+      registerWith: (reg: any) => underlying.registerWith(reg),
+    };
+    const svc = makeBridgeService({
+      registry: adapter,
+      log: () => {},
+      createClient: () => ({
+        client: makeMockClient({
+          capabilities: { tools: {} },
+          tools: [{ name: "tool1", description: "T.", inputSchema: { type: "object" } }],
+        }),
+      }),
+      initialServers: new Map([["srv", baseCfg("srv")]]),
+    });
+    await tick(); await tick();
+    // registerWith must have been called through the adapter — tool must be live
+    expect(underlying.liveSchemas().map((s: any) => s.name)).toContain("mcp:srv:tool1");
+    await svc.shutdownAll();
+  });
+});
+
 describe("makeBridgeService", () => {
   it("registers global resource tools once", async () => {
     const reg = new FakeRegistry();
