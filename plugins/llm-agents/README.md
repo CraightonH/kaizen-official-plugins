@@ -53,7 +53,7 @@ Semantics:
 
 - `turn:start` — `{ turnId, trigger, parentTurnId? }` — feeds the turn tracker used for depth computation and for distinguishing top-level from agent turns.
 - `turn:end` — `{ turnId }` — drops the tracker record and clears the per-turn injection guard.
-- `llm:before-call` (mutable) — `{ request, turnId? }` — appends the available-agents section to `request.systemPrompt` on the first call of each top-level turn. Skipped without `turnId`, for nested turns, or when the registry is empty.
+- `prompt:system` — contributes a section with id `"llm-agents:available"`, priority `150`, and title `"Available agents (use dispatch_agent to invoke)"`. The render function returns one bullet per agent (descriptions trimmed to ~200 chars), or `""` when the registry is empty (causing the registry to drop the section). Generation is bumped on every registry mutation so callers re-render when agents are added or removed. The section is only rendered for top-level turns (`trigger === "user"`); nested agent turns are excluded.
 
 ### Events emitted
 
