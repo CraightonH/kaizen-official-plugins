@@ -9,9 +9,14 @@ const plugin: KaizenPlugin = {
   name: "llm-codemode-dispatch",
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
-  services: { provides: ["tool-dispatch:strategy"] },
+  services: {
+    provides: ["tool-dispatch:strategy"],
+    consumes: ["prompt:system", "tools:registry"],
+  },
 
   async setup(ctx) {
+    ctx.consumeService("prompt:system");
+    ctx.consumeService("tools:registry");
     const config = await loadConfig(realDeps((m) => ctx.log(m)));
 
     let promptSystemSection:
