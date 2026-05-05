@@ -19,6 +19,12 @@ describe("wrapCode", () => {
     expect(r.wrapped).toContain("return 42;");
   });
 
+  it("accepts multi-statement code ending with top-level return (matches system prompt)", () => {
+    const r = wrapCode("const x = 1 + 2;\nreturn x;");
+    expect(r.transpileError).toBeUndefined();
+    expect(r.wrapped).toContain("return x;");
+  });
+
   it("preserves trailing statement (no rewrite) if not expression", () => {
     const r = wrapCode("const x = 5;\nif (x) { /* */ }");
     expect(r.wrapped).not.toMatch(/return \(if/);
