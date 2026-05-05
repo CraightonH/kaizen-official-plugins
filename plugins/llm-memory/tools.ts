@@ -1,4 +1,5 @@
 import type { MemoryEntry, MemoryScope, MemoryStoreService, MemoryType } from "./public.d.ts";
+import type { ToolRegistration } from "llm-tools-registry/public";
 
 // Match the Spec 0 ToolsRegistryService surface without importing it (avoid build-time coupling).
 export interface ToolsRegistryLike {
@@ -6,6 +7,7 @@ export interface ToolsRegistryLike {
     schema: { name: string; description: string; parameters: Record<string, unknown>; tags?: string[] },
     handler: (args: any, ctx: { signal: AbortSignal; callId: string; turnId?: string; log: (m: string) => void }) => Promise<unknown>,
   ): () => void;
+  registerWith?(registration: ToolRegistration): () => void;
 }
 
 export interface RegisterToolsOptions {
@@ -76,42 +78,44 @@ export function registerTools(
     return { ok: true, path: `${scope}:${name}` };
   };
 
-  const u1 = registry.register(
-    {
-      name: "memory_recall",
-      description: "Load the full body of one or more saved memories from llm-memory.",
-      parameters: {
-        type: "object",
-        properties: {
-          query: { type: "string" },
-          names: { type: "array", items: { type: "string" } },
-          type: { type: "string", enum: ["user", "feedback", "project", "reference"] },
-        },
+  const recallSchema = {
+    name: "memory_recall",
+    description: "Load the full body of one or more saved memories from llm-memory.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string" },
+        names: { type: "array", items: { type: "string" } },
+        type: { type: "string", enum: ["user", "feedback", "project", "reference"] },
       },
-      tags: ["memory", "read"],
     },
-    recallHandler,
-  );
+    tags: ["memory", "read"],
+  };
 
-  const u2 = registry.register(
-    {
-      name: "memory_save",
-      description: "Persist a new memory for future turns. Refuses overwrite unless name ends with `!`.",
-      parameters: {
-        type: "object",
-        required: ["name", "description", "content", "type"],
-        properties: {
-          name: { type: "string" },
-          description: { type: "string" },
-          content: { type: "string" },
-          type: { type: "string", enum: ["user", "feedback", "project", "reference"] },
-          scope: { type: "string", enum: ["project", "global"] },
-        },
+  const saveSchema = {
+    name: "memory_save",
+    description: "Persist a new memory for future turns. Refuses overwrite unless name ends with `!`.",
+    parameters: {
+      type: "object",
+      required: ["name", "description", "content", "type"],
+      properties: {
+        name: { type: "string" },
+        description: { type: "string" },
+        content: { type: "string" },
+        type: { type: "string", enum: ["user", "feedback", "project", "reference"] },
+        scope: { type: "string", enum: ["project", "global"] },
       },
-      tags: ["memory", "write"],
     },
-    saveHandler,
-  );
+    tags: ["memory", "write"],
+  };
+
+  const u1 = registry.registerWith
+    ? registry.registerWith({ schema: recallSchema, handler: recallHandler, source: { kind: "memory" } })
+    : registry.register(recallSchema, recallHandler);
+
+  const u2 = registry.registerWith
+    ? registry.registerWith({ schema: saveSchema, handler: saveHandler, source: { kind: "memory" } })
+    : registry.register(saveSchema, saveHandler);
 
   return {
     unregister: () => { try { u1(); } catch {} try { u2(); } catch {} },

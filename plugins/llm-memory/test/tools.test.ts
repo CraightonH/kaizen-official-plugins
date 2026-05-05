@@ -17,10 +17,11 @@ function fakeStore(): { svc: MemoryStoreService; calls: any } {
 }
 
 function fakeRegistry() {
-  const registered: { schema: any; handler: any }[] = [];
+  const registered: { schema: any; handler: any; source?: any }[] = [];
   return {
     registry: {
       register: mock((schema: any, handler: any) => { registered.push({ schema, handler }); return () => {}; }),
+      registerWith: mock((reg: any) => { registered.push(reg); return () => {}; }),
       list: mock(() => registered.map((r) => r.schema)),
       invoke: mock(async () => undefined),
     },
@@ -31,12 +32,15 @@ function fakeRegistry() {
 const ctx: any = { signal: new AbortController().signal, callId: "c1", log: () => {} };
 
 describe("registerTools", () => {
-  it("registers two tools tagged memory", () => {
+  it("registers two tools tagged memory with source kind='memory'", () => {
     const { svc } = fakeStore();
     const { registry, registered } = fakeRegistry();
     registerTools(registry as any, svc, { log: () => {}, denyTypes: [] });
     expect(registered.map((r) => r.schema.name).sort()).toEqual(["memory_recall", "memory_save"]);
-    for (const r of registered) expect(r.schema.tags).toContain("memory");
+    for (const r of registered) {
+      expect(r.schema.tags).toContain("memory");
+      expect(r.source).toEqual({ kind: "memory" });
+    }
   });
   it("memory_recall by names exact-loads and includes body", async () => {
     const { svc } = fakeStore();
