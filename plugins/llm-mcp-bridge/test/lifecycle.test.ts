@@ -301,7 +301,6 @@ describe("ServerLifecycle — registerWith source tagging", () => {
   it("tools from different servers get their respective server names in source", async () => {
     const reg = new FakeRegistry();
     const t = new FakeTimers();
-    let attempt = 0;
     const cfgA = baseCfg({ name: "serverA" });
     const cfgB = baseCfg({ name: "serverB" });
 

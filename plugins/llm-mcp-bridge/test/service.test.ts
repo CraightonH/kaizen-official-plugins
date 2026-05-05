@@ -35,6 +35,10 @@ describe("makeBridgeService", () => {
       initialServers: new Map(),
     });
     expect(reg.liveSchemas().map((s) => s.name).sort()).toEqual(["list_mcp_resources", "read_mcp_resource"]);
+    const readReg = reg.registered.get("read_mcp_resource");
+    const listReg = reg.registered.get("list_mcp_resources");
+    expect(readReg?.source).toEqual({ kind: "local" });
+    expect(listReg?.source).toEqual({ kind: "local" });
     await svc.shutdownAll();
   });
 
