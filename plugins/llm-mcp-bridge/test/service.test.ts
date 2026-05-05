@@ -4,12 +4,16 @@ import type { ResolvedServerConfig } from "../config.ts";
 import { makeMockClient } from "./mockServer.ts";
 
 class FakeRegistry {
-  registered = new Map<string, { schema: any; handler: any; unregistered: boolean }>();
+  registered = new Map<string, { schema: any; handler: any; source: any; unregistered: boolean }>();
   register(schema: any, handler: any) {
+    return this.registerWith({ schema, handler, source: { kind: "local" } });
+  }
+  registerWith(reg: { schema: any; handler: any; source: any }) {
+    const { schema, handler, source } = reg;
     if (this.registered.has(schema.name) && !this.registered.get(schema.name)!.unregistered) {
       throw new Error(`duplicate: ${schema.name}`);
     }
-    this.registered.set(schema.name, { schema, handler, unregistered: false });
+    this.registered.set(schema.name, { schema, handler, source, unregistered: false });
     return () => { this.registered.get(schema.name)!.unregistered = true; };
   }
   liveSchemas() { return [...this.registered.values()].filter((v) => !v.unregistered).map((v) => v.schema); }

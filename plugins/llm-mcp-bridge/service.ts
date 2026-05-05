@@ -51,8 +51,8 @@ export function makeBridgeService(deps: BridgeDeps): InternalBridge {
   };
   const readReg = makeReadMcpResourceTool(getClientByServer);
   const listReg = makeListMcpResourcesTool(getHealthyClients);
-  const unregisterRead = deps.registry.register(readReg.schema as any, readReg.handler as any);
-  const unregisterList = deps.registry.register(listReg.schema as any, listReg.handler as any);
+  const unregisterRead = deps.registry.registerWith({ schema: readReg.schema as any, handler: readReg.handler as any, source: { kind: "local" } });
+  const unregisterList = deps.registry.registerWith({ schema: listReg.schema as any, handler: listReg.handler as any, source: { kind: "local" } });
 
   // Start initial set.
   for (const [name, cfg] of deps.initialServers) {
