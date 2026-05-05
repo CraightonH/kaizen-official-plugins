@@ -1,5 +1,11 @@
 /// <reference lib="webworker" />
-import type { HostToWorker, ToolInvokeMsg, ToolResultMsg, StdoutMsg, DoneMsg, ErrorMsg } from "./rpc-types.ts";
+import type { HostToWorker, ToolInvokeMsg, ToolResultMsg, StdoutMsg, DoneMsg, ErrorMsg, RegistrationMeta } from "./rpc-types.ts";
+
+function normalizeServerName(name: string): string {
+  let n = name.replace(/[^A-Za-z0-9_]/g, "_");
+  if (/^[0-9]/.test(n)) n = `_${n}`;
+  return n;
+}
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -66,19 +72,63 @@ const pending = new Map<string, Pending>();
 let counter = 0;
 function nextId(): string { return `c${++counter}`; }
 
-function makeKaizen(): unknown {
-  const toolsProxy = new Proxy({}, {
+function invokeFn(name: string) {
+  return (args: unknown) => new Promise((resolve, reject) => {
+    const id = nextId();
+    pending.set(id, { resolve, reject });
+    const msg: ToolInvokeMsg = { type: "tool-invoke", id, name, args };
+    (self as any).postMessage(msg);
+  });
+}
+
+// Lazy proxy used as a fallback when no registrations are provided (e.g. by
+// older callers or tests). Preserves the historical flat-shape behavior.
+function makeLazyToolsProxy(): unknown {
+  return new Proxy({}, {
     get(_t, prop) {
       if (typeof prop !== "string") return undefined;
-      return (args: unknown) => new Promise((resolve, reject) => {
-        const id = nextId();
-        pending.set(id, { resolve, reject });
-        const msg: ToolInvokeMsg = { type: "tool-invoke", id, name: prop, args };
-        (self as any).postMessage(msg);
-      });
+      return invokeFn(prop);
     },
   });
-  return { tools: toolsProxy };
+}
+
+function makeKaizen(registrations: RegistrationMeta[] | undefined): unknown {
+  if (!registrations || registrations.length === 0) {
+    // No metadata: fall back to a fully-lazy `kaizen.tools.*` proxy so that
+    // legacy tests / callers without `listRegistrations` still work.
+    return { tools: makeLazyToolsProxy() };
+  }
+  const out: Record<string, unknown> = {};
+  const ensure = (k: string): Record<string, unknown> => {
+    if (!out[k]) out[k] = {};
+    return out[k] as Record<string, unknown>;
+  };
+  for (const r of registrations) {
+    const name = r.name;
+    const s = r.source;
+    switch (s.kind) {
+      case "local":
+        ensure("tools")[name] = invokeFn(name);
+        break;
+      case "mcp": {
+        const server = normalizeServerName(s.server);
+        const ns = ensure("mcp");
+        if (!ns[server]) ns[server] = {};
+        (ns[server] as Record<string, unknown>)[name] = invokeFn(name);
+        break;
+      }
+      case "agent":
+        ensure("agents")[name] = invokeFn(name);
+        break;
+      case "skill":
+        ensure("skills")[name] = invokeFn(name);
+        break;
+      case "memory":
+        ensure("memory")[name] = invokeFn(name);
+        break;
+    }
+  }
+  return out;
 }
 
 // ---------- Main (single listener) ----------
@@ -110,7 +160,7 @@ self.addEventListener("message", async (ev: MessageEvent<HostToWorker>) => {
   if (msg.type === "init") {
     stdoutCap = msg.maxStdoutBytes;
     curateGlobals();
-    (globalThis as any).kaizen = makeKaizen();
+    (globalThis as any).kaizen = makeKaizen(msg.registrations);
     (globalThis as any).console = makeConsole();
     try {
       // Transpile TS→JS before evaluating (strips type assertions like `as any`).
