@@ -42,6 +42,7 @@ const plugin: KaizenPlugin = {
         registerWith: (reg) => registry.registerWith(reg),
       },
       log,
+      emit: (e, p) => ctx.emit(e, p),
       createClient: (cfg) => createClient(cfg, { log, version: VERSION }),
       initialServers: initial.servers,
     });

@@ -113,6 +113,54 @@ describe("makeBridgeService", () => {
     await svc.shutdownAll();
   });
 
+  it("emits mcp:registration-conflict when two server names normalize to the same identifier", async () => {
+    const reg = new FakeRegistry();
+    const emitted: Array<{ event: string; payload: unknown }> = [];
+    const svc = makeBridgeService({
+      registry: reg,
+      log: () => {},
+      emit: (e, p) => { emitted.push({ event: e, payload: p }); },
+      createClient: () => ({ client: makeMockClient({ capabilities: { tools: {} }, tools: [] }) }),
+      initialServers: new Map([
+        ["foo-bar", baseCfg("foo-bar")],
+        ["foo_bar", baseCfg("foo_bar")],
+      ]),
+    });
+    await tick();
+    const conflicts = emitted.filter((e) => e.event === "mcp:registration-conflict");
+    expect(conflicts).toHaveLength(1);
+    const payload = conflicts[0].payload as { normalized: string; servers: string[] };
+    expect(payload.normalized).toBe("foo_bar");
+    expect(payload.servers.sort()).toEqual(["foo-bar", "foo_bar"].sort());
+    await svc.shutdownAll();
+  });
+
+  it("emits mcp:registration-conflict after reload introduces a collision", async () => {
+    const reg = new FakeRegistry();
+    const emitted: Array<{ event: string; payload: unknown }> = [];
+    const svc = makeBridgeService({
+      registry: reg,
+      log: () => {},
+      emit: (e, p) => { emitted.push({ event: e, payload: p }); },
+      createClient: () => ({ client: makeMockClient({ capabilities: { tools: {} }, tools: [] }) }),
+      initialServers: new Map([["solo", baseCfg("solo")]]),
+    });
+    await tick();
+    expect(emitted.filter((e) => e.event === "mcp:registration-conflict")).toHaveLength(0);
+    // "solo" and "solo.v2" do NOT collide; "foo-bar" and "foo_bar" DO collide
+    await svc.reload(new Map([
+      ["foo-bar", baseCfg("foo-bar")],
+      ["foo_bar", baseCfg("foo_bar")],
+    ]));
+    await tick();
+    const conflicts = emitted.filter((e) => e.event === "mcp:registration-conflict");
+    expect(conflicts).toHaveLength(1);
+    const payload = conflicts[0].payload as { normalized: string; servers: string[] };
+    expect(payload.normalized).toBe("foo_bar");
+    expect(payload.servers.sort()).toEqual(["foo-bar", "foo_bar"].sort());
+    await svc.shutdownAll();
+  });
+
   it("get(name) returns undefined for unknown server", async () => {
     const reg = new FakeRegistry();
     const svc = makeBridgeService({

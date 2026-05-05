@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { isValidServerName, kaizenToolName, kaizenToolTags, MCP_NAME_RE } from "../names.ts";
+import { isValidServerName, kaizenToolName, kaizenToolTags, MCP_NAME_RE, normalizeServerName, detectConflicts } from "../names.ts";
 
 describe("names", () => {
   it("MCP_NAME_RE matches lowercase alnum + _ + - starting alnum", () => {
@@ -24,5 +24,40 @@ describe("names", () => {
 
   it("kaizenToolTags produces [mcp, mcp:<server>]", () => {
     expect(kaizenToolTags("github")).toEqual(["mcp", "mcp:github"]);
+  });
+});
+
+describe("normalizeServerName", () => {
+  it("replaces non-alnum/underscore chars with underscore", () => {
+    expect(normalizeServerName("foo-bar")).toBe("foo_bar");
+    expect(normalizeServerName("foo bar")).toBe("foo_bar");
+    expect(normalizeServerName("foo.bar")).toBe("foo_bar");
+  });
+
+  it("prepends underscore when name starts with a digit", () => {
+    expect(normalizeServerName("1server")).toBe("_1server");
+  });
+
+  it("leaves already-valid identifiers unchanged", () => {
+    expect(normalizeServerName("foo_bar")).toBe("foo_bar");
+    expect(normalizeServerName("FooBar")).toBe("FooBar");
+  });
+});
+
+describe("detectConflicts", () => {
+  it("returns conflict when two names normalize to the same identifier", () => {
+    const conflicts = detectConflicts(["foo-bar", "foo_bar"]);
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].normalized).toBe("foo_bar");
+    expect(conflicts[0].servers.sort()).toEqual(["foo-bar", "foo_bar"].sort());
+  });
+
+  it("returns no conflicts for all-distinct normalized names", () => {
+    const conflicts = detectConflicts(["alpha", "beta", "gamma"]);
+    expect(conflicts).toHaveLength(0);
+  });
+
+  it("handles empty list", () => {
+    expect(detectConflicts([])).toHaveLength(0);
   });
 });
