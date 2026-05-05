@@ -186,3 +186,18 @@ describe("makeRegistry — invoke", () => {
     expect(cb).toEqual(["tool:before-execute", "tool:execute", "tool:result"]);
   });
 });
+
+import type { ToolSource, ToolRegistration } from "../public";
+
+describe("public types — ToolSource", () => {
+  it("admits all spec'd source kinds", () => {
+    const a: ToolSource = { kind: "local" };
+    const b: ToolSource = { kind: "mcp", server: "filesystem" };
+    const c: ToolSource = { kind: "agent" };
+    const d: ToolSource = { kind: "skill" };
+    const e: ToolSource = { kind: "memory" };
+    expect([a, b, c, d, e].every(Boolean)).toBe(true);
+    const _r: ToolRegistration | undefined = undefined;
+    expect(_r).toBeUndefined();
+  });
+});
