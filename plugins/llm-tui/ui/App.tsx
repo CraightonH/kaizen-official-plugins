@@ -24,7 +24,7 @@ export const App: React.FC<AppProps> = ({ store, registry, triggers, theme, onSu
     () => store.snapshot(),
   );
 
-  // Ctrl+R toggles the most recent Thoughts block. The InputBox handles
+  // Ctrl+R toggles ALL Thoughts blocks together. The InputBox handles
   // its own useInput; ink dispatches to all hooks, so a second hook here
   // for a chord that the input doesn't claim is safe.
   useInput((input, key) => {

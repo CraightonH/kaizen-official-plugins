@@ -3,7 +3,7 @@ export interface TranscriptLine {
   id: number;
   kind: TranscriptKind;
   text: string;
-  /** thoughts kind: whether the block is currently expanded. Toggleable via Ctrl+R for the most recent block. */
+  /** thoughts kind: whether the block is currently expanded. Ctrl+R toggles all blocks together. */
   expanded?: boolean;
 }
 export interface BusyState { active: boolean; message?: string; }
@@ -99,19 +99,16 @@ export class TuiStore {
   }
 
   toggleLatestThoughts(): void {
-    // Walk transcript from the end and flip the most recent thoughts block.
-    let idx = -1;
-    for (let i = this._transcript.length - 1; i >= 0; i--) {
-      if (this._transcript[i]!.kind === "thoughts") { idx = i; break; }
-    }
-    if (idx < 0) return;
-    const cur = this._transcript[idx]!;
-    const next = { ...cur, expanded: !(cur.expanded ?? false) };
-    this._transcript = [
-      ...this._transcript.slice(0, idx),
-      next,
-      ...this._transcript.slice(idx + 1),
-    ];
+    // Toggle all thoughts blocks together. If any are collapsed, expand all;
+    // otherwise collapse all. This makes Ctrl+R reveal the full reasoning
+    // history (across multi-turn loops) in one keystroke.
+    const blocks = this._transcript.filter((e) => e.kind === "thoughts");
+    if (blocks.length === 0) return;
+    const anyCollapsed = blocks.some((e) => !(e.expanded ?? false));
+    const target = anyCollapsed; // expand all if any collapsed; otherwise collapse all
+    this._transcript = this._transcript.map((e) =>
+      e.kind === "thoughts" ? { ...e, expanded: target } : e,
+    );
     this._emit();
   }
 
