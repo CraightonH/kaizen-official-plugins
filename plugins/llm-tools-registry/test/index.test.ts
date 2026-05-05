@@ -49,6 +49,6 @@ describe("llm-tools-registry plugin", () => {
     );
     await svc.invoke("noop", {}, { signal: new AbortController().signal, callId: "c1", log: () => {} });
     const names = (ctx.emit as any).mock.calls.map((c: any[]) => c[0]);
-    expect(names).toEqual(["tool:before-execute", "tool:execute", "tool:result"]);
+    expect(names).toEqual(["tools:registered", "tool:before-execute", "tool:execute", "tool:result"]);
   });
 });

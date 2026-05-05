@@ -128,9 +128,9 @@ describe("makeRegistry — invoke", () => {
     r.register(SCHEMA("a"), async (args) => ({ echoed: args }));
     const result = await r.invoke("a", { x: 1 }, ctx());
     expect(result).toEqual({ echoed: { x: 1 } });
-    expect(events.map((e) => e.name)).toEqual(["tool:before-execute", "tool:execute", "tool:result"]);
-    expect(events[0].payload).toMatchObject({ name: "a", args: { x: 1 }, callId: "c1" });
-    expect(events[2].payload).toMatchObject({ name: "a", callId: "c1", result: { echoed: { x: 1 } } });
+    expect(events.map((e) => e.name)).toEqual(["tools:registered", "tool:before-execute", "tool:execute", "tool:result"]);
+    expect(events[1].payload).toMatchObject({ name: "a", args: { x: 1 }, callId: "c1" });
+    expect(events[3].payload).toMatchObject({ name: "a", callId: "c1", result: { echoed: { x: 1 } } });
   });
 
   it("subscriber that mutates args is observed by handler and tool:execute", async () => {
@@ -153,7 +153,7 @@ describe("makeRegistry — invoke", () => {
     r.register(SCHEMA("a"), async () => { handlerCalled = true; return "ok"; });
     await expect(r.invoke("a", {}, ctx())).rejects.toThrow(/cancelled/);
     expect(handlerCalled).toBe(false);
-    expect(events.map((e) => e.name)).toEqual(["tool:before-execute", "tool:error"]);
+    expect(events.map((e) => e.name)).toEqual(["tools:registered", "tool:before-execute", "tool:error"]);
   });
 
   it("handler throw emits tool:error and re-rejects with original error", async () => {
@@ -162,8 +162,8 @@ describe("makeRegistry — invoke", () => {
     const boom = new Error("boom");
     r.register(SCHEMA("a"), async () => { throw boom; });
     await expect(r.invoke("a", {}, ctx())).rejects.toBe(boom);
-    expect(events.map((e) => e.name)).toEqual(["tool:before-execute", "tool:execute", "tool:error"]);
-    expect(events[2].payload).toMatchObject({ name: "a", callId: "c1", message: "boom", cause: boom });
+    expect(events.map((e) => e.name)).toEqual(["tools:registered", "tool:before-execute", "tool:execute", "tool:error"]);
+    expect(events[3].payload).toMatchObject({ name: "a", callId: "c1", message: "boom", cause: boom });
   });
 
   it("two concurrent invokes have independent event streams", async () => {
@@ -199,5 +199,65 @@ describe("public types — ToolSource", () => {
     expect([a, b, c, d, e].every(Boolean)).toBe(true);
     const _r: ToolRegistration | undefined = undefined;
     expect(_r).toBeUndefined();
+  });
+});
+
+describe("registry — provenance", () => {
+  it("legacy register(schema, handler) defaults source to { kind: 'local' }", () => {
+    const emit = mock(async () => []);
+    const r = makeRegistry(emit as any);
+    r.register({ name: "t", description: "", parameters: { type: "object" } as any }, async () => "ok");
+    const reg = r.listRegistrations()[0];
+    expect(reg!.source).toEqual({ kind: "local" });
+  });
+
+  it("new registerWith(reg) keeps the supplied source", () => {
+    const emit = mock(async () => []);
+    const r = makeRegistry(emit as any);
+    r.registerWith({
+      schema: { name: "t", description: "", parameters: { type: "object" } as any },
+      handler: async () => "ok",
+      source: { kind: "mcp", server: "filesystem" },
+    });
+    const reg = r.listRegistrations()[0];
+    expect(reg!.source).toEqual({ kind: "mcp", server: "filesystem" });
+  });
+
+  it("registering emits tools:registered with name and source", async () => {
+    const emit = mock(async () => []);
+    const r = makeRegistry(emit as any);
+    r.registerWith({
+      schema: { name: "t", description: "", parameters: { type: "object" } as any },
+      handler: async () => "ok",
+      source: { kind: "agent" },
+    });
+    expect(emit).toHaveBeenCalledWith("tools:registered", { name: "t", source: { kind: "agent" } });
+  });
+
+  it("unregistering (via the returned closure) emits tools:unregistered", async () => {
+    const emit = mock(async () => []);
+    const r = makeRegistry(emit as any);
+    const off = r.registerWith({
+      schema: { name: "t", description: "", parameters: { type: "object" } as any },
+      handler: async () => "ok",
+      source: { kind: "skill" },
+    });
+    emit.mockClear();
+    off();
+    expect(emit).toHaveBeenCalledWith("tools:unregistered", { name: "t", source: { kind: "skill" } });
+  });
+
+  it("list(filter.sources) restricts by kind", () => {
+    const r = makeRegistry(mock(async () => []) as any);
+    r.registerWith({
+      schema: { name: "a", description: "", parameters: { type: "object" } as any },
+      handler: async () => null, source: { kind: "local" },
+    });
+    r.registerWith({
+      schema: { name: "b", description: "", parameters: { type: "object" } as any },
+      handler: async () => null, source: { kind: "mcp", server: "fs" },
+    });
+    const onlyMcp = r.list({ sources: ["mcp"] });
+    expect(onlyMcp.map((s) => s.name)).toEqual(["b"]);
   });
 });

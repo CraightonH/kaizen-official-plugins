@@ -2,6 +2,8 @@ import type {
   ToolSchema,
 } from "llm-events/public";
 
+import type { ToolSource, ToolRegistration } from "./public";
+
 const CANCEL_TOOL: unique symbol = Symbol.for("kaizen.cancel") as never;
 
 export interface ToolExecutionContext {
@@ -15,49 +17,79 @@ export type ToolHandler = (args: unknown, ctx: ToolExecutionContext) => Promise<
 
 export interface ToolsRegistryService {
   register(schema: ToolSchema, handler: ToolHandler): () => void;
-  list(filter?: { tags?: string[]; names?: string[] }): ToolSchema[];
+  registerWith(reg: ToolRegistration): () => void;
+  list(filter?: { tags?: string[]; names?: string[]; sources?: ToolSource["kind"][] }): ToolSchema[];
+  listRegistrations(filter?: { tags?: string[]; names?: string[]; sources?: ToolSource["kind"][] }): ToolRegistration[];
   invoke(name: string, args: unknown, ctx: ToolExecutionContext): Promise<unknown>;
 }
 
-interface Entry { schema: ToolSchema; handler: ToolHandler; }
+interface Entry { schema: ToolSchema; handler: ToolHandler; source: ToolSource; }
 
 type Emit = (event: string, payload: unknown) => Promise<unknown[]>;
 
 export function makeRegistry(emit: Emit): ToolsRegistryService {
   const entries = new Map<string, Entry>();
 
-  function register(schema: ToolSchema, handler: ToolHandler): () => void {
+  function registerWith(reg: ToolRegistration): () => void {
+    const { schema, handler, source } = reg;
     if (typeof schema.name !== "string" || schema.name.length === 0) {
       throw new Error("ToolSchema.name must be a non-empty string");
     }
     if (entries.has(schema.name)) {
       throw new Error(`tool already registered: ${schema.name}`);
     }
-    const entry: Entry = { schema, handler };
+    const entry: Entry = { schema, handler, source };
     entries.set(schema.name, entry);
+    emit("tools:registered", { name: schema.name, source });
     let removed = false;
     return () => {
       if (removed) return;
       removed = true;
       // Reference identity: only remove if this exact entry is still mapped.
       const cur = entries.get(schema.name);
-      if (cur === entry) entries.delete(schema.name);
+      if (cur === entry) {
+        entries.delete(schema.name);
+        emit("tools:unregistered", { name: schema.name, source });
+      }
     };
   }
 
-  function list(filter?: { tags?: string[]; names?: string[] }): ToolSchema[] {
+  function register(schema: ToolSchema, handler: ToolHandler): () => void {
+    return registerWith({ schema, handler, source: { kind: "local" } });
+  }
+
+  function matchesFilter(
+    entry: Entry,
+    filter?: { tags?: string[]; names?: string[]; sources?: ToolSource["kind"][] },
+  ): boolean {
+    if (!filter) return true;
+    const { tags, names, sources } = filter;
+    if (names && !new Set(names).has(entry.schema.name)) return false;
+    if (sources && !new Set(sources).has(entry.source.kind)) return false;
+    if (tags) {
+      const tagSet = new Set(tags);
+      const schemaTags = entry.schema.tags ?? [];
+      let any = false;
+      for (const t of schemaTags) if (tagSet.has(t)) { any = true; break; }
+      if (!any) return false;
+    }
+    return true;
+  }
+
+  function list(filter?: { tags?: string[]; names?: string[]; sources?: ToolSource["kind"][] }): ToolSchema[] {
     const out: ToolSchema[] = [];
-    const tagSet = filter?.tags ? new Set(filter.tags) : null;
-    const nameSet = filter?.names ? new Set(filter.names) : null;
-    for (const { schema } of entries.values()) {
-      if (nameSet && !nameSet.has(schema.name)) continue;
-      if (tagSet) {
-        const tags = schema.tags ?? [];
-        let any = false;
-        for (const t of tags) if (tagSet.has(t)) { any = true; break; }
-        if (!any) continue;
+    for (const entry of entries.values()) {
+      if (matchesFilter(entry, filter)) out.push(entry.schema);
+    }
+    return out;
+  }
+
+  function listRegistrations(filter?: { tags?: string[]; names?: string[]; sources?: ToolSource["kind"][] }): ToolRegistration[] {
+    const out: ToolRegistration[] = [];
+    for (const entry of entries.values()) {
+      if (matchesFilter(entry, filter)) {
+        out.push({ schema: entry.schema, handler: entry.handler, source: entry.source });
       }
-      out.push(schema);
     }
     return out;
   }
@@ -94,5 +126,5 @@ export function makeRegistry(emit: Emit): ToolsRegistryService {
     }
   }
 
-  return { register, list, invoke };
+  return { register, registerWith, list, listRegistrations, invoke };
 }
