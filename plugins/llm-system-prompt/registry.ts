@@ -19,6 +19,8 @@ export interface CreateRegistryOptions {
 export interface SystemPromptServiceImpl extends SystemPromptService {
   disable(id: string): void;
   enable(id: string): void;
+  has(id: string): boolean;
+  renderSection(id: string): Promise<string | undefined>;
 }
 
 export function createRegistry(opts: CreateRegistryOptions): SystemPromptServiceImpl {
@@ -121,6 +123,23 @@ export function createRegistry(opts: CreateRegistryOptions): SystemPromptService
     return cachedAssembly;
   }
 
+  function has(id: string): boolean {
+    const e = map.get(id);
+    return Boolean(e && !e.removed);
+  }
+
+  async function renderSection(id: string): Promise<string | undefined> {
+    const e = map.get(id);
+    if (!e || e.removed || e.disabled) return undefined;
+    try {
+      const r = e.section.render();
+      return r instanceof Promise ? await r : r;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return `<!-- render error: ${msg} -->`;
+    }
+  }
+
   return {
     register,
     assemble,
@@ -128,5 +147,7 @@ export function createRegistry(opts: CreateRegistryOptions): SystemPromptService
     generation: () => generation,
     disable,
     enable,
+    has,
+    renderSection,
   };
 }
