@@ -172,7 +172,7 @@ export interface EventLogEntry {
   offset: number;     // monotonic per session
   ts: number;
   event: string;      // e.g. "llm:request"
-  payload: unknown;   // turnId/sessionId live inside the payload per the events vocab
+  payload: ({ turnId?: string; sessionId?: string } & Record<string, unknown>);
 }
 ```
 
@@ -272,6 +272,7 @@ Index is a **derived view**. On startup the manager reads it to populate an in-m
 
 - Snapshot writes use temp-file + atomic rename (`snapshot.json.tmp` → `snapshot.json`). Half-written snapshots are impossible.
 - `events.jsonl` is append-only with fsync on `turn:end` and opportunistically on `TurnHandle.commit()`. On startup, manager scans tail of each open `events.jsonl`; partial trailing line (no `\n`) is detected and truncated.
+- A crash can occur after `TurnHandle.commit()` fsyncs `snapshot.json` but before the driver emits `turn:end`. That state is valid: the snapshot is authoritative for resume, and the manager does not synthesize `turn:end` on recovery (doing so would invent timing/reason data). Analysis tooling **infers** this state by detecting (a) a `turn:start` in `events.jsonl` with no matching `turn:end` and (b) `snapshot.lastTurnAt` advanced past that turn's start timestamp; the label `unknown-after-commit` is a documentation convention for that inferred state, not a stored event reason.
 - Index entries lag snapshot/events writes by definition — recovery walks dirs if the index is stale or missing.
 
 ## Event log: which events, what fields
@@ -484,6 +485,8 @@ export const DISPATCH_SCHEMA: ToolSchema = {
 ```ts
 const parentSessionId = ctx.sessionId;
 if (!parentSessionId) throw new Error("dispatch_agent: ToolExecutionContext.sessionId missing");
+const parentTurnId = ctx.turnId;
+if (!parentTurnId) throw new Error("dispatch_agent: ToolExecutionContext.turnId missing");
 
 const childId = args.session_id ?? `oneshot-${shortUuid()}`;
 if (!/^[A-Za-z0-9_.-]+$/.test(childId)) {
@@ -513,7 +516,7 @@ const input: RunConversationInput = {
   sessionId: session.id,
   toolFilter,
   ...(internal.modelOverride ? { model: internal.modelOverride } : {}),
-  parentTurnId: ctx.turnId,
+  parentTurnId,
   signal: ctx.signal,
   userMessage: { role: "user", content: args.prompt },
 };
@@ -537,7 +540,7 @@ export interface ToolExecutionContext {
 }
 ```
 
-The driver/dispatch strategies MUST populate both fields when invoking tools during a conversation. Consumers such as `dispatch_agent` that require turn/session context throw if either field is missing; direct registry users outside a driver turn remain possible but cannot use those tools.
+The driver/dispatch strategies MUST populate both fields when invoking tools during a conversation. Consumers such as `dispatch_agent` that require turn/session context throw if either field is missing; direct registry users outside a driver turn remain possible but cannot use those tools. `dispatch_agent` specifically requires both `turnId` and `sessionId`, because depth tracking needs turn ancestry and sub-session creation needs the parent session.
 
 **Depth tracking is unchanged.** `turn-tracker.ts` walks `parentTurnId`. Sub-sessions don't change depth semantics — depth is about turn ancestry, not session ancestry.
 
@@ -553,7 +556,7 @@ Per the harness's namespacing rule (`<source>:<name>`), session commands use the
 | `/session:delete <id>` | Delete a session. Confirmation prompt. `--cascade` for sub-trees. |
 | `/clear` | Create fresh top-level session, emit `session:active-changed`, then emit `conversation:cleared { from, to }`. Old session is archived, not deleted. |
 
-`/session:delete` active-session rule: deleting the active session is allowed only after command-side preflight confirms the delete would pass the manager's validations. The command creates a replacement top-level session, emits `session:active-changed { from: deletedId, to: replacementId }`, then deletes the requested session. If preflight fails (for example, children exist and `--cascade` was omitted), no active-session change occurs. Deleting an inactive session leaves `activeSessionId` unchanged.
+`/session:delete` active-session rule: deleting the active session is allowed only after command-side preflight confirms the delete would pass the manager's validations. The command then creates a replacement top-level session, attempts the delete, and emits `session:active-changed { from: deletedId, to: replacementId }` only after delete succeeds. If preflight fails (for example, children exist and `--cascade` was omitted) or the delete throws, no active-session change occurs. If replacement creation succeeded but delete failed, the command best-effort deletes the unused replacement and surfaces the original delete error; if the replacement cleanup also fails, log it and still surface the original delete error (do not aggregate or replace it). Deleting an inactive session leaves `activeSessionId` unchanged.
 
 The driver itself does not register these — `llm-slash-commands` does, calling `sessions:store` directly and using `session:active-changed` as the driver-facing state update.
 
@@ -573,7 +576,17 @@ export function harnessKey(h: HarnessIdentity): string {
   // bumps within the same logical harness.
   if (h.ref) {
     const withoutVersion = h.ref.replace(/@[^/@]+$/, "");
-    return sanitize(withoutVersion.replace(/\//g, "_"));
+    const derived = sanitize(withoutVersion.replace(/\//g, "_"));
+    // Reject any ref whose derived key would collide with the file-path namespace.
+    // The file-path branch always emits keys prefixed `local_`, and the bare key
+    // `local` is structurally adjacent. Rejecting both locks the namespaces apart.
+    if (derived === "local" || derived.startsWith("local_")) {
+      throw new Error(
+        `Harness ref '${h.ref}' derives to a session key starting with 'local' / 'local_', ` +
+          `which is reserved for path-derived session keys. Rename the harness source.`,
+      );
+    }
+    return derived;
   }
 
   // Local path invocation has no marketplace/source namespace. Prefix with
@@ -652,6 +665,7 @@ Matches existing `bun:test` patterns in `llm-driver/test` and `llm-agents/test`.
 - Cascade delete touches only descendants.
 - `readEvents()` honors `fromOffset` / `limit`.
 - `harnessKey()` covers marketplace ref-with-version, ref-without-version, scoped refs, local single-file json path (`local_<name>`), local directory-style path (`local_<name>`), and missing-both fallback.
+- `harnessKey()` rejects any ref whose derived key would equal `local` or start with `local_` (covers `local`, `local/foo`, `local_foo/bar`, etc.).
 
 **Integration test** — single test against a tmp dir:
 
@@ -660,6 +674,7 @@ Matches existing `bun:test` patterns in `llm-driver/test` and `llm-agents/test`.
 - Cancel-rollback: start a turn, append, abort signal, assert rollback restored prior message count and snapshot is unchanged.
 - Failed commit: force snapshot write failure, assert driver emits `turn:error` and `turn:end { reason: "error" }`, snapshot remains previous state, and event log retains the failed attempt.
 - Trace routing: assert `llm:request`, `llm:done`, `tool:*`, and `codemode:*` events with `turnId`/`sessionId` land in the owning session; assert direct out-of-turn registry events without ids are ignored by the session manager.
+- Crash-after-commit window: commit a snapshot, omit `turn:end`, reload, and assert: (a) resume uses the committed snapshot, (b) `events.jsonl` contains the original `turn:start` with no synthesized `turn:end`, (c) `snapshot.lastTurnAt` is greater than the `ts` of the orphan `turn:start`. Analysis tools detect the `unknown-after-commit` state from this combination.
 
 **`llm-driver` test updates** — existing tests in `integration.test.ts` and `system-prompt-integration.test.ts` get a fake `sessions:store` injected via deps. A test helper builds the fake. Cancel-rollback test asserts `TurnHandle.rollback()` was called instead of asserting `state.messages` reverted.
 
