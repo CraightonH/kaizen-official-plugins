@@ -4,8 +4,6 @@
 [some json object]
 ```
 which then just outputs to the terminal, not run as a tool. Is this a tool call code problem or an LLM system prompt issue?
-3. Feature request: tui should pop up a list of available slash commands, with filtering as the user types, ie. `/` should show a list of all available slash commands registered, `/p` should filter to ones beginning with `p`, etc.
-4. Word wrapping doesn't work in input box. When wrapping, we lose cursor and formatting.
-5. I can't use Option + arrow keys to navigate input box per word. Should also implement Command + arrow for line navigation.
-6. Cannot paste into input box. Paste inserts above box and is not submitted on Enter.
-7. LLM is unable to distinguish between tool call responses and user responses. This causes confusion when asked to recall previous turns. Maybe need more metadata packaging tool calls?
+3. Word wrapping doesn't work in input box. When wrapping, we lose cursor and formatting.
+4. Cannot paste into input box. Paste inserts above box and is not submitted on Enter.
+5. LLM is unable to distinguish between tool call responses and user responses. This causes confusion when asked to recall previous turns. Maybe need more metadata packaging tool calls?
