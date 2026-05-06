@@ -197,6 +197,100 @@ describe("InputBox", () => {
     expect(ctx.store.snapshot().input.value).toBe("");
   });
 
+  describe("word/line cursor navigation", () => {
+    // ANSI CSI modifier table: 1=Shift, 2=Alt/Meta, 4=Ctrl. Sent as (mod+1).
+    const optLeft  = "\x1b[1;3D"; // Option/Alt+Left
+    const optRight = "\x1b[1;3C"; // Option/Alt+Right
+    const ctrlLeft  = "\x1b[1;5D";
+    const ctrlRight = "\x1b[1;5C";
+    const home = "\x1b[H";
+    const end  = "\x1b[F";
+
+    async function typed(text: string) {
+      const ctx = setup();
+      const { stdin } = render(
+        <InputBox store={ctx.store} registry={ctx.reg} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+      );
+      await tick();
+      stdin.write(text);
+      await tick();
+      return { ...ctx, stdin };
+    }
+
+    it("Option+Left jumps to previous word boundary", async () => {
+      const ctx = await typed("foo bar baz");
+      expect(ctx.store.snapshot().input.cursor).toBe(11);
+      ctx.stdin.write(optLeft); await tick();
+      expect(ctx.store.snapshot().input.cursor).toBe(8); // start of "baz"
+      ctx.stdin.write(optLeft); await tick();
+      expect(ctx.store.snapshot().input.cursor).toBe(4); // start of "bar"
+      ctx.stdin.write(optLeft); await tick();
+      expect(ctx.store.snapshot().input.cursor).toBe(0); // start of "foo"
+    });
+
+    it("Option+Right jumps to next word boundary", async () => {
+      const ctx = await typed("foo bar baz");
+      // Move cursor to start.
+      ctx.store.setInput("foo bar baz", 0);
+      await tick();
+      ctx.stdin.write(optRight); await tick();
+      expect(ctx.store.snapshot().input.cursor).toBe(3); // end of "foo"
+      ctx.stdin.write(optRight); await tick();
+      expect(ctx.store.snapshot().input.cursor).toBe(7); // end of "bar"
+      ctx.stdin.write(optRight); await tick();
+      expect(ctx.store.snapshot().input.cursor).toBe(11); // end of "baz"
+    });
+
+    it("Ctrl+Left/Right jump to line start/end", async () => {
+      const ctx = await typed("hello world");
+      ctx.stdin.write(ctrlLeft); await tick();
+      expect(ctx.store.snapshot().input.cursor).toBe(0);
+      ctx.stdin.write(ctrlRight); await tick();
+      expect(ctx.store.snapshot().input.cursor).toBe(11);
+    });
+
+    it("Home/End jump to line start/end", async () => {
+      const ctx = await typed("abc def");
+      ctx.stdin.write(home); await tick();
+      expect(ctx.store.snapshot().input.cursor).toBe(0);
+      ctx.stdin.write(end); await tick();
+      expect(ctx.store.snapshot().input.cursor).toBe(7);
+    });
+
+    it("ESC+b / ESC+f (Option+arrow on macOS Terminal) jump by word", async () => {
+      const ctx = await typed("foo bar baz");
+      ctx.stdin.write("\x1bb"); await tick();
+      expect(ctx.store.snapshot().input.cursor).toBe(8);
+      ctx.stdin.write("\x1bb"); await tick();
+      expect(ctx.store.snapshot().input.cursor).toBe(4);
+      ctx.stdin.write("\x1bf"); await tick();
+      expect(ctx.store.snapshot().input.cursor).toBe(7);
+    });
+
+    it("Ctrl+A / Ctrl+E (Cmd+arrow on macOS Terminal) jump to line bounds", async () => {
+      const ctx = await typed("hello world");
+      ctx.stdin.write("\x01"); await tick(); // Ctrl+A
+      expect(ctx.store.snapshot().input.cursor).toBe(0);
+      ctx.stdin.write("\x05"); await tick(); // Ctrl+E
+      expect(ctx.store.snapshot().input.cursor).toBe(11);
+    });
+
+    it("line jumps respect newlines (multi-line buffer)", async () => {
+      const ctx = setup();
+      const { stdin } = render(
+        <InputBox store={ctx.store} registry={ctx.reg} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+      );
+      await tick();
+      // "abc\ndefgh" — place cursor in middle of second line (offset 6 = "de|fgh").
+      ctx.store.setInput("abc\ndefgh", 6);
+      await tick();
+      stdin.write(home); await tick();
+      expect(ctx.store.snapshot().input.cursor).toBe(4); // start of second line
+      stdin.write(end); await tick();
+      expect(ctx.store.snapshot().input.cursor).toBe(9); // end of second line
+    });
+  });
+
   it("Up arrow recalls history when popup is closed", async () => {
     const ctx = setup();
     ctx.store.submit("first");

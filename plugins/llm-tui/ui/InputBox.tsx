@@ -39,6 +39,34 @@ function atWordStart(line: string, pos: number): boolean {
   return prev === undefined || /\s/.test(prev);
 }
 
+const isWordChar = (ch: string | undefined) => !!ch && /\w/.test(ch);
+
+// Bash/readline-style word jump: skip non-word chars then word chars going left.
+function prevWordPos(s: string, pos: number): number {
+  let i = pos;
+  while (i > 0 && !isWordChar(s[i - 1])) i--;
+  while (i > 0 && isWordChar(s[i - 1])) i--;
+  return i;
+}
+
+function nextWordPos(s: string, pos: number): number {
+  let i = pos;
+  while (i < s.length && !isWordChar(s[i])) i++;
+  while (i < s.length && isWordChar(s[i])) i++;
+  return i;
+}
+
+// Line bounds for the (multi-line) buffer split by "\n".
+function lineStartPos(s: string, pos: number): number {
+  const nl = s.lastIndexOf("\n", pos - 1);
+  return nl < 0 ? 0 : nl + 1;
+}
+
+function lineEndPos(s: string, pos: number): number {
+  const nl = s.indexOf("\n", pos);
+  return nl < 0 ? s.length : nl;
+}
+
 export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, theme, onSubmit, onCtrlC }) => {
   const snap = useSyncExternalStore(
     (cb) => store.subscribe(cb),
@@ -110,6 +138,24 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
   useInput((input, key) => {
     if (key.ctrl && input === "c") { onCtrlC?.(); return; }
 
+    // Readline-style cursor navigation. macOS Terminal.app and iTerm2 with
+    // "Option as Meta" / "Send Ctrl+A/E for ⌘+←/→" send these sequences:
+    //   Option+Left/Right  → ESC b / ESC f      (meta+b/meta+f)
+    //   Cmd+Left/Right     → \x01 / \x05         (ctrl+a / ctrl+e)
+    // Handled BEFORE the blanket `if (key.ctrl) return` guard below.
+    if (key.meta && !key.return && (input === "b" || input === "\x1bb")) {
+      store.setInput(value, prevWordPos(value, cursor)); return;
+    }
+    if (key.meta && !key.return && (input === "f" || input === "\x1bf")) {
+      store.setInput(value, nextWordPos(value, cursor)); return;
+    }
+    if (key.ctrl && input === "a") {
+      store.setInput(value, lineStartPos(value, cursor)); return;
+    }
+    if (key.ctrl && input === "e") {
+      store.setInput(value, lineEndPos(value, cursor)); return;
+    }
+
     if (key.escape) {
       if (popup) { store.closePopup(); return; }
       return;
@@ -163,11 +209,22 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
       return;
     }
 
+    // Home/End → line start/end (also fires when iTerm2's "Natural Text Editing"
+    // preset maps Cmd+Left/Right to Home/End).
+    if (key.home) { store.setInput(value, lineStartPos(value, cursor)); return; }
+    if (key.end)  { store.setInput(value, lineEndPos(value, cursor));   return; }
+
+    // Word jump: Option+Left/Right (macOS) → meta+arrow.
+    // Line jump: Ctrl+Left/Right and Super+Left/Right (Kitty protocol Cmd).
     if (key.leftArrow) {
+      if (key.meta) { store.setInput(value, prevWordPos(value, cursor)); return; }
+      if (key.ctrl || key.super) { store.setInput(value, lineStartPos(value, cursor)); return; }
       store.setInput(value, Math.max(0, cursor - 1));
       return;
     }
     if (key.rightArrow) {
+      if (key.meta) { store.setInput(value, nextWordPos(value, cursor)); return; }
+      if (key.ctrl || key.super) { store.setInput(value, lineEndPos(value, cursor)); return; }
       store.setInput(value, Math.min(value.length, cursor + 1));
       return;
     }
