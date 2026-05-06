@@ -6,7 +6,7 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 
 ```
 index.ts          Plugin lifecycle: loads config, wires service, registers slash commands,
-                  emits status-bar events, hooks `session:end` for shutdown.
+                  emits status-bar events, hooks `harness:end` for shutdown.
                   The only file that touches `ctx`.
 config.ts         loadConfig(deps) → { servers, warnings }. Pure logic. Reads the three
                   config locations, deep-interpolates `${env:VAR}`, validates server

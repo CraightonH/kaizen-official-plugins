@@ -17,6 +17,10 @@ function fakeRegistry(handlers: Record<string, (args: unknown) => Promise<unknow
   };
 }
 
+function input(overrides: Parameters<ReturnType<typeof makeStrategy>["handleResponse"]>[0]) {
+  return { turnId: "turn-1", sessionId: "session-1", ...overrides };
+}
+
 const SCHEMA = (n: string): ToolSchema => ({ name: n, description: "", parameters: { type: "object" } as any });
 
 function tc(id: string, name: string, args: unknown): ToolCall { return { id, name, arguments: args }; }
@@ -40,24 +44,24 @@ describe("handleResponse — terminal", () => {
   it("no toolCalls → []", async () => {
     const s = makeStrategy();
     const r: LLMResponse = { content: "done", finishReason: "stop" };
-    const out = await s.handleResponse({
+    const out = await s.handleResponse(input({
       response: r,
       registry: fakeRegistry({}),
       signal: new AbortController().signal,
       emit: noEmit,
-    });
+    }));
     expect(out).toEqual([]);
   });
 
   it("empty toolCalls array → []", async () => {
     const s = makeStrategy();
     const r: LLMResponse = { content: "done", toolCalls: [], finishReason: "stop" };
-    const out = await s.handleResponse({
+    const out = await s.handleResponse(input({
       response: r,
       registry: fakeRegistry({}),
       signal: new AbortController().signal,
       emit: noEmit,
-    });
+    }));
     expect(out).toEqual([]);
   });
 });
@@ -70,12 +74,12 @@ describe("handleResponse — tool calls", () => {
       toolCalls: [tc("c1", "echo", { x: 1 })],
       finishReason: "tool_calls",
     };
-    const out = await s.handleResponse({
+    const out = await s.handleResponse(input({
       response: r,
       registry: fakeRegistry({ echo: (a) => ({ got: a }) }),
       signal: new AbortController().signal,
       emit: noEmit,
-    });
+    }));
     expect(out.length).toBe(2);
     expect(out[0]).toMatchObject({ role: "assistant", toolCalls: r.toolCalls });
     expect(out[1]).toMatchObject({
@@ -99,12 +103,12 @@ describe("handleResponse — tool calls", () => {
       toolCalls: [tc("1", "a", {}), tc("2", "b", {}), tc("3", "c", {})],
       finishReason: "tool_calls",
     };
-    const out = await s.handleResponse({
+    const out = await s.handleResponse(input({
       response: r,
       registry: reg,
       signal: new AbortController().signal,
       emit: noEmit,
-    });
+    }));
     expect(order).toEqual(["a", "b", "c"]);
     expect(out.length).toBe(4);
     expect(out.slice(1).map((m) => (m as any).toolCallId)).toEqual(["1", "2", "3"]);
@@ -121,12 +125,12 @@ describe("handleResponse — tool calls", () => {
       toolCalls: [tc("1", "a", {}), tc("2", "b", {})],
       finishReason: "tool_calls",
     };
-    const out = await s.handleResponse({
+    const out = await s.handleResponse(input({
       response: r,
       registry: reg,
       signal: new AbortController().signal,
       emit: noEmit,
-    });
+    }));
     expect((out[1] as any).content).toBe('{"error":"boom"}');
     expect((out[2] as any).content).toBe("ok");
   });
@@ -138,12 +142,12 @@ describe("handleResponse — tool calls", () => {
       toolCalls: [tc("1", "missing", {})],
       finishReason: "tool_calls",
     };
-    const out = await s.handleResponse({
+    const out = await s.handleResponse(input({
       response: r,
       registry: fakeRegistry({}),
       signal: new AbortController().signal,
       emit: noEmit,
-    });
+    }));
     expect((out[1] as any).content).toMatch(/unknown tool/);
   });
 
@@ -156,17 +160,40 @@ describe("handleResponse — tool calls", () => {
       toolCalls: [tc("1", "a", "{not json")],
       finishReason: "tool_calls",
     };
-    const out = await s.handleResponse({
+    const out = await s.handleResponse(input({
       response: r,
       registry: reg,
       signal: new AbortController().signal,
       emit: emit as any,
-    });
+    }));
     const parsed = JSON.parse((out[1] as any).content);
     expect(parsed.error).toMatch(/malformed/);
     expect(parsed.raw).toBe("{not json");
     const calls = (emit as any).mock.calls.map((c: any[]) => c[0]);
     expect(calls).toContain("tool:error");
+    const errPayload = (emit as any).mock.calls.find((c: any[]) => c[0] === "tool:error")[1];
+    expect(errPayload).toMatchObject({ turnId: "turn-1", sessionId: "session-1" });
+  });
+
+  it("threads turnId/sessionId into registry.invoke context", async () => {
+    const s = makeStrategy();
+    let seenCtx: any;
+    const reg: ToolsRegistryService = {
+      register: () => () => {},
+      list: () => [],
+      invoke: async (_n, _a, ctx) => {
+        seenCtx = ctx;
+        return "ok";
+      },
+    };
+    await s.handleResponse(input({
+      response: { content: "", toolCalls: [tc("1", "a", {})], finishReason: "tool_calls" },
+      registry: reg,
+      signal: new AbortController().signal,
+      emit: noEmit,
+    }));
+    expect(seenCtx.turnId).toBe("turn-1");
+    expect(seenCtx.sessionId).toBe("session-1");
   });
 
   it("aborted signal mid-loop → remaining calls get 'cancelled' tool messages", async () => {
@@ -182,12 +209,12 @@ describe("handleResponse — tool calls", () => {
       toolCalls: [tc("1", "a", {}), tc("2", "b", {}), tc("3", "c", {})],
       finishReason: "tool_calls",
     };
-    const out = await s.handleResponse({
+    const out = await s.handleResponse(input({
       response: r,
       registry: reg,
       signal: ac.signal,
       emit: noEmit,
-    });
+    }));
     expect(out.length).toBe(4);
     expect((out[1] as any).content).toBe("ra");
     expect(JSON.parse((out[2] as any).content)).toEqual({ error: "cancelled" });
@@ -205,12 +232,12 @@ describe("handleResponse — tool calls", () => {
       toolCalls: [tc("1", "a", {})],
       finishReason: "tool_calls",
     };
-    const out = await s.handleResponse({
+    const out = await s.handleResponse(input({
       response: r,
       registry: reg,
       signal: new AbortController().signal,
       emit: emit as any,
-    });
+    }));
     expect((out[1] as any).content).toBe(String(o));
     const evNames = (emit as any).mock.calls.map((c: any[]) => c[0]);
     expect(evNames).toContain("tool:error");
@@ -224,12 +251,12 @@ describe("handleResponse — tool calls", () => {
       toolCalls: [tc("1", "a", {})],
       finishReason: "tool_calls",
     };
-    const out = await s.handleResponse({
+    const out = await s.handleResponse(input({
       response: r,
       registry: reg,
       signal: new AbortController().signal,
       emit: noEmit,
-    });
+    }));
     expect((out[1] as any).content).toBe("");
   });
 
@@ -241,12 +268,12 @@ describe("handleResponse — tool calls", () => {
       list: () => [],
       invoke: async (_n, _a, ctx) => { ctx.log("hello"); return "ok"; },
     };
-    await s.handleResponse({
+    await s.handleResponse(input({
       response: { content: "", toolCalls: [tc("c1", "a", {})], finishReason: "tool_calls" },
       registry: reg,
       signal: new AbortController().signal,
       emit: emit as any,
-    });
+    }));
     const statusCall = (emit as any).mock.calls.find((c: any[]) => c[0] === "status:item-update");
     expect(statusCall).toBeDefined();
     expect(statusCall[1]).toEqual({ key: "tool:c1", value: "hello" });

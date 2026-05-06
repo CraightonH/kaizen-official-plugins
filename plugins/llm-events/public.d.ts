@@ -1,10 +1,14 @@
 import type { JSONSchema7 } from "json-schema";
 
 export interface Vocab {
-  readonly SESSION_START: "session:start";
-  readonly SESSION_END: "session:end";
-  readonly SESSION_ERROR: "session:error";
-  readonly SESSION_EXIT_REQUESTED: "session:exit-requested";
+  readonly HARNESS_START: "harness:start";
+  readonly HARNESS_END: "harness:end";
+  readonly HARNESS_ERROR: "harness:error";
+  readonly HARNESS_EXIT_REQUESTED: "harness:exit-requested";
+  readonly SESSION_CREATED: "session:created";
+  readonly SESSION_RESUMED: "session:resumed";
+  readonly SESSION_DELETED: "session:deleted";
+  readonly SESSION_ACTIVE_CHANGED: "session:active-changed";
   readonly INPUT_SUBMIT: "input:submit";
   readonly INPUT_HANDLED: "input:handled";
   readonly CONVERSATION_USER_MESSAGE: "conversation:user-message";
@@ -140,6 +144,12 @@ export interface ToolExecutionContext {
    * slash commands, ad-hoc registry use).
    */
   turnId?: string;
+  /**
+   * Id of the session that owns the turn. Required for tool calls invoked
+   * from inside a driver turn so turn-scoped traces can be routed to the
+   * correct session log; optional for direct/ad-hoc registry use.
+   */
+  sessionId?: string;
   log: (msg: string) => void;
 }
 
@@ -185,14 +195,18 @@ export interface ToolDispatchStrategy {
     registry: ToolsRegistryService;
     signal: AbortSignal;
     emit: (event: string, payload: unknown) => Promise<void>;
+    turnId: string;
+    sessionId: string;
   }): Promise<ChatMessage[]>;
 }
 
 // ---------- driver:run-conversation (owned by `llm-driver`) ----------
 
-export interface RunConversationInput {
+import type { TurnHandle } from "llm-session-manager/public";
+
+export type RunConversationInput = {
   systemPrompt: string;
-  messages: ChatMessage[];
+  sessionId: string;
   /** Restricts the tool registry view for this nested run. */
   toolFilter?: { tags?: string[]; names?: string[] };
   /** Override default model for this run. */
@@ -200,12 +214,22 @@ export interface RunConversationInput {
   /** For nested-turn telemetry (set by `llm-agents` when dispatching sub-agents). */
   parentTurnId?: string;
   signal?: AbortSignal;
-}
+  trigger?: "user" | "agent";
+} & (
+  | {
+      externalTurnId: string;
+      turnHandle: TurnHandle;
+      userMessage?: never;
+    }
+  | {
+      userMessage: ChatMessage;
+      externalTurnId?: never;
+      turnHandle?: never;
+    }
+);
 
 export interface RunConversationOutput {
   finalMessage: ChatMessage;
-  /** Full transcript including the input messages. */
-  messages: ChatMessage[];
   usage: { promptTokens: number; completionTokens: number };
 }
 

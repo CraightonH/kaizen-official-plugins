@@ -1,6 +1,36 @@
 // plugins/llm-driver/test/integration.test.ts
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "../index.ts";
+import type { ChatMessage } from "llm-events/public";
+
+function makeSessions() {
+  let next = 0;
+  const messages = new Map<string, ChatMessage[]>();
+  const open = new Map<string, ChatMessage[]>();
+  return {
+    async create() {
+      const id = `00000000-0000-4000-8000-${String(++next).padStart(12, "0")}`;
+      messages.set(id, []);
+      return { id, harness: "h", metadata: {}, createdAt: next, pluginFingerprint: [] };
+    },
+    async getMessages(id: string) { return [...(messages.get(id) ?? []), ...(open.get(id) ?? [])]; },
+    beginTurn(id: string, turnId: string) {
+      const buffer: ChatMessage[] = [];
+      open.set(id, buffer);
+      return {
+        turnId,
+        append: (msg: ChatMessage) => buffer.push(msg),
+        commit: async () => { messages.set(id, [...(messages.get(id) ?? []), ...buffer]); open.delete(id); },
+        rollback: async () => { open.delete(id); },
+      };
+    },
+    async load(id: string) { return { id, harness: "h", metadata: {}, createdAt: 1, pluginFingerprint: [] }; },
+    async exists(id: string) { return messages.has(id); },
+    async list() { return []; },
+    async delete() {},
+    async *readEvents() {},
+  };
+}
 
 describe("llm-driver integration (synthetic llm:complete)", () => {
   it("session-level event sequence is exactly correct for a single turn", async () => {
@@ -21,6 +51,7 @@ describe("llm-driver integration (synthetic llm:complete)", () => {
       },
       async listModels() { return []; },
     };
+    const sessions = makeSessions();
     const ctx: any = {
       log: () => {},
       config: { defaultSystemPrompt: "sp" },
@@ -31,6 +62,7 @@ describe("llm-driver integration (synthetic llm:complete)", () => {
       useService: (n: string) => {
         if (n === "llm-tui:channel") return ui;
         if (n === "llm:complete") return llm;
+        if (n === "sessions:store") return sessions;
         throw new Error(`useService: no provider for '${n}'`);
       },
       on: (n: string, fn: Function) => { (handlers[n] ??= []).push(fn); return () => {}; },
@@ -40,13 +72,14 @@ describe("llm-driver integration (synthetic llm:complete)", () => {
     await plugin.start!(ctx);
     const seq = events.map(e => e.name);
     // Required ordering checkpoints (other events may interleave but these MUST appear in order):
-    expect(seq[0]).toBe("session:start");
+    expect(seq[0]).toBe("harness:start");
+    expect(seq).toContain("session:active-changed");
     expect(seq.indexOf("turn:start")).toBeGreaterThan(0);
     expect(seq.indexOf("llm:before-call")).toBeGreaterThan(seq.indexOf("turn:start"));
     expect(seq.indexOf("llm:request")).toBeGreaterThan(seq.indexOf("llm:before-call"));
     expect(seq.indexOf("llm:done")).toBeGreaterThan(seq.indexOf("llm:request"));
     expect(seq.indexOf("conversation:assistant-message")).toBeGreaterThan(seq.indexOf("llm:done"));
     expect(seq.indexOf("turn:end")).toBeGreaterThan(seq.indexOf("conversation:assistant-message"));
-    expect(seq.at(-1)).toBe("session:end");
+    expect(seq.at(-1)).toBe("harness:end");
   });
 });

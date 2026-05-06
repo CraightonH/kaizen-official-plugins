@@ -42,19 +42,19 @@ describe("makeOnInputSubmit", () => {
     expect(bus.emitted.find((e) => e.event === "input:handled")).toBeDefined();
   });
 
-  it("handler throwing: surfaces session:error AND still emits input:handled", async () => {
+  it("handler throwing: surfaces harness:error AND still emits input:handled", async () => {
     const reg = createRegistry();
     reg.register({ name: "boom", description: "d", source: "builtin" }, async () => { throw new Error("kapow"); });
     const bus = makeBus();
     const fn = makeOnInputSubmit({ registry: reg, bus });
     await fn({ text: "/boom" });
-    const err = bus.emitted.find((e) => e.event === "session:error");
+    const err = bus.emitted.find((e) => e.event === "harness:error");
     expect(err).toBeDefined();
     expect((err!.payload as any).message).toMatch(/kapow/);
     expect(bus.emitted.find((e) => e.event === "input:handled")).toBeDefined();
   });
 
-  it("handler that emits input:submit: wrapped emit throws ReentrantSlashEmitError surfaced via session:error", async () => {
+  it("handler that emits input:submit: wrapped emit throws ReentrantSlashEmitError surfaced via harness:error", async () => {
     const reg = createRegistry();
     reg.register({ name: "loopy", description: "d", source: "builtin" }, async (ctx) => {
       await ctx.emit("input:submit", { text: "/help" });
@@ -62,7 +62,7 @@ describe("makeOnInputSubmit", () => {
     const bus = makeBus();
     const fn = makeOnInputSubmit({ registry: reg, bus });
     await fn({ text: "/loopy" });
-    const err = bus.emitted.find((e) => e.event === "session:error") as any;
+    const err = bus.emitted.find((e) => e.event === "harness:error") as any;
     expect(err).toBeDefined();
     expect(String(err.payload.message)).toMatch(/input:submit/);
     expect(bus.emitted.find((e) => e.event === "input:handled")).toBeDefined();

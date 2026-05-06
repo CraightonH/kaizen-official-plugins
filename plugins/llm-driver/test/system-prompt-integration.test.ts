@@ -1,5 +1,32 @@
 import { describe, expect, it, mock } from "bun:test";
 import { runConversation, type RunConversationDeps } from "../loop.ts";
+import type { ChatMessage } from "llm-events/public";
+import type { SessionsStoreService, TurnHandle } from "llm-session-manager/public";
+
+function makeSessions(): SessionsStoreService {
+  let open: ChatMessage[] | null = null;
+  const committed: ChatMessage[] = [];
+  return {
+    async create() { throw new Error("not needed"); },
+    async load() { return {} as any; },
+    async exists() { return true; },
+    async getMessages() { return open ? [...committed, ...open] : committed.slice(); },
+    beginTurn(_id: string, turnId: string): TurnHandle {
+      if (open) throw new Error("already open");
+      const buffer: ChatMessage[] = [];
+      open = buffer;
+      return {
+        turnId,
+        append: (m) => buffer.push(m),
+        commit: async () => { committed.push(...buffer); open = null; },
+        rollback: async () => { open = null; },
+      };
+    },
+    async list() { return []; },
+    async delete() {},
+    async *readEvents() {},
+  } as any;
+}
 
 function makeDeps(overrides: Partial<RunConversationDeps>): RunConversationDeps {
   const base: RunConversationDeps = {
@@ -12,6 +39,7 @@ function makeDeps(overrides: Partial<RunConversationDeps>): RunConversationDeps 
     } as any,
     registry: undefined,
     strategy: undefined,
+    sessions: makeSessions(),
     log: () => {},
     idGen: () => "turn-1",
     defaultSystemPrompt: "",
@@ -42,7 +70,7 @@ describe("driver — prompt:system consumption", () => {
     } as any);
 
     await runConversation(
-      { systemPrompt: "", messages: [{ role: "user", content: "hi" }] },
+      { systemPrompt: "", sessionId: "session-1", userMessage: { role: "user", content: "hi" } },
       deps,
     );
 
@@ -61,8 +89,8 @@ describe("driver — prompt:system consumption", () => {
     } as any;
 
     const deps = makeDeps({ promptSystem } as any);
-    await runConversation({ systemPrompt: "", messages: [{ role: "user", content: "1" }] }, deps);
-    await runConversation({ systemPrompt: "", messages: [{ role: "user", content: "2" }] }, deps);
+    await runConversation({ systemPrompt: "", sessionId: "session-1", userMessage: { role: "user", content: "1" } }, deps);
+    await runConversation({ systemPrompt: "", sessionId: "session-1", userMessage: { role: "user", content: "2" } }, deps);
 
     expect(assembleCalls).toBe(1);
   });
@@ -78,9 +106,9 @@ describe("driver — prompt:system consumption", () => {
     } as any;
 
     const deps = makeDeps({ promptSystem } as any);
-    await runConversation({ systemPrompt: "", messages: [{ role: "user", content: "1" }] }, deps);
+    await runConversation({ systemPrompt: "", sessionId: "session-1", userMessage: { role: "user", content: "1" } }, deps);
     gen = 2;
-    await runConversation({ systemPrompt: "", messages: [{ role: "user", content: "2" }] }, deps);
+    await runConversation({ systemPrompt: "", sessionId: "session-1", userMessage: { role: "user", content: "2" } }, deps);
 
     expect(assembleCalls).toBe(2);
   });
@@ -102,7 +130,7 @@ describe("driver — prompt:system consumption", () => {
     });
 
     await runConversation(
-      { systemPrompt: "BASE", messages: [{ role: "user", content: "hi" }] },
+      { systemPrompt: "BASE", sessionId: "session-1", userMessage: { role: "user", content: "hi" } },
       deps,
     );
 

@@ -10,6 +10,7 @@ export interface ToolExecutionContext {
   signal: AbortSignal;
   callId: string;
   turnId?: string;
+  sessionId?: string;
   log: (msg: string) => void;
 }
 
@@ -95,33 +96,57 @@ export function makeRegistry(emit: Emit): ToolsRegistryService {
   }
 
   async function invoke(name: string, args: unknown, ctx: ToolExecutionContext): Promise<unknown> {
+    const scoped = {
+      ...(ctx.turnId !== undefined ? { turnId: ctx.turnId } : {}),
+      ...(ctx.sessionId !== undefined ? { sessionId: ctx.sessionId } : {}),
+    };
     const entry = entries.get(name);
     if (!entry) {
       const message = `unknown tool: ${name}`;
-      await emit("tool:error", { name, callId: ctx.callId, message });
+      await emit("tool:error", { name, callId: ctx.callId, message, ...scoped });
       throw new Error(message);
     }
 
-    const beforePayload: { name: string; args: unknown; callId: string } = { name, args, callId: ctx.callId };
+    const beforePayload: {
+      name: string;
+      args: unknown;
+      callId: string;
+      turnId?: string;
+      sessionId?: string;
+    } = { name, args, callId: ctx.callId, ...scoped };
     await emit("tool:before-execute", beforePayload);
 
     if (beforePayload.args === CANCEL_TOOL) {
       const message = "cancelled by subscriber";
-      await emit("tool:error", { name, callId: ctx.callId, message });
+      await emit("tool:error", { name, callId: ctx.callId, message, ...scoped });
       const err = new Error(message);
       (err as any).name = "AbortError";
       throw err;
     }
 
-    await emit("tool:execute", { name, args: beforePayload.args, callId: ctx.callId });
+    await emit("tool:execute", { name, args: beforePayload.args, callId: ctx.callId, ...scoped });
 
+    const startedAt = Date.now();
     try {
       const result = await entry.handler(beforePayload.args, ctx);
-      await emit("tool:result", { name, callId: ctx.callId, result });
+      await emit("tool:result", {
+        name,
+        callId: ctx.callId,
+        result,
+        durationMs: Date.now() - startedAt,
+        ...scoped,
+      });
       return result;
     } catch (err) {
       const message = String((err as any)?.message ?? err);
-      await emit("tool:error", { name, callId: ctx.callId, message, cause: err });
+      await emit("tool:error", {
+        name,
+        callId: ctx.callId,
+        message,
+        cause: err,
+        durationMs: Date.now() - startedAt,
+        ...scoped,
+      });
       throw err;
     }
   }

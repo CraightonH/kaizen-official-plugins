@@ -5,10 +5,14 @@ export const CANCEL_TOOL: unique symbol = Symbol.for("kaizen.cancel") as any;
 export const CODEMODE_CANCEL_SENTINEL = "__kaizen_cancel__" as const;
 
 export const VOCAB: Vocab = Object.freeze({
-  SESSION_START: "session:start",
-  SESSION_END: "session:end",
-  SESSION_ERROR: "session:error",
-  SESSION_EXIT_REQUESTED: "session:exit-requested",
+  HARNESS_START: "harness:start",
+  HARNESS_END: "harness:end",
+  HARNESS_ERROR: "harness:error",
+  HARNESS_EXIT_REQUESTED: "harness:exit-requested",
+  SESSION_CREATED: "session:created",
+  SESSION_RESUMED: "session:resumed",
+  SESSION_DELETED: "session:deleted",
+  SESSION_ACTIVE_CHANGED: "session:active-changed",
   INPUT_SUBMIT: "input:submit",
   INPUT_HANDLED: "input:handled",
   CONVERSATION_USER_MESSAGE: "conversation:user-message",

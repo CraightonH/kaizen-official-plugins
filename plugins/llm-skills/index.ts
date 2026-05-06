@@ -65,7 +65,7 @@ const plugin: KaizenPlugin = {
       projectRoot,
       userRoot,
       warn: (m) => ctx.log(m),
-      error: (m) => { void ctx.emit("session:error", { message: m }); },
+      error: (m) => { void ctx.emit("harness:error", { message: m }); },
       onChange: () => { sectionHandle?.bumpGeneration(); },
     });
 
@@ -88,7 +88,7 @@ const plugin: KaizenPlugin = {
       // Bump after initial scan so generation is fresh.
       sectionHandle.bumpGeneration();
     } else {
-      void ctx.emit("session:error", { message: "llm-skills: missing required service(s): prompt:system; available-skills section disabled" });
+      void ctx.emit("harness:error", { message: "llm-skills: missing required service(s): prompt:system; available-skills section disabled" });
     }
 
     // Throttled rescan on turn:start.

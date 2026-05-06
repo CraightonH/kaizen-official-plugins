@@ -1,6 +1,6 @@
 {
   "name": "llm-tools-registry",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Central tool registry and single tool-execution chokepoint for the openai-compatible harness.",
   "type": "module",
   "exports": {

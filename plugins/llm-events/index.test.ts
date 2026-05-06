@@ -32,7 +32,8 @@ describe("llm-events", () => {
   });
 
   it("VOCAB exposes the Spec 0 event names", () => {
-    expect(VOCAB.SESSION_START).toBe("session:start");
+    expect(VOCAB.HARNESS_START).toBe("harness:start");
+    expect(VOCAB.SESSION_CREATED).toBe("session:created");
     expect(VOCAB.LLM_BEFORE_CALL).toBe("llm:before-call");
     expect(VOCAB.LLM_TOKEN).toBe("llm:token");
     expect(VOCAB.LLM_DONE).toBe("llm:done");
@@ -47,10 +48,14 @@ describe("llm-events", () => {
 
   it("VOCAB contains every Spec 0 event name", () => {
     const expected = new Set([
-      "session:start",
-      "session:end",
-      "session:error",
-      "session:exit-requested",
+      "harness:start",
+      "harness:end",
+      "harness:error",
+      "harness:exit-requested",
+      "session:created",
+      "session:resumed",
+      "session:deleted",
+      "session:active-changed",
       "input:submit",
       "input:handled",
       "conversation:user-message",
@@ -105,6 +110,7 @@ describe("llm-events", () => {
       signal: AbortSignal;
       callId: string;
       log: (msg: string) => void;
+      sessionId?: string;
     } ? true : false;
     const ctxOk: _Ctx = true;
     expect(ctxOk).toBe(true);
@@ -133,14 +139,13 @@ describe("llm-events", () => {
 
     type _In = import("./public").RunConversationInput extends {
       systemPrompt: string;
-      messages: any[];
+      sessionId: string;
     } ? true : false;
     const inOk: _In = true;
     expect(inOk).toBe(true);
 
     type _Out = import("./public").RunConversationOutput extends {
       finalMessage: any;
-      messages: any[];
       usage: { promptTokens: number; completionTokens: number };
     } ? true : false;
     const outOk: _Out = true;

@@ -1,6 +1,7 @@
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "../index.ts";
-import type { LLMStreamEvent } from "llm-events/public";
+import type { ChatMessage, LLMStreamEvent } from "llm-events/public";
+import type { SessionsStoreService, TurnHandle } from "llm-session-manager/public";
 
 function makeUi(lines: string[]) {
   const out: string[] = [];
@@ -25,10 +26,49 @@ function makeLlm(events: LLMStreamEvent[][]) {
   };
 }
 
+function makeSessions(): SessionsStoreService {
+  let next = 0;
+  const messages = new Map<string, ChatMessage[]>();
+  const open = new Map<string, ChatMessage[]>();
+  return {
+    async create() {
+      const id = `00000000-0000-4000-8000-${String(++next).padStart(12, "0")}`;
+      messages.set(id, []);
+      return { id, harness: "h", metadata: {}, createdAt: next, pluginFingerprint: [] };
+    },
+    async load(id: string) {
+      if (!messages.has(id)) throw new Error("not found");
+      return { id, harness: "h", metadata: {}, createdAt: 1, pluginFingerprint: [] };
+    },
+    async exists(id: string) { return messages.has(id); },
+    async getMessages(id: string) {
+      return [...(messages.get(id) ?? []), ...(open.get(id) ?? [])];
+    },
+    beginTurn(id: string, turnId: string): TurnHandle {
+      if (open.has(id)) throw new Error("already open");
+      const buffer: ChatMessage[] = [];
+      open.set(id, buffer);
+      return {
+        turnId,
+        append: (msg) => buffer.push(msg),
+        commit: async () => {
+          messages.set(id, [...(messages.get(id) ?? []), ...buffer]);
+          open.delete(id);
+        },
+        rollback: async () => { open.delete(id); },
+      };
+    },
+    async list() { return []; },
+    async delete() {},
+    async *readEvents() {},
+  } as any;
+}
+
 function makeCtx(deps: { ui: any; llm: any; cleared?: () => Promise<void>; cfg?: any }) {
   const handlers: Record<string, Function[]> = {};
   const events: { name: string; payload: any }[] = [];
   const provided: Record<string, unknown> = {};
+  const sessions = makeSessions();
   return {
     log: mock(() => {}),
     config: deps.cfg ?? { defaultSystemPrompt: "sp" },
@@ -39,6 +79,7 @@ function makeCtx(deps: { ui: any; llm: any; cleared?: () => Promise<void>; cfg?:
     useService: (name: string) => {
       if (name === "llm-tui:channel") return deps.ui;
       if (name === "llm:complete") return deps.llm;
+      if (name === "sessions:store") return sessions;
       throw new Error(`useService: no provider for '${name}'`);
     },
     on: (name: string, fn: Function) => {
@@ -52,6 +93,7 @@ function makeCtx(deps: { ui: any; llm: any; cleared?: () => Promise<void>; cfg?:
     handlers,
     events,
     provided,
+    sessions,
   } as any;
 }
 
@@ -75,8 +117,9 @@ describe("llm-driver index", () => {
     await plugin.setup!(ctx);
     await plugin.start!(ctx);
     const names = ctx.events.map((e: any) => e.name);
-    expect(names[0]).toBe("session:start");
-    expect(names.at(-1)).toBe("session:end");
+    expect(names[0]).toBe("harness:start");
+    expect(names).toContain("session:active-changed");
+    expect(names.at(-1)).toBe("harness:end");
     const turnStarts = ctx.events.filter((e: any) => e.name === "turn:start");
     expect(turnStarts.length).toBe(2);
     for (const ts of turnStarts) expect(ts.payload.trigger).toBe("user");
@@ -123,7 +166,7 @@ describe("llm-driver index", () => {
     expect(reqs[1].payload.request.messages.map((m: any) => m.content)).toEqual(["ok"]);
   });
 
-  it("conversation:cleared resets transcript", async () => {
+  it("session:active-changed switches the active transcript", async () => {
     const ui = makeUi(["one", "two", ""]);
     const llm = makeLlm([
       [{ type: "done", response: { content: "r1", finishReason: "stop" } }],
@@ -131,10 +174,12 @@ describe("llm-driver index", () => {
     ]);
     const ctx = makeCtx({ ui, llm });
     await plugin.setup!(ctx);
-    // Fire conversation:cleared between the two inputs by listening to input:submit
-    // on `two` and clearing first.
     ctx.on("input:submit", async (p: any) => {
-      if (p.text === "two") await ctx.emit("conversation:cleared", {});
+      if (p.text === "two") {
+        const next = await ctx.sessions.create({});
+        await ctx.emit("session:active-changed", { from: "old", to: next.id });
+        await ctx.emit("conversation:cleared", { from: "old", to: next.id });
+      }
     });
     await plugin.start!(ctx);
     const reqs = ctx.events.filter((e: any) => e.name === "llm:request");
@@ -150,9 +195,11 @@ describe("llm-driver index", () => {
     const ctx = makeCtx({ ui: makeUi([]), llm });
     await plugin.setup!(ctx);
     const svc = ctx.provided["driver:run-conversation"] as any;
+    const session = await ctx.sessions.create({});
     const out = await svc.runConversation({
       systemPrompt: "agent-sp",
-      messages: [{ role: "user", content: "go" }],
+      sessionId: session.id,
+      userMessage: { role: "user", content: "go" },
       parentTurnId: "turn_parent",
     });
     expect(out.finalMessage.content).toBe("child-final");

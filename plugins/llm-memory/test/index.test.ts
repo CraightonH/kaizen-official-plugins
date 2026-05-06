@@ -102,7 +102,7 @@ describe("llm-memory setup wiring", () => {
     }
   });
 
-  it("emits session:error when prompt:system unavailable", async () => {
+  it("emits harness:error when prompt:system unavailable", async () => {
     const home = mkdtempSync(join(tmpdir(), "llm-memory-home-"));
     const orig = process.env.HOME;
     process.env.HOME = home;
@@ -110,7 +110,7 @@ describe("llm-memory setup wiring", () => {
       const ctx = makeCtx(undefined); // no prompt:system
       await plugin.setup(ctx);
       const calls: any[] = (ctx.emit as any).mock.calls;
-      const errorCall = calls.find(([evt]: [string]) => evt === "session:error");
+      const errorCall = calls.find(([evt]: [string]) => evt === "harness:error");
       expect(errorCall).toBeTruthy();
       expect(errorCall[1].message).toMatch(/prompt:system/);
       expect(errorCall[1].message).toMatch(/saved-memories section disabled/);

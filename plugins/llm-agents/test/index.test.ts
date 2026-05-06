@@ -1,7 +1,20 @@
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "../index.ts";
 
-function makeCtx(opts: { tools?: any; driver?: any; promptSystem?: any; readFile?: any } = {}) {
+function makeSessions() {
+  return {
+    async create() { return { id: "parent/child", harness: "h", metadata: {}, createdAt: 1, pluginFingerprint: [] }; },
+    async load(id: string) { return { id, harness: "h", agentName: "a", metadata: {}, createdAt: 1, pluginFingerprint: [] }; },
+    async exists() { return false; },
+    async getMessages() { return []; },
+    beginTurn() { throw new Error("not needed"); },
+    async list() { return []; },
+    async delete() {},
+    async *readEvents() {},
+  };
+}
+
+function makeCtx(opts: { tools?: any; driver?: any; sessions?: any; promptSystem?: any; readFile?: any } = {}) {
   const subs: Record<string, ((p: any) => any)[]> = {};
   const provided: Record<string, unknown> = {};
   return {
@@ -17,6 +30,7 @@ function makeCtx(opts: { tools?: any; driver?: any; promptSystem?: any; readFile
     useService: (name: string) => {
       if (name === "tools:registry") return opts.tools;
       if (name === "driver:run-conversation") return opts.driver;
+      if (name === "sessions:store") return opts.sessions ?? makeSessions();
       if (name === "prompt:system") return opts.promptSystem;
       return undefined;
     },
@@ -50,15 +64,15 @@ describe("llm-agents plugin", () => {
     expect(reg.source).toEqual({ kind: "agent" });
   });
 
-  it("emits session:error when tools:registry missing", async () => {
+  it("emits harness:error when tools:registry missing", async () => {
     const promptSystem = { register: mock(() => ({ unregister: () => {}, bumpGeneration: () => {} })), assemble: async () => "", list: () => [], generation: () => 0 };
     const ctx = makeCtx({ tools: undefined, driver: { runConversation: async () => ({} as any) }, promptSystem });
-    let captured: any = null;
-    ctx.on("session:error", (p: any) => { captured = p; });
+    const captured: any[] = [];
+    ctx.on("harness:error", (p: any) => { captured.push(p); });
     await plugin.setup(ctx);
     // Allow microtask discovery to settle:
     await new Promise((r) => setTimeout(r, 0));
-    expect(captured?.message).toMatch(/tools:registry/);
+    expect(captured.some((p) => /tools:registry/.test(p.message))).toBe(true);
   });
 
   it("manifest declares correct services and permissions", () => {

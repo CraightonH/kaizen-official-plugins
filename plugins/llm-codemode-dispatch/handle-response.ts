@@ -10,6 +10,8 @@ export type RunInSandbox = (
   signal: AbortSignal,
   config: CodeModeConfig,
   emit?: (event: string, payload: unknown) => Promise<void>,
+  turnId?: string,
+  sessionId?: string,
 ) => Promise<SandboxRunResult>;
 
 export interface HandleResponseInput {
@@ -17,6 +19,8 @@ export interface HandleResponseInput {
   registry: ToolsRegistryService;
   signal: AbortSignal;
   emit: (event: string, payload: unknown) => Promise<void>;
+  turnId: string;
+  sessionId: string;
 }
 
 export function makeHandleResponse(config: CodeModeConfig, runner: RunInSandbox) {
@@ -24,29 +28,30 @@ export function makeHandleResponse(config: CodeModeConfig, runner: RunInSandbox)
     const { code, ignoredCount } = extractCodeBlocks(input.response.content ?? "", config.maxBlocksPerResponse);
     if (!code) return [];
 
-    await input.emit("codemode:code-emitted", { code, language: "typescript" });
+    const scoped = { turnId: input.turnId, sessionId: input.sessionId };
+    await input.emit("codemode:code-emitted", { code, language: "typescript", ...scoped });
 
-    const beforeExec: { code: string } = { code };
+    const beforeExec: { code: string; turnId: string; sessionId: string } = { code, ...scoped };
     await input.emit("codemode:before-execute", beforeExec);
     const finalCode = beforeExec.code;
 
     let result: SandboxRunResult;
     try {
-      result = await runner(finalCode, input.registry, input.signal, config, input.emit);
+      result = await runner(finalCode, input.registry, input.signal, config, input.emit, input.turnId, input.sessionId);
     } catch (err) {
       // AbortError or unexpected — rethrow so driver handles cancellation
       throw err;
     }
 
     if (result.ok) {
-      await input.emit("codemode:result", { stdout: result.stdout, returnValue: result.returnValue });
+      await input.emit("codemode:result", { stdout: result.stdout, returnValue: result.returnValue, ...scoped });
       const content = formatResultMessage(
         { ok: true, returnValue: result.returnValue, stdout: result.stdout, ignoredBlocks: ignoredCount },
         { maxStdoutBytes: config.maxStdoutBytes, maxReturnBytes: config.maxReturnBytes, maxBlocksPerResponse: config.maxBlocksPerResponse },
       );
       return [{ role: "user", content }];
     } else {
-      await input.emit("codemode:error", { message: `${result.errorName}: ${result.errorMessage}` });
+      await input.emit("codemode:error", { message: `${result.errorName}: ${result.errorMessage}`, stdout: result.stdout, ...scoped });
       const content = formatResultMessage(
         { ok: false, errorName: result.errorName, errorMessage: result.errorMessage, stdout: result.stdout, ignoredBlocks: ignoredCount },
         { maxStdoutBytes: config.maxStdoutBytes, maxReturnBytes: config.maxReturnBytes, maxBlocksPerResponse: config.maxBlocksPerResponse },

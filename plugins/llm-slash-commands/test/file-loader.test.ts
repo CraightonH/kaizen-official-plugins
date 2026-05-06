@@ -77,23 +77,24 @@ describe("loadFileCommands", () => {
     expect(warnings[0]).toMatch(/bad\.md/);
   });
 
-  it("invokes handler: substitutes {{args}}, emits conversation:user-message, calls runConversation", async () => {
+  it("invokes handler: substitutes {{args}} and calls runConversation for the active session", async () => {
     const reg = createRegistry();
     const fs = makeFsDeps({ "/u/.kaizen/commands/echo.md": VALID });
     const emit = mock(async (_e: string, _p: unknown) => {});
-    const runConversation = mock(async () => ({ finalMessage: { role: "assistant", content: "" }, messages: [], usage: { promptTokens: 0, completionTokens: 0 } }));
+    const runConversation = mock(async () => ({ finalMessage: { role: "assistant", content: "" }, usage: { promptTokens: 0, completionTokens: 0 } }));
     const driver = { runConversation };
     await loadFileCommands({
-      home: "/u", cwd: "/p", registry: reg, ...fs, getDriver: () => driver as any,
+      home: "/u", cwd: "/p", registry: reg, ...fs, getDriver: () => driver as any, getActiveSessionId: () => "session-1",
     });
     const ctx: any = { args: "hello world", raw: "/echo hello world", signal: new AbortController().signal, emit, print: async () => {} };
     await reg.get("echo")!.handler(ctx);
     const userMsgCalls = emit.mock.calls.filter((c) => c[0] === "conversation:user-message");
-    expect(userMsgCalls.length).toBe(1);
-    const payload: any = userMsgCalls[0]![1];
-    expect(payload.message.role).toBe("user");
-    expect(payload.message.content).toBe("You said: hello world.\n");
+    expect(userMsgCalls.length).toBe(0);
     expect(runConversation).toHaveBeenCalledTimes(1);
+    expect(runConversation.mock.calls[0]![0]).toMatchObject({
+      sessionId: "session-1",
+      userMessage: { role: "user", content: "You said: hello world.\n" },
+    });
   });
 
   it("required-args validation: empty args prints usage and does NOT call runConversation", async () => {

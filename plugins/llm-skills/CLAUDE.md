@@ -37,7 +37,7 @@ Boundaries:
 
 - **Path-derived name is canonical.** Frontmatter `name` is informational only — if it disagrees with the relative path, the path wins and a warning is logged. The LLM-visible identifier must be predictable from disk layout.
 - **Project beats user beats programmatic.** Conflict resolution is fixed; do not reorder. Masking emits a `warn` (config-time concern), not an event.
-- **Scan failures are non-fatal.** Bad frontmatter, unreadable files, duplicate names within a layer all skip the offending entry and emit `session:error` (or `warn` for masking). The scan must never throw.
+- **Scan failures are non-fatal.** Bad frontmatter, unreadable files, duplicate names within a layer all skip the offending entry and emit `harness:error` (or `warn` for masking). The scan must never throw.
 - **Empty registry → no section.** `buildSkillsBlock` returns `""` for an empty list; the `prompt:system` registry's "empty sections are dropped" invariant ensures no `## Available skills` header appears.
 - **Skills contribute via `prompt:system`.** A section with id `"llm-skills:available"` and priority 160 is registered at setup. Its title is "Available skills". Generation is bumped after any rescan-changed event and after programmatic register/unregister calls.
 - **Tokens are cached at registration.** `manifest.tokens` is computed once (heuristic or frontmatter override) and never recomputed by `list()`. The `load_skill` handler recomputes only as a fallback when `list()` doesn't carry a token count for the loaded skill.

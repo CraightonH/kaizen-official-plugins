@@ -74,7 +74,7 @@ const plugin: KaizenPlugin = {
     const statusTimer = setInterval(updateStatus, 5000);
     updateStatus();
 
-    ctx.on("session:end", async () => {
+    ctx.on("harness:end", async () => {
       clearInterval(statusTimer);
       await ctx.emit("status:item-clear", { key: "mcp" });
       await svc.shutdownAll();

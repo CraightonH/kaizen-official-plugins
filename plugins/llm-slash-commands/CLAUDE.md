@@ -15,8 +15,9 @@ parser.ts         parse(text) → { name, args } | null. Pure function. Single r
 dispatcher.ts     makeOnInputSubmit({ registry, bus }) → onInputSubmit handler. Owns the
                   per-dispatch inSlashDispatch guard, builds SlashCommandContext, wraps emit
                   to reject re-entrant input:submit, emits input:handled exactly once per claim.
-builtins.ts       registerBuiltins(registry). Defines /help (with grouping by source/prefix)
-                  and /exit (emits session:exit-requested). Pure; no state.
+builtins.ts       registerBuiltins(registry). Defines /help, /exit (emits
+                  harness:exit-requested), /clear, and /session:* commands.
+                  Pure with injected session dependencies.
 file-loader.ts    loadFileCommands({ home, cwd, registry, readDir, readFile, getDriver }) →
                   warnings[]. Walks user dir then project dir; project shadows user (same-name
                   user file is unregistered before re-registering). Builds per-file handlers

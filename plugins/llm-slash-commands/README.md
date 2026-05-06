@@ -12,7 +12,9 @@ Owns slash-command intake for the harness. Intercepts user input that begins wit
   - YAML frontmatter (`description`, optional `usage`, optional `arguments.required`); body supports `{{args}}` substitution. Project files shadow user files of the same name.
 - Ships built-ins:
   - `/help [command]` — list all registered commands grouped by source (Built-in, Driver, Skills, Agents, Memory, MCP, User), or print one entry's detail.
-  - `/exit` — request session shutdown via `session:exit-requested`.
+  - `/exit` — request harness shutdown via `harness:exit-requested`.
+  - `/clear` — archive the current transcript by creating a fresh active session.
+  - `/session:new`, `/session:list`, `/session:resume <id>`, `/session:delete <id> [--cascade]` — manage persistent sessions when `sessions:store` is available.
 - On parse miss, returns silently so the lower-priority default `input:submit` consumer can treat the line as a normal user message.
 - On unknown command, prints `Unknown command: /foo. Type /help for a list.` and claims the event.
 - Optionally registers a `/`-triggered completion source against `llm-tui:completion` if that service is present.
@@ -55,7 +57,9 @@ Semantics:
 
 ### Consumes
 
-**Service** — `driver:run-conversation` (optional). Looked up at command-invocation time. File-based commands invoke `runConversation()` after emitting their rendered `conversation:user-message`. If the driver is absent, the user message is still emitted and the turn is skipped.
+**Service** — `driver:run-conversation` (optional). Looked up at command-invocation time. File-based commands invoke `runConversation()` against the active session after emitting their rendered `conversation:user-message`. If the driver or active session is absent, the user message is still emitted and the turn is skipped.
+
+**Service** — `sessions:store` (optional). Enables `/clear` archival semantics and the `/session:*` built-ins. Without it, only `/help` and `/exit` are registered.
 
 **Service** — `llm-tui:completion` (optional). When present, the plugin registers one source with `trigger: "/"` that filters `registry.list()` against the prefix and ranks built-ins first, then file-sourced, then plugin-namespaced. When absent, dispatch via `input:submit` works unchanged.
 
@@ -68,8 +72,10 @@ Emits:
 - `input:handled` — `{ by: "llm-slash-commands" }`. Emitted after every claimed dispatch (matched, unknown-command, or handler-threw).
 - `conversation:system-message` — used by `print()`, by the unknown-command path, and by file-loader startup warnings.
 - `conversation:user-message` — emitted by file-based command handlers before invoking `driver:run-conversation`.
-- `session:error` — when a handler throws. The original dispatch still emits `input:handled`.
-- `session:exit-requested` — emitted by `/exit`.
+- `harness:error` — when a handler throws. The original dispatch still emits `input:handled`.
+- `harness:exit-requested` — emitted by `/exit`.
+- `session:active-changed` — emitted by `/clear`, `/session:new`, `/session:resume`, and active-session deletion.
+- `session:resumed` — emitted by `/session:resume`.
 
 The wrapped `emit` passed to handlers throws `ReentrantSlashEmitError` if a handler attempts to re-emit `input:submit`. A per-dispatch flag also drops any nested `input:submit` the subscriber sees as defense in depth.
 
@@ -83,4 +89,4 @@ The project command dir is derived from `process.cwd()` at setup time; no env ov
 
 ## Permissions
 
-`tier: unscoped` — reads two user-controlled directories (`~/.kaizen/commands/`, `<cwd>/.kaizen/commands/`); emits a session-shutdown event on `/exit`. No network or subprocess.
+`tier: unscoped` — reads two user-controlled directories (`~/.kaizen/commands/`, `<cwd>/.kaizen/commands/`); emits a harness-shutdown event on `/exit`. No network or subprocess.

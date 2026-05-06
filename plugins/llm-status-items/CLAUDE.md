@@ -32,7 +32,7 @@ Boundaries:
 - **`turn:end` owns `turnInFlight = false`.** `llm:done` updates token totals only. Don't conflate them — providers can emit multiple `llm:done`s per turn (tool-call rounds), but `turn:end` fires once.
 - **Context ceiling is resolved at most once per model id.** `contextCache` and `modelsListed` gate `listModels()`. Providers without `listModels` must not be retried.
 - **`lastPromptTokens` ≠ cumulative `promptTokens`.** The `_ctx` item is denominated against the most recent call's prompt size (what the model actually saw), not session totals. Don't "fix" this.
-- **Empty status is worse than zeros.** `initialized` flips on `session:start` so zero-valued counters are emitted before the first turn runs. Don't suppress them.
+- **Empty status is worse than zeros.** `initialized` flips on `harness:start` so zero-valued counters are emitted before the first turn runs. Don't suppress them.
 
 ## Adding a new status item
 

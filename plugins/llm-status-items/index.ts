@@ -5,7 +5,7 @@ import { formatDollars, loadRateTable, realCostDeps, tokensToCents, type CostDep
 import { formatContextItem } from "./context.ts";
 
 const SUBSCRIBED = [
-  "session:start",
+  "harness:start",
   "llm:before-call",
   "llm:done",
   "turn:start",
@@ -37,7 +37,7 @@ const plugin: KaizenPlugin = {
     let state: StatusState = initialState();
     let costCents = 0;
     let costActive = false; // becomes true after first successful cost emission; controls whether to clear on conversation:cleared
-    // Flips on the first session:start. Lets emitDiff render zero token
+    // Flips on the first harness:start. Lets emitDiff render zero token
     // counters and the empty context bar before any turn has run, so the
     // status line isn't half-empty at idle.
     let initialized = false;
@@ -114,7 +114,7 @@ const plugin: KaizenPlugin = {
       // signal about how much room is left in the window.
       const inV = String(state.promptTokens);
       const outV = String(state.completionTokens);
-      // Once we've initialized (after session:start), surface zeros too —
+      // Once we've initialized (after harness:start), surface zeros too —
       // an empty status line is worse than visible defaults.
       const haveTokens = initialized || state.promptTokens > 0 || state.completionTokens > 0;
       if (state.cleared) {
@@ -158,7 +158,7 @@ const plugin: KaizenPlugin = {
         lastEmitted.ctx = null;
       } else if (state.contextLength) {
         // Render with zero used before any call has been made. Keeps the bar
-        // visible from session:start instead of waiting for first llm:done.
+        // visible from harness:start instead of waiting for first llm:done.
         const value = formatContextItem(state.lastPromptTokens, state.contextLength);
         if (value !== lastEmitted.ctx) {
           await ctx.emit("status:item-update", { key: "_ctx", value });
@@ -203,19 +203,19 @@ const plugin: KaizenPlugin = {
     for (const name of SUBSCRIBED) {
       ctx.on(name, async (payload: any) => {
         state = applyEvent(state, name, payload);
-        // session:start: probe the provider once so the bar can render
+        // harness:start: probe the provider once so the bar can render
         // model + ctx before any turn runs, and flip `initialized` so
         // zero-valued counters appear instead of being suppressed.
-        // llm:before-call / llm:done: same probe in case session:start
+        // llm:before-call / llm:done: same probe in case harness:start
         // landed before the provider service was available.
-        if (state.contextLength === null && (name === "session:start" || name === "llm:before-call" || name === "llm:done")) {
+        if (state.contextLength === null && (name === "harness:start" || name === "llm:before-call" || name === "llm:done")) {
           const ceiling = await resolveCeiling(state.model);
           if (ceiling !== null) state = { ...state, contextLength: ceiling };
           if (!state.model && ambientLoadedModelId) {
             state = { ...state, model: ambientLoadedModelId };
           }
         }
-        if (name === "session:start") initialized = true;
+        if (name === "harness:start") initialized = true;
         await emitDiff();
         await emitCost(name, payload);
       });

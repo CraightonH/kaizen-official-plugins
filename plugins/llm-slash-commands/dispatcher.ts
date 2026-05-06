@@ -48,7 +48,7 @@ export function makeOnInputSubmit(deps: DispatcherDeps): (payload: { text: strin
         try {
           await entry.handler(ctx);
         } catch (e) {
-          await deps.bus.emit("session:error", {
+          await deps.bus.emit("harness:error", {
             message: (e as Error).message ?? String(e),
             cause: e,
           });

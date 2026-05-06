@@ -24,32 +24,34 @@ describe("maybeExtract", () => {
   it("no-op when autoExtract is false", async () => {
     const d = baseDeps();
     d.config.autoExtract = false;
-    await maybeExtract({ reason: "complete", lastUserMessage: "remember that X", turnId: "t1" }, d as any);
+    await maybeExtract({ reason: "complete", lastUserMessage: "remember that X", turnId: "t1", sessionId: "s1" }, d as any);
     expect(d.runConversation).not.toHaveBeenCalled();
   });
   it("no-op when reason !== complete", async () => {
     const d = baseDeps();
-    await maybeExtract({ reason: "cancelled", lastUserMessage: "remember that X", turnId: "t1" }, d as any);
+    await maybeExtract({ reason: "cancelled", lastUserMessage: "remember that X", turnId: "t1", sessionId: "s1" }, d as any);
     expect(d.runConversation).not.toHaveBeenCalled();
   });
   it("no-op when no trigger matches", async () => {
     const d = baseDeps();
-    await maybeExtract({ reason: "complete", lastUserMessage: "hello world", turnId: "t1" }, d as any);
+    await maybeExtract({ reason: "complete", lastUserMessage: "hello world", turnId: "t1", sessionId: "s1" }, d as any);
     expect(d.runConversation).not.toHaveBeenCalled();
   });
   it("dispatches a side conversation with toolFilter when trigger matches", async () => {
     const d = baseDeps();
-    await maybeExtract({ reason: "complete", lastUserMessage: "From now on always lower-case my variables.", turnId: "t1" }, d as any);
+    await maybeExtract({ reason: "complete", lastUserMessage: "From now on always lower-case my variables.", turnId: "t1", sessionId: "s1" }, d as any);
     expect(d.runConversation).toHaveBeenCalledTimes(1);
     const arg = (d.runConversation.mock.calls[0]![0]) as any;
     expect(arg.toolFilter).toEqual({ names: ["memory_save"] });
     expect(arg.parentTurnId).toBe("t1");
+    expect(arg.sessionId).toBe("s1");
+    expect(arg.userMessage).toEqual({ role: "user", content: "From now on always lower-case my variables." });
   });
   it("swallows errors from the side call (logs, does not throw)", async () => {
     const log = mock(() => {});
     const d = { ...baseDeps(), log };
     d.runConversation = mock(async () => { throw new Error("driver gone"); });
-    await maybeExtract({ reason: "complete", lastUserMessage: "remember that x", turnId: "t1" }, d as any);
+    await maybeExtract({ reason: "complete", lastUserMessage: "remember that x", turnId: "t1", sessionId: "s1" }, d as any);
     expect(log).toHaveBeenCalled();
   });
 });
