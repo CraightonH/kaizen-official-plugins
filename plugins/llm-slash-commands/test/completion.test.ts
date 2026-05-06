@@ -4,28 +4,29 @@ import { registerBuiltins } from "../builtins.ts";
 import { buildCompletionSource } from "../completion.ts";
 
 describe("buildCompletionSource", () => {
-  it("returns trigger='/' source", () => {
+  it("returns id and trigger='/'", () => {
     const reg = createRegistry();
     const src = buildCompletionSource(reg);
     expect(src.trigger).toBe("/");
+    expect(src.id).toBe("llm-slash-commands:registry");
   });
 
-  it("filters by prefix after the slash", async () => {
+  it("filters by prefix (query is text AFTER the slash)", async () => {
     const reg = createRegistry();
     registerBuiltins(reg);
     reg.register({ name: "mcp:reload", description: "r", source: "plugin" }, async () => {});
     const src = buildCompletionSource(reg);
-    const items = await src.list("/he", 3);
+    const items = await src.list("he");
     expect(items.map((i) => i.label)).toEqual(["/help"]);
     expect(items[0]!.insertText).toBe("/help ");
   });
 
-  it("returns all when prefix empty", async () => {
+  it("returns all when query empty (user just typed '/')", async () => {
     const reg = createRegistry();
     registerBuiltins(reg);
     reg.register({ name: "mcp:reload", description: "r", source: "plugin" }, async () => {});
     const src = buildCompletionSource(reg);
-    const items = await src.list("/", 1);
+    const items = await src.list("");
     expect(items.length).toBe(3);
     // Built-ins before namespaced.
     expect(items[0]!.label).toMatch(/^\/(help|exit)$/);
@@ -36,14 +37,17 @@ describe("buildCompletionSource", () => {
     const reg = createRegistry();
     registerBuiltins(reg);
     const src = buildCompletionSource(reg);
-    const items = await src.list("/help", 5);
+    const items = await src.list("help");
     expect(items[0]!.description).toMatch(/slash commands/i);
   });
 
-  it("returns [] when input doesn't start with /", async () => {
+  it("filters by namespace prefix", async () => {
     const reg = createRegistry();
-    registerBuiltins(reg);
+    reg.register({ name: "session:list", description: "list", source: "builtin" }, async () => {});
+    reg.register({ name: "session:new", description: "new", source: "builtin" }, async () => {});
+    reg.register({ name: "mcp:reload", description: "r", source: "builtin" }, async () => {});
     const src = buildCompletionSource(reg);
-    expect(await src.list("hello", 5)).toEqual([]);
+    const items = await src.list("session");
+    expect(items.map((i) => i.label)).toEqual(["/session:list", "/session:new"]);
   });
 });

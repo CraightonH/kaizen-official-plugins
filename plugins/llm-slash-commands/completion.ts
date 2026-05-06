@@ -6,9 +6,12 @@ export interface CompletionItem {
   description?: string;
 }
 
+// Matches the llm-tui CompletionSource contract: id + trigger + list(query),
+// where `query` is the text typed AFTER the trigger char (no leading "/").
 export interface CompletionSource {
+  id: string;
   trigger: string;
-  list(input: string, cursor: number): Promise<CompletionItem[]>;
+  list(query: string): Promise<CompletionItem[]>;
 }
 
 function rank(m: SlashCommandManifest): number {
@@ -19,13 +22,12 @@ function rank(m: SlashCommandManifest): number {
 
 export function buildCompletionSource(registry: SlashRegistryService): CompletionSource {
   return {
+    id: "llm-slash-commands:registry",
     trigger: "/",
-    async list(input: string, cursor: number): Promise<CompletionItem[]> {
-      if (!input.startsWith("/")) return [];
-      const prefix = input.slice(1, cursor);
+    async list(query: string): Promise<CompletionItem[]> {
       const all = registry.list();
       return all
-        .filter((m) => m.name.startsWith(prefix))
+        .filter((m) => m.name.startsWith(query))
         .sort((a, b) => {
           const ra = rank(a), rb = rank(b);
           if (ra !== rb) return ra - rb;

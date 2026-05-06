@@ -129,7 +129,7 @@ describe("llm-slash-commands integration", () => {
 
     expect(tuiSources.length).toBe(1);
     expect(tuiSources[0]!.trigger).toBe("/");
-    const items = await tuiSources[0]!.list("/he", 3);
+    const items = await tuiSources[0]!.list("he");
     expect(items.find((i: any) => i.label === "/help")).toBeDefined();
 
     process.env.HOME = origHome;

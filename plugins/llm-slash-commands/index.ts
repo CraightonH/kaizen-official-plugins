@@ -74,7 +74,7 @@ const plugin: KaizenPlugin = {
       completion = undefined;
     }
     if (completion) {
-      completion.register(buildCompletionSource(registry) as any);
+      completion.register(buildCompletionSource(registry));
     }
   },
 };
