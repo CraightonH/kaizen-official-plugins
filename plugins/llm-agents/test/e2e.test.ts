@@ -9,6 +9,26 @@ function makeCtx(opts: { tools?: any; driver?: any } = {}) {
   const provided: Record<string, unknown> = {};
   let registeredTool: any = null;
   let registeredHandler: any = null;
+  const sessions = {
+    async create(opts: any) {
+      return {
+        id: `${opts.parentSessionId}/${opts.childId}`,
+        harness: "h",
+        parentSessionId: opts.parentSessionId,
+        agentName: opts.agentName,
+        metadata: {},
+        createdAt: 1,
+        pluginFingerprint: [],
+      };
+    },
+    async load(id: string) { return { id, harness: "h", agentName: "code-reviewer", metadata: {}, createdAt: 1, pluginFingerprint: [] }; },
+    async exists() { return false; },
+    async getMessages() { return []; },
+    beginTurn() { throw new Error("not needed"); },
+    async list() { return []; },
+    async delete() {},
+    async *readEvents() {},
+  };
   return {
     subs, provided,
     get registeredTool() { return registeredTool; },
@@ -28,6 +48,7 @@ function makeCtx(opts: { tools?: any; driver?: any } = {}) {
         list: () => [], invoke: async () => {},
       };
       if (name === "driver:run-conversation") return opts.driver;
+      if (name === "sessions:store") return sessions;
       if (name === "prompt:system") return {
         register: () => ({ unregister: () => {}, bumpGeneration: () => {} }),
         assemble: async () => "",
@@ -56,7 +77,7 @@ describe("llm-agents E2E", () => {
     const driver = {
       runConversation: mock(async (input: any) => {
         captured = input;
-        return { finalMessage: { role: "assistant", content: "DONE" }, messages: [], usage: { promptTokens: 1, completionTokens: 1 } };
+        return { finalMessage: { role: "assistant", content: "DONE" }, usage: { promptTokens: 1, completionTokens: 1 } };
       }),
     };
     const ctx = makeCtx({ driver });
@@ -74,11 +95,13 @@ describe("llm-agents E2E", () => {
     expect(handler).toBeTruthy();
     const result = await handler(
       { agent_name: "code-reviewer", prompt: "review file X" },
-      { signal: new AbortController().signal, callId: "c1", turnId: "t-parent", log: () => {} },
+      { signal: new AbortController().signal, callId: "c1", turnId: "t-parent", sessionId: "parent-session", log: () => {} },
     );
     expect(result).toBe("DONE");
     expect(captured.systemPrompt).toContain("careful, terse code reviewer");
     expect(captured.parentTurnId).toBe("t-parent");
+    expect(captured.sessionId).toMatch(/^parent-session\/oneshot-/);
+    expect(captured.userMessage).toEqual({ role: "user", content: "review file X" });
     expect(captured.toolFilter.names).toContain("dispatch_agent");
     expect(captured.toolFilter.names).toContain("read_file");
 

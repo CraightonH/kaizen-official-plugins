@@ -400,7 +400,7 @@ describe("harnessKey", () => {
   test("rejects ref derived to 'local_*'", () => {
     expect(() => harnessKey({ ref: "local/foo" })).toThrow(/reserved/i);
     expect(() => harnessKey({ ref: "local_foo/bar" })).toThrow(/reserved/i);
-    expect(() => harnessKey({ ref: "local-foo" })).not.toThrow(); // hyphen, doesn't sanitize to underscore
+    expect(() => harnessKey({ ref: "local-foo" })).not.toThrow();
   });
 
   test("ref takes precedence over jsonPath", () => {
@@ -885,6 +885,12 @@ describe("events-log", () => {
     expect(log.nextOffset()).toBe(0);
   });
 
+  test("flush is a no-op before the first append", async () => {
+    const dir = tmp();
+    const log = openEventsLog(join(dir, "events.jsonl"));
+    await expect(log.flush()).resolves.toBeUndefined();
+  });
+
   test("append: monotonic offsets, persisted to disk", async () => {
     const dir = tmp();
     const path = join(dir, "events.jsonl");
@@ -1021,6 +1027,7 @@ export function openEventsLog(path: string): EventsLog {
 
     async flush() {
       // fsync the file so events are durable across crashes.
+      if (!existsSync(path)) return;
       const fd = openSync(path, "r");
       try { fsyncSync(fd); } finally { closeSync(fd); }
     },
@@ -1340,7 +1347,7 @@ describe("store: create / load / list / delete", () => {
   test("create sub-session requires parent + childId", async () => {
     const { store } = setup();
     const parent = await store.create({});
-    expect(() => store.create({ parentSessionId: parent.id })).toThrow(/childId/);
+    await expect(store.create({ parentSessionId: parent.id })).rejects.toThrow(/childId/);
     const child = await store.create({ parentSessionId: parent.id, childId: "review-A" });
     expect(child.id).toBe(`${parent.id}/review-A`);
   });
@@ -1348,15 +1355,15 @@ describe("store: create / load / list / delete", () => {
   test("create sub-session with invalid childId throws", async () => {
     const { store } = setup();
     const parent = await store.create({});
-    expect(() => store.create({ parentSessionId: parent.id, childId: "a/b" })).toThrow();
-    expect(() => store.create({ parentSessionId: parent.id, childId: ".." })).toThrow();
-    expect(() => store.create({ parentSessionId: parent.id, childId: "" })).toThrow();
+    await expect(store.create({ parentSessionId: parent.id, childId: "a/b" })).rejects.toThrow();
+    await expect(store.create({ parentSessionId: parent.id, childId: ".." })).rejects.toThrow();
+    await expect(store.create({ parentSessionId: parent.id, childId: "" })).rejects.toThrow();
   });
 
   test("alias collision under same parent throws", async () => {
     const { store } = setup();
     await store.create({ alias: "main" });
-    expect(() => store.create({ alias: "main" })).toThrow(/alias/i);
+    await expect(store.create({ alias: "main" })).rejects.toThrow(/alias/i);
   });
 
   test("load: returns SessionRecord without messages", async () => {
@@ -1666,29 +1673,40 @@ export function makeStore(deps: StoreDeps): SessionsStoreService {
     const sess = loadIntoCache(id);
     if (sess.openTurn) throw new Error(`beginTurn: session '${id}' already has an open turn`);
     const buffered: ChatMessage[] = [];
-    let committed = false;
+    let closed = false;
     const handle: TurnHandle = {
       turnId,
       append(msg) {
-        if (committed) throw new Error("turnHandle: append after commit/rollback");
+        if (closed) throw new Error("turnHandle: append after commit/rollback");
         buffered.push(msg);
       },
       async commit() {
-        if (committed) return;
-        committed = true;
+        if (closed) return;
         const newMessages = [...sess.snapshot.messages, ...buffered];
         const next: Snapshot = { ...sess.snapshot, messages: newMessages, lastTurnAt: deps.now() };
         const paths = sessionPaths(root, id);
-        await writeSnapshotAtomic(paths.snapshot, paths.snapshotTmp, next);
+        // Flush the event-log tail before snapshot write. After snapshot write
+        // succeeds, no required operation below is allowed to throw; otherwise
+        // a commit failure would leave a newer snapshot while the driver tries
+        // to roll back the turn.
         await sess.events.flush();
+        await writeSnapshotAtomic(paths.snapshot, paths.snapshotTmp, next);
+        closed = true;
         sess.snapshot = next;
         sess.record = recordFromSnapshot(next);
         sess.openTurn = undefined;
-        await index.appendUpdate({ id, lastTurnAt: next.lastTurnAt! });
+        try {
+          await index.appendUpdate({ id, lastTurnAt: next.lastTurnAt! });
+        } catch (err) {
+          // index.jsonl is a derived view; startup rebuild can recover from
+          // stale/missing updates. Do not convert a successful snapshot commit
+          // into a turn failure because the index append lagged.
+          deps.log(`sessions: index update failed for ${id}: ${String((err as any)?.message ?? err)}`);
+        }
       },
       async rollback() {
-        if (committed) return; // post-commit rollback is a no-op
-        committed = true;
+        if (closed) return; // post-commit rollback is a no-op
+        closed = true;
         sess.openTurn = undefined;
       },
     };
@@ -1739,6 +1757,7 @@ export function makeStore(deps: StoreDeps): SessionsStoreService {
     if (!index.get(sessionId)) return;
     const sess = loadIntoCache(sessionId);
     await sess.events.append({ ts, event, payload });
+    if (event === "turn:end") await sess.events.flush();
   }
 
   return {
@@ -1792,9 +1811,11 @@ function makeFakeStore() {
 }
 
 describe("trace-subscriber", () => {
+  const noopLog = (_msg: string) => {};
+
   test("turn:start: registers turnId→sessionId, writes turn:start to log", async () => {
     const fake = makeFakeStore();
-    const sub = makeTraceSubscriber({ store: fake as any, now: () => 100 });
+    const sub = makeTraceSubscriber({ store: fake as any, now: () => 100, log: noopLog });
     await sub.handle("turn:start", { turnId: "t1", sessionId: "s1", trigger: "user" });
     expect(fake.calls).toEqual([
       { sessionId: "s1", ts: 100, event: "turn:start", payload: { turnId: "t1", sessionId: "s1", trigger: "user" } },
@@ -1803,7 +1824,7 @@ describe("trace-subscriber", () => {
 
   test("llm:request etc routed by turnId", async () => {
     const fake = makeFakeStore();
-    const sub = makeTraceSubscriber({ store: fake as any, now: () => 100 });
+    const sub = makeTraceSubscriber({ store: fake as any, now: () => 100, log: noopLog });
     await sub.handle("turn:start", { turnId: "t1", sessionId: "s1" });
     await sub.handle("llm:request", { turnId: "t1", request: { model: "m" } });
     expect(fake.calls.map((c) => c.event)).toEqual(["turn:start", "llm:request"]);
@@ -1812,14 +1833,14 @@ describe("trace-subscriber", () => {
 
   test("event payload missing turnId is ignored", async () => {
     const fake = makeFakeStore();
-    const sub = makeTraceSubscriber({ store: fake as any, now: () => 100 });
+    const sub = makeTraceSubscriber({ store: fake as any, now: () => 100, log: noopLog });
     await sub.handle("llm:request", { /* no turnId */ });
     expect(fake.calls).toEqual([]);
   });
 
   test("turn:end clears mapping AFTER writing turn:end", async () => {
     const fake = makeFakeStore();
-    const sub = makeTraceSubscriber({ store: fake as any, now: () => 100 });
+    const sub = makeTraceSubscriber({ store: fake as any, now: () => 100, log: noopLog });
     await sub.handle("turn:start", { turnId: "t1", sessionId: "s1" });
     await sub.handle("turn:end", { turnId: "t1", reason: "complete" });
     // turn:end was written; now an event with the same turnId should be ignored.
@@ -1829,7 +1850,7 @@ describe("trace-subscriber", () => {
 
   test("llm:before-call is NOT logged (per spec)", async () => {
     const fake = makeFakeStore();
-    const sub = makeTraceSubscriber({ store: fake as any, now: () => 100 });
+    const sub = makeTraceSubscriber({ store: fake as any, now: () => 100, log: noopLog });
     await sub.handle("turn:start", { turnId: "t1", sessionId: "s1" });
     await sub.handle("llm:before-call", { turnId: "t1", request: {} });
     expect(fake.calls.map((c) => c.event)).toEqual(["turn:start"]);
@@ -1837,12 +1858,23 @@ describe("trace-subscriber", () => {
 
   test("ignores known-noisy events (llm:token, llm:reasoning, llm:tool-call)", async () => {
     const fake = makeFakeStore();
-    const sub = makeTraceSubscriber({ store: fake as any, now: () => 100 });
+    const sub = makeTraceSubscriber({ store: fake as any, now: () => 100, log: noopLog });
     await sub.handle("turn:start", { turnId: "t1", sessionId: "s1" });
     await sub.handle("llm:token", { turnId: "t1", delta: "x" });
     await sub.handle("llm:reasoning", { turnId: "t1", delta: "..." });
     await sub.handle("llm:tool-call", { turnId: "t1", toolCall: {} });
     expect(fake.calls.map((c) => c.event)).toEqual(["turn:start"]);
+  });
+
+  test("event-log write failures are logged and dropped", async () => {
+    const logs: string[] = [];
+    const sub = makeTraceSubscriber({
+      store: { internalAppendEvent: async () => { throw new Error("disk full"); } } as any,
+      now: () => 100,
+      log: (msg) => logs.push(msg),
+    });
+    await sub.handle("turn:start", { turnId: "t1", sessionId: "s1" });
+    expect(logs.join("\n")).toContain("disk full");
   });
 });
 ```
@@ -1874,6 +1906,7 @@ const SKIP_EVENTS = new Set<string>([
 export interface TraceSubscriberDeps {
   store: SessionsStoreService;
   now: () => number;
+  log: (msg: string) => void;
 }
 
 export interface TraceSubscriber {
@@ -1901,7 +1934,12 @@ export function makeTraceSubscriber(deps: TraceSubscriberDeps): TraceSubscriber 
 
       const append = deps.store.internalAppendEvent;
       if (!append) return;
-      await append(sessionId, deps.now(), event, payload);
+      try {
+        await append(sessionId, deps.now(), event, payload);
+      } catch (err) {
+        deps.log(`sessions: dropped trace event ${event}: ${String((err as any)?.message ?? err)}`);
+        return;
+      }
 
       if (event === "turn:end") {
         turnToSession.delete(turnId);
@@ -2090,7 +2128,7 @@ const plugin: KaizenPlugin = {
     ctx.defineService("sessions:store", { description: "Persistent session store with per-turn append/commit/rollback and an append-only event log." });
     ctx.provideService<SessionsStoreService>("sessions:store", store);
 
-    const tracer = makeTraceSubscriber({ store, now: () => Date.now() });
+    const tracer = makeTraceSubscriber({ store, now: () => Date.now(), log: ctx.log.bind(ctx) });
     for (const event of TRACE_EVENTS) {
       ctx.on(event, async (payload: any) => { await tracer.handle(event, payload); });
     }
@@ -2627,7 +2665,14 @@ The biggest single-plugin change. Removes `state.messages`, gains `activeSession
 - [ ] **Step 1: Replace the existing shapes**
 
 ```ts
-import type { TurnHandle } from "llm-session-manager/public";
+// Keep structurally identical to llm-session-manager/public TurnHandle.
+// Do not import from llm-session-manager here: llm-events must stay dependency-rooted.
+export interface TurnHandle {
+  readonly turnId: string;
+  append(msg: ChatMessage): void;
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+}
 
 export type RunConversationInput = {
   systemPrompt: string;
@@ -2660,26 +2705,7 @@ export interface DriverService {
 }
 ```
 
-Note: `llm-events` now imports `TurnHandle` from `llm-session-manager/public`. Add the workspace dep:
-
-`plugins/llm-events/package.json`:
-- Add `"llm-session-manager": "workspace:*"` to `dependencies`.
-
-This introduces a circularity risk. To avoid it, define `TurnHandle` (with the same shape) as a local type-only alias in `llm-events/public.d.ts` instead of importing — `llm-events` is the source of truth for cross-plugin types, and the spec already exports `TurnHandle` from `llm-session-manager`. **Take the local-type approach** to keep the dependency direction one-way.
-
-Replace the `import type` with an inline definition mirroring `store.ts`:
-
-```ts
-// (above RunConversationInput, in llm-events/public.d.ts)
-export interface TurnHandle {
-  readonly turnId: string;
-  append(msg: ChatMessage): void;
-  commit(): Promise<void>;
-  rollback(): Promise<void>;
-}
-```
-
-The session-manager's `store.ts` keeps its own `TurnHandle` definition; the two must remain identical. Add a comment in both files pointing to the other.
+Do not add an `llm-session-manager` dependency to `llm-events`. `llm-events` is the dependency root for cross-plugin types; importing from the session manager would create a circular dependency. The session-manager's `store.ts` keeps its own `TurnHandle` definition; the two must remain identical. Add a comment in both files pointing to the other.
 
 - [ ] **Step 2: Run llm-events tests**
 
@@ -2838,7 +2864,7 @@ cd plugins/llm-driver && bun test
 
 Walk through the existing `index.ts` (already read in the brainstorm) and apply the changes outlined above. Reference points in current code (per the file as-is):
 - `state.messages` declaration → replace with `activeSessionId: string | null`.
-- `ctx.on("conversation:cleared", ...)` → keep subscription but make body a no-op or just emit `session:active-changed` if you choose to consolidate (per spec, the slash command emits it; the driver subscribes).
+- `ctx.on("conversation:cleared", ...)` → keep subscription but make body a no-op/status reset only. Per spec, slash commands emit `session:active-changed`; the driver subscribes and must not also emit it for `/clear`.
 - `ctx.emit("session:start")` → `ctx.emit("harness:start")`.
 - `ctx.emit("session:end")` → `ctx.emit("harness:end")`.
 - `ctx.emit("session:error", ...)` → `ctx.emit("harness:error", ...)`.
@@ -3025,9 +3051,11 @@ const handler: ToolHandler = async (rawArgs: unknown, ctx: ToolExecutionContext)
 Add a small `shortUuid()` helper at the top of the file:
 
 ```ts
+import { randomUUID } from "node:crypto";
+
 function shortUuid(): string {
   // 8 hex chars from crypto.randomUUID without dashes; enough entropy for one-shot ids.
-  return require("node:crypto").randomUUID().replace(/-/g, "").slice(0, 8);
+  return randomUUID().replace(/-/g, "").slice(0, 8);
 }
 ```
 
@@ -3095,6 +3123,8 @@ cp -R plugins/llm-agents/. ~/.kaizen/marketplaces/official/plugins/llm-agents@<N
 - Modify: `plugins/llm-slash-commands/index.ts` to consume `sessions:store`
 - Modify: `plugins/llm-slash-commands/test/*`
 
+Important: `llm-slash-commands` must mirror the driver's active session id. It does this by registering a setup-time `ctx.on("session:active-changed", ...)` listener and storing the latest `to` value in module/plugin state. The driver remains the UX owner of active state; slash commands only keep a mirror so they can compute `{ from, to }` payloads and active-delete behavior.
+
 - [ ] **Step 1: Read existing builtin pattern**
 
 ```bash
@@ -3110,6 +3140,10 @@ For each command:
 ```ts
 test("/session:new emits session:active-changed and creates a new session", async () => {
   // Precondition: active session "old". After /session:new: active is the new id; session:active-changed { from: "old", to: <new> } emitted.
+});
+
+test("session commands mirror active session from session:active-changed", async () => {
+  // Emit session:active-changed { from: null, to: "s1" }; then /session:new should use from: "s1".
 });
 
 test("/session:list shows top-level sessions only by default", async () => {
@@ -3139,13 +3173,14 @@ cd plugins/llm-slash-commands && bun test
 
 In `builtins.ts` (or new file `session-commands.ts` and import from index), register four commands and one updated `/clear`. For each, the handler:
 1. Calls into `sessions:store` (resolved via the deps captured at register time).
-2. Emits `session:active-changed { from, to }` for new/resume/clear/delete-of-active.
-3. For `/clear`: also emit `conversation:cleared` (no payload — per spec UI-reset signal only).
-4. For `/session:delete`:
+2. Reads the mirrored `activeSessionId` captured from `session:active-changed`; if a command that needs an active session runs before one is known, print a clear error and do not create/delete anything.
+3. Emits `session:active-changed { from, to }` for new/resume/clear/delete-of-active.
+4. For `/clear`: also emit `conversation:cleared { from, to }`.
+5. For `/session:delete`:
    - Preflight: check children (call `sessions.list({ parentSessionId: id })` or read from `list({ includeChildren: true })` filtered by parentSessionId).
    - If active: create replacement, attempt `sessions.delete(id, { cascade })`, emit `session:active-changed` only on success. On delete failure: best-effort `sessions.delete(replacement.id)`; if cleanup fails, log and surface the original error.
 
-Resolve `sessions:store` either at registration time (deps closure) or in `setup()` and pass to register.
+Resolve `sessions:store` either at registration time (deps closure) or in `setup()` and pass to register. In `index.ts`, add `"sessions:store"` to `services.consumes`, call `ctx.consumeService("sessions:store")`, and register the `session:active-changed` listener before command handlers can run.
 
 - [ ] **Step 5: Run, see pass + commit**
 
@@ -3312,6 +3347,6 @@ After all 9 phases:
 A scan of the plan against the spec:
 
 - **Spec coverage** — every spec section mapped to a phase: contract → 2; on-disk layout → 2.5/2.6/2.7/2.8; event log → 2.9 + Phase 4; driver changes → 5; agent dispatch → 6; slash commands → 7; harness key → 2.2; vocab rename → 1; tools registry sessionId → 3; dispatch strategies → 4; testing → embedded TDD throughout, plus integration in 2.12 and smoke in 9.2.
-- **Type consistency** — `TurnHandle` defined once in `llm-events/public.d.ts` and re-exported by `llm-session-manager/public.d.ts`. `SessionsStoreService` defined in `llm-session-manager/store.ts`, re-exported via `llm-session-manager/public.d.ts`. Inline-defined `TurnHandle` in `llm-events` and the one in `store.ts` MUST stay structurally identical — see notes in Task 5.1.
+- **Type consistency** — `TurnHandle` is intentionally defined structurally in both `llm-events/public.d.ts` and `llm-session-manager` to keep dependency direction one-way; those definitions MUST stay identical — see notes in Task 5.1. `SessionsStoreService` is defined in `llm-session-manager/store.ts` and re-exported via `llm-session-manager/public.d.ts`.
 - **Placeholders** — none of the "TBD/TODO" variety. Two soft elisions remain: (a) Task 4.2 / 4.3 expect the executor to read the current dispatch source before editing rather than inlining the full file here, because both are non-trivial and TDD-driven; (b) Phase 8 asks the executor to grep for stale subscribers and treat each match as a commit. Both are explicit work items, not placeholder text.
 - **Plugin fingerprint** — the spec calls for sorted `<name>@<version>` of all loaded plugins recorded per session. Kaizen does not currently expose the loaded plugin set to plugins, so Task 2.11 records a placeholder fingerprint with just `llm-session-manager@0.1.0`. Filing a kaizen issue to expose plugin set, similar to issue #74 for harness identity, is a reasonable follow-up — call it out in the smoke step.

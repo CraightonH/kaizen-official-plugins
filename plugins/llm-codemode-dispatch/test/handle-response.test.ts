@@ -17,13 +17,14 @@ function mockRegistry(handlers: Record<string, (a: any) => unknown> = {}): Tools
 
 const ac = () => new AbortController();
 const noopEmit = mock(async () => {});
+const scoped = { turnId: "turn-1", sessionId: "session-1" };
 
 describe("handleResponse", () => {
   it("no code → returns []", async () => {
     const fakeRun = mock(async () => ({ ok: true, returnValue: undefined, stdout: "" }));
     const handle = makeHandleResponse(DEFAULT_CONFIG, fakeRun as any);
     const resp: LLMResponse = { content: "Just text.", finishReason: "stop" };
-    const out = await handle({ response: resp, registry: mockRegistry(), signal: ac().signal, emit: noopEmit });
+    const out = await handle({ response: resp, registry: mockRegistry(), signal: ac().signal, emit: noopEmit, ...scoped });
     expect(out).toEqual([]);
     expect(fakeRun).not.toHaveBeenCalled();
   });
@@ -34,7 +35,7 @@ describe("handleResponse", () => {
     const fakeRun = mock(async () => ({ ok: true, returnValue: 42, stdout: "hello\n" }));
     const handle = makeHandleResponse(DEFAULT_CONFIG, fakeRun as any);
     const resp: LLMResponse = { content: "```typescript\n1+1;\n```", finishReason: "stop" };
-    const out = await handle({ response: resp, registry: mockRegistry(), signal: ac().signal, emit: emit as any });
+    const out = await handle({ response: resp, registry: mockRegistry(), signal: ac().signal, emit: emit as any, ...scoped });
     expect(out.length).toBe(1);
     expect(out[0].role).toBe("user");
     expect(out[0].content).toContain("[code execution result]");
@@ -43,6 +44,8 @@ describe("handleResponse", () => {
     expect(events).toContain("codemode:code-emitted");
     expect(events).toContain("codemode:before-execute");
     expect(events).toContain("codemode:result");
+    const resultPayload = (emit as any).mock.calls.find((c: any[]) => c[0] === "codemode:result")[1];
+    expect(resultPayload).toMatchObject(scoped);
   });
 
   it("before-execute subscriber may mutate code", async () => {
@@ -56,7 +59,7 @@ describe("handleResponse", () => {
     });
     const handle = makeHandleResponse(DEFAULT_CONFIG, fakeRun as any);
     const resp: LLMResponse = { content: "```typescript\n1+1;\n```", finishReason: "stop" };
-    const out = await handle({ response: resp, registry: mockRegistry(), signal: ac().signal, emit: emit as any });
+    const out = await handle({ response: resp, registry: mockRegistry(), signal: ac().signal, emit: emit as any, ...scoped });
     expect(observedCode).toBe(`throw new Error("blocked")`);
     expect(out[0].content).toContain("exit: error");
     expect(out[0].content).toContain("blocked");
@@ -68,8 +71,9 @@ describe("handleResponse", () => {
     const fakeRun = mock(async () => ({ ok: false, errorName: "TypeError", errorMessage: "boom", stdout: "" }));
     const handle = makeHandleResponse(DEFAULT_CONFIG, fakeRun as any);
     const resp: LLMResponse = { content: "```typescript\nbad();\n```", finishReason: "stop" };
-    await handle({ response: resp, registry: mockRegistry(), signal: ac().signal, emit: emit as any });
+    await handle({ response: resp, registry: mockRegistry(), signal: ac().signal, emit: emit as any, ...scoped });
     expect(events.some((e) => e.name === "codemode:error")).toBe(true);
+    expect(events.find((e) => e.name === "codemode:error")!.payload).toMatchObject(scoped);
   });
 
   it("respects maxBlocksPerResponse and reports ignored count in feedback", async () => {
@@ -77,7 +81,7 @@ describe("handleResponse", () => {
     const cfg = { ...DEFAULT_CONFIG, maxBlocksPerResponse: 2 };
     const handle = makeHandleResponse(cfg, fakeRun as any);
     const blocks = Array(5).fill(0).map((_,i) => "```typescript\n"+i+";\n```").join("\n");
-    const out = await handle({ response: { content: blocks, finishReason: "stop" }, registry: mockRegistry(), signal: ac().signal, emit: noopEmit as any });
+    const out = await handle({ response: { content: blocks, finishReason: "stop" }, registry: mockRegistry(), signal: ac().signal, emit: noopEmit as any, ...scoped });
     expect(out[0].content).toContain("note: 3 additional code block(s) were ignored because the limit is 2");
   });
 
@@ -85,6 +89,24 @@ describe("handleResponse", () => {
     const fakeRun = mock(async () => { const e: any = new Error("aborted"); e.name = "AbortError"; throw e; });
     const handle = makeHandleResponse(DEFAULT_CONFIG, fakeRun as any);
     const resp: LLMResponse = { content: "```typescript\n1;\n```", finishReason: "stop" };
-    await expect(handle({ response: resp, registry: mockRegistry(), signal: ac().signal, emit: noopEmit as any })).rejects.toThrow();
+    await expect(handle({ response: resp, registry: mockRegistry(), signal: ac().signal, emit: noopEmit as any, ...scoped })).rejects.toThrow();
+  });
+
+  it("threads turnId/sessionId into sandbox runner", async () => {
+    let seen: any[] = [];
+    const fakeRun = mock(async (...args: any[]) => {
+      seen = args;
+      return { ok: true, returnValue: undefined, stdout: "" };
+    });
+    const handle = makeHandleResponse(DEFAULT_CONFIG, fakeRun as any);
+    await handle({
+      response: { content: "```typescript\n1;\n```", finishReason: "stop" },
+      registry: mockRegistry(),
+      signal: ac().signal,
+      emit: noopEmit as any,
+      ...scoped,
+    });
+    expect(seen[5]).toBe("turn-1");
+    expect(seen[6]).toBe("session-1");
   });
 });

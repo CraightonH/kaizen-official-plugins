@@ -92,6 +92,7 @@ export async function runInSandbox(
   config: CodeModeConfig,
   emit?: (event: string, payload: unknown) => Promise<void>,
   turnId?: string,
+  sessionId?: string,
 ): Promise<SandboxRunResult> {
   const wrap = wrapCode(userCode);
   if (wrap.transpileError) {
@@ -150,16 +151,29 @@ export async function runInSandbox(
             signal: ac.signal,
             callId: msg.id,
             turnId,
+            sessionId,
             log: (m) => { void emit?.("status:item-update", { key: `tool:${msg.id}`, value: m }); },
           });
-          worker.postMessage({ type: "tool-result", id: msg.id, ok: true, value } satisfies ToolResultMsg);
+          if (!settled) {
+            try {
+              worker.postMessage({ type: "tool-result", id: msg.id, ok: true, value } satisfies ToolResultMsg);
+            } catch {
+              // Worker may have been terminated by timeout/abort while the tool call was in flight.
+            }
+          }
         } catch (err) {
-          worker.postMessage({
-            type: "tool-result",
-            id: msg.id,
-            ok: false,
-            error: { name: (err as Error)?.name ?? "Error", message: String((err as Error)?.message ?? err) },
-          } satisfies ToolResultMsg);
+          if (!settled) {
+            try {
+              worker.postMessage({
+                type: "tool-result",
+                id: msg.id,
+                ok: false,
+                error: { name: (err as Error)?.name ?? "Error", message: String((err as Error)?.message ?? err) },
+              } satisfies ToolResultMsg);
+            } catch {
+              // Worker may have been terminated by timeout/abort while the tool call was in flight.
+            }
+          }
         } finally {
           inflightToolControllers.delete(ac);
         }

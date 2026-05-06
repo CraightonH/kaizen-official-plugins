@@ -4,7 +4,7 @@ import plugin from "../index.ts";
 
 const FIX = join(import.meta.dir, "fixtures");
 
-function makeCtx(opts: { driver?: any; tuiCompletion?: any } = {}) {
+function makeCtx(opts: { driver?: any; sessions?: any; tuiCompletion?: any } = {}) {
   const subs: Record<string, { fn: any; priority: number }[]> = {};
   const services: Record<string, unknown> = {};
   const emits: { event: string; payload: unknown }[] = [];
@@ -16,6 +16,10 @@ function makeCtx(opts: { driver?: any; tuiCompletion?: any } = {}) {
     provideService: mock((name: string, impl: unknown) => { services[name] = impl; }),
     useService: mock(<T,>(name: string): T | undefined => {
       if (name === "driver:run-conversation") return opts.driver as T | undefined;
+      if (name === "sessions:store") {
+        if (!opts.sessions) throw new Error(`useService: no provider for '${name}'`);
+        return opts.sessions as T;
+      }
       if (name === "llm-tui:completion") {
         if (!opts.tuiCompletion) throw new Error(`useService: no provider for '${name}'`);
         return opts.tuiCompletion as T;
@@ -65,22 +69,26 @@ describe("llm-slash-commands integration", () => {
     process.chdir(origCwd);
   });
 
-  it("dispatches /echo via input:submit, emits conversation:user-message and calls runConversation", async () => {
+  it("dispatches /echo via input:submit and calls runConversation for the active session", async () => {
     const origHome = process.env.HOME, origCwd = process.cwd();
     process.env.HOME = join(FIX, "user-home");
     process.chdir(join(FIX, "project-home"));
 
-    const runConversation = mock(async () => ({ finalMessage: { role: "assistant", content: "" }, messages: [], usage: { promptTokens: 0, completionTokens: 0 } }));
+    const runConversation = mock(async () => ({ finalMessage: { role: "assistant", content: "" }, usage: { promptTokens: 0, completionTokens: 0 } }));
     const driver = { runConversation };
-    const { ctx, emits } = makeCtx({ driver });
+    const { ctx, emits } = makeCtx({ driver, sessions: {} });
     await plugin.setup(ctx);
+    await ctx.emit("session:active-changed", { from: null, to: "session-1" });
 
     await ctx.emit("input:submit", { text: "/echo hello world" });
 
     const userMsg = emits.find((e) => e.event === "conversation:user-message");
-    expect(userMsg).toBeDefined();
-    expect((userMsg!.payload as any).message.content).toBe("PROJECT:hello world\n");
+    expect(userMsg).toBeUndefined();
     expect(runConversation).toHaveBeenCalledTimes(1);
+    expect(runConversation.mock.calls[0]![0]).toMatchObject({
+      sessionId: "session-1",
+      userMessage: { role: "user", content: "PROJECT:hello world\n" },
+    });
 
     const handled = emits.find((e) => e.event === "input:handled");
     expect(handled?.payload).toEqual({ by: "llm-slash-commands" });

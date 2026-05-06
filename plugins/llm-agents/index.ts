@@ -1,5 +1,6 @@
 import type { KaizenPlugin } from "kaizen/types";
 import type { AgentsRegistryService, DriverService, ToolsRegistryService } from "llm-events/public";
+import type { SessionsStoreService } from "llm-session-manager/public";
 import type { SystemPromptService } from "llm-system-prompt/public";
 import { loadConfig, realDeps } from "./config.ts";
 import { loadFromDirs } from "./loader.ts";
@@ -15,7 +16,7 @@ const plugin: KaizenPlugin = {
   permissions: { tier: "unscoped" },
   services: {
     provides: ["agents:registry"],
-    consumes: ["tools:registry", "driver:run-conversation", "llm-events:vocabulary", "prompt:system"],
+    consumes: ["tools:registry", "driver:run-conversation", "sessions:store", "llm-events:vocabulary", "prompt:system"],
   },
 
   async setup(ctx) {
@@ -35,15 +36,21 @@ const plugin: KaizenPlugin = {
 
     const tools = ctx.useService<ToolsRegistryService>("tools:registry");
     const driver = ctx.useService<DriverService>("driver:run-conversation");
+    const sessions = ctx.useService<SessionsStoreService>("sessions:store");
 
-    if (!tools || !driver) {
-      const missing = [!tools && "tools:registry", !driver && "driver:run-conversation"].filter(Boolean).join(", ");
-      void ctx.emit("session:error", { message: `llm-agents: missing required service(s): ${missing}; dispatch_agent disabled` });
+    if (!tools || !driver || !sessions) {
+      const missing = [
+        !tools && "tools:registry",
+        !driver && "driver:run-conversation",
+        !sessions && "sessions:store",
+      ].filter(Boolean).join(", ");
+      void ctx.emit("harness:error", { message: `llm-agents: missing required service(s): ${missing}; dispatch_agent disabled` });
     } else {
       const dispatch = makeDispatchTool({
         registry: handle,
         tracker,
         driver,
+        sessions,
         maxDepth: config.maxDepth,
         hasSkills: () => !!ctx.useService("skills:registry"),
       });
@@ -66,7 +73,7 @@ const plugin: KaizenPlugin = {
         render: () => buildAgentsBlock(handle.service.list()),
       });
     } else {
-      void ctx.emit("session:error", { message: "llm-agents: missing required service(s): prompt:system; available-agents section disabled" });
+      void ctx.emit("harness:error", { message: "llm-agents: missing required service(s): prompt:system; available-agents section disabled" });
     }
 
     // Discovery in a microtask — does not block setup().
@@ -85,11 +92,11 @@ const plugin: KaizenPlugin = {
         handle.setInner(makeRegistry(result.manifests, () => sectionHandle?.bumpGeneration()), () => sectionHandle?.bumpGeneration());
         ready = true;
         for (const e of result.errors) {
-          await ctx.emit("session:error", { message: `llm-agents: ${e.path}: ${e.message}` });
+          await ctx.emit("harness:error", { message: `llm-agents: ${e.path}: ${e.message}` });
         }
       } catch (err) {
         ready = true;
-        await ctx.emit("session:error", { message: `llm-agents: discovery failed: ${(err as Error).message}` });
+        await ctx.emit("harness:error", { message: `llm-agents: discovery failed: ${(err as Error).message}` });
       }
     });
   },

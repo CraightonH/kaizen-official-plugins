@@ -1,6 +1,6 @@
 {
   "name": "llm-mcp-bridge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Bridge MCP servers (tools + resources) into the kaizen tools:registry.",
   "type": "module",
   "exports": {

@@ -14,13 +14,24 @@ const plugin: KaizenPlugin = {
   name: "llm-slash-commands",
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
-  services: { provides: ["slash:registry"] },
+  services: { consumes: ["sessions:store"], provides: ["slash:registry"] },
 
   async setup(ctx) {
     const registry: SlashRegistryService = createRegistry();
+    ctx.consumeService?.("sessions:store");
+    let sessions: any;
+    try { sessions = ctx.useService("sessions:store"); } catch { sessions = undefined; }
+    let activeSessionId: string | null = null;
+    ctx.on?.("session:active-changed", (payload: any) => {
+      if (typeof payload?.to === "string") activeSessionId = payload.to;
+    });
 
     // Built-ins.
-    registerBuiltins(registry);
+    registerBuiltins(registry, {
+      sessions,
+      getActiveSessionId: () => activeSessionId,
+      log: (msg) => ctx.log(msg),
+    });
 
     // File commands.
     const home = process.env.HOME ?? "/";
@@ -32,6 +43,7 @@ const plugin: KaizenPlugin = {
       readDir: (p) => readdir(p),
       readFile: (p) => readFile(p, "utf8"),
       getDriver: () => ctx.useService?.<DriverLike>("driver:run-conversation") ?? undefined,
+      getActiveSessionId: () => activeSessionId,
     });
     if (warnings.length) {
       const text = "llm-slash-commands: file loader warnings\n" + warnings.map((w) => `  - ${w}`).join("\n");

@@ -77,7 +77,7 @@ const plugin: KaizenPlugin = {
         },
       });
     } else {
-      void ctx.emit("session:error", { message: "llm-memory: missing required service(s): prompt:system; saved-memories section disabled" });
+      void ctx.emit("harness:error", { message: "llm-memory: missing required service(s): prompt:system; saved-memories section disabled" });
     }
 
     // Tools registration (best-effort; the tools registry may not exist in A-tier harnesses).
@@ -90,11 +90,11 @@ const plugin: KaizenPlugin = {
 
     // Auto-extraction (off by default).
     if (config.autoExtract) {
-      ctx.on("turn:end", async (payload: { reason: string; lastUserMessage?: string; turnId?: string }) => {
+      ctx.on("turn:end", async (payload: { reason: string; lastUserMessage?: string; turnId?: string; sessionId?: string }) => {
         if (!payload.lastUserMessage || !payload.turnId) return;
         const driver = ctx.useService<{ runConversation: any }>("driver:run-conversation");
         await maybeExtract(
-          { reason: payload.reason, lastUserMessage: payload.lastUserMessage, turnId: payload.turnId },
+          { reason: payload.reason, lastUserMessage: payload.lastUserMessage, turnId: payload.turnId, sessionId: payload.sessionId },
           { config, runConversation: driver?.runConversation ?? null, log },
         );
       });

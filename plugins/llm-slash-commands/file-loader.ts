@@ -4,8 +4,9 @@ import { DuplicateRegistrationError } from "./errors.ts";
 
 export interface DriverLike {
   runConversation(input: {
-    systemPrompt?: string;
-    messages: { role: "system" | "user" | "assistant" | "tool"; content: string }[];
+    systemPrompt: string;
+    sessionId: string;
+    userMessage: { role: "user"; content: string };
     signal?: AbortSignal;
   }): Promise<unknown>;
 }
@@ -17,6 +18,7 @@ export interface FileLoaderDeps {
   readDir: (path: string) => Promise<string[]>;
   readFile: (path: string) => Promise<string>;
   getDriver: () => DriverLike | undefined;
+  getActiveSessionId?: () => string | null;
 }
 
 interface DiscoveredFile {
@@ -103,13 +105,17 @@ function makeHandler(
       return;
     }
     const rendered = body.split("{{args}}").join(ctx.args);
-    await ctx.emit("conversation:user-message", { message: { role: "user", content: rendered } });
     const driver = deps.getDriver();
-    if (driver) {
+    const sessionId = deps.getActiveSessionId?.() ?? null;
+    if (driver && sessionId) {
       await driver.runConversation({
-        messages: [{ role: "user", content: rendered }],
+        systemPrompt: "",
+        sessionId,
+        userMessage: { role: "user", content: rendered },
         signal: ctx.signal,
       });
+    } else {
+      await ctx.emit("conversation:user-message", { message: { role: "user", content: rendered } });
     }
   };
 }

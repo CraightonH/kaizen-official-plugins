@@ -5,10 +5,9 @@ import type {
   LLMResponse,
   ToolSchema,
 } from "llm-events/public";
+import type { SessionsStoreService, TurnHandle } from "llm-session-manager/public";
 import { aggregateUsage } from "./state.ts";
 
-// These optional service shapes are loose-typed here so loop.ts has no
-// non-type-only dependency on packages that don't exist yet.
 export interface ToolsRegistryService {
   list(filter?: { tags?: string[]; names?: string[] }): ToolSchema[];
   invoke(name: string, args: unknown, ctx: any): Promise<unknown>;
@@ -24,25 +23,36 @@ export interface ToolDispatchStrategy {
     registry: ToolsRegistryService;
     signal: AbortSignal;
     emit: (event: string, payload: unknown) => Promise<void>;
+    turnId: string;
+    sessionId: string;
   }): Promise<ChatMessage[]>;
 }
 
-export interface RunConversationInput {
+type RunConversationBase = {
   systemPrompt: string;
-  messages: ChatMessage[];
+  sessionId: string;
   toolFilter?: { tags?: string[]; names?: string[] };
   model?: string;
   parentTurnId?: string;
   signal?: AbortSignal;
-  /** Set by index.ts when calling for the interactive loop — turn:start is owned by start(). */
-  externalTurnId?: string;
-  /** Set by index.ts to label the turn trigger. Defaults to "agent". */
   trigger?: "user" | "agent";
-}
+};
+
+export type RunConversationInput = RunConversationBase & (
+  | {
+      externalTurnId: string;
+      turnHandle: TurnHandle;
+      userMessage?: never;
+    }
+  | {
+      userMessage: ChatMessage;
+      externalTurnId?: never;
+      turnHandle?: never;
+    }
+);
 
 export interface RunConversationOutput {
   finalMessage: ChatMessage;
-  messages: ChatMessage[];
   usage: { promptTokens: number; completionTokens: number };
 }
 
@@ -56,14 +66,10 @@ export interface RunConversationDeps {
   llmComplete: LLMCompleteService;
   registry: ToolsRegistryService | undefined;
   strategy: ToolDispatchStrategy | undefined;
+  sessions: SessionsStoreService;
   log: (msg: string) => void;
   idGen: () => string;
   defaultSystemPrompt: string;
-  /** Optional prompt:system service. When present, all LLM-call systemPrompts
-   * come from `assemble()` and the legacy input.systemPrompt + strategy
-   * append path is bypassed. Generation-keyed cache (see assemblyCache)
-   * avoids re-assembling on every turn — listening to prompt:rebuilt is
-   * unnecessary because we re-check generation each turn. */
   promptSystem?: PromptSystemServiceLike;
 }
 
@@ -85,10 +91,6 @@ interface AssemblyCache {
   generation: number;
   prompt: string;
 }
-// Per-deps WeakMap cache keyed on the deps bag (one bag per driver instance).
-// Re-checked each turn against promptSystem.generation(); on mismatch we
-// re-assemble. This avoids needing a prompt:rebuilt subscription — generation
-// is the source of truth.
 const assemblyCache = new WeakMap<RunConversationDeps, AssemblyCache>();
 
 async function resolveSystemPrompt(
@@ -109,6 +111,54 @@ async function resolveSystemPrompt(
   return appendSystemAppend(input.systemPrompt, legacyAppend);
 }
 
+async function completeOnce(
+  request: LLMRequest,
+  input: RunConversationInput,
+  deps: RunConversationDeps,
+  turnId: string,
+  signal: AbortSignal,
+): Promise<LLMResponse> {
+  const startedAt = Date.now();
+  let finalResponse: LLMResponse | null = null;
+  try {
+    for await (const ev of deps.llmComplete.complete(request, { signal })) {
+      if (ev.type === "token") {
+        await deps.emit("llm:token", { delta: ev.delta, turnId, sessionId: input.sessionId });
+      } else if (ev.type === "reasoning") {
+        await deps.emit("llm:reasoning", { delta: ev.delta, turnId, sessionId: input.sessionId });
+      } else if (ev.type === "tool-call") {
+        await deps.emit("llm:tool-call", { toolCall: ev.toolCall, turnId, sessionId: input.sessionId });
+      } else if (ev.type === "done") {
+        finalResponse = ev.response;
+        await deps.emit("llm:done", {
+          response: ev.response,
+          latencyMs: Date.now() - startedAt,
+          turnId,
+          sessionId: input.sessionId,
+        });
+      } else if (ev.type === "error") {
+        await deps.emit("llm:error", {
+          message: ev.message,
+          cause: ev.cause,
+          latencyMs: Date.now() - startedAt,
+          turnId,
+          sessionId: input.sessionId,
+        });
+        throw Object.assign(new Error(ev.message), { name: "LLMError", cause: ev.cause });
+      }
+    }
+  } catch (err: any) {
+    if (err?.name === "AbortError" || signal.aborted) throw err;
+    if (err?.name === "LLMError") throw err;
+    throw err;
+  }
+
+  if (finalResponse === null) {
+    throw Object.assign(new Error("stream ended without 'done' event"), { name: "LLMError" });
+  }
+  return finalResponse;
+}
+
 export async function runConversation(
   input: RunConversationInput,
   deps: RunConversationDeps,
@@ -116,25 +166,24 @@ export async function runConversation(
   const ownsTurn = input.externalTurnId === undefined;
   const turnId = input.externalTurnId ?? deps.idGen();
   const trigger = input.trigger ?? "agent";
+  const signal = input.signal ?? new AbortController().signal;
+  const turnHandle = "turnHandle" in input && input.turnHandle
+    ? input.turnHandle
+    : deps.sessions.beginTurn(input.sessionId, turnId);
+  const usages: Array<LLMResponse["usage"]> = [];
 
   if (ownsTurn) {
+    turnHandle.append(input.userMessage);
+    await deps.emit("conversation:user-message", { message: input.userMessage });
     await deps.emit("turn:start", {
       turnId,
+      sessionId: input.sessionId,
       trigger,
       ...(input.parentTurnId !== undefined ? { parentTurnId: input.parentTurnId } : {}),
     });
   }
 
-  const signal = input.signal ?? new AbortController().signal;
-  const workingMessages: ChatMessage[] = input.messages.slice();
-  const usages: Array<LLMResponse["usage"]> = [];
-
-  try {
-    // --- single LLM call (A-tier path) ---
-    // prepareRequest can be sync or async (codemode renders TS .d.ts and is
-    // genuinely async). Awaiting always is correct — sync return values
-    // unwrap fine. Reading .systemPromptAppend without await left it
-    // `undefined`, so the LLM never saw the kaizen.tools.* API.
+  async function makeRequest(): Promise<{ request: LLMRequest; response: LLMResponse }> {
     const additions = deps.strategy
       ? await deps.strategy.prepareRequest({
           availableTools: deps.registry ? deps.registry.list(input.toolFilter) : [],
@@ -143,159 +192,115 @@ export async function runConversation(
 
     const request: LLMRequest = {
       model: input.model,
-      messages: workingMessages.slice(),
+      messages: await deps.sessions.getMessages(input.sessionId),
       systemPrompt: await resolveSystemPrompt(input, deps, additions.systemPromptAppend),
       tools: additions.tools,
     };
 
-    await deps.emit("llm:before-call", { request, turnId });
+    await deps.emit("llm:before-call", { request, turnId, sessionId: input.sessionId });
     if (request.cancelled === true) {
-      const finalMessage = workingMessages[workingMessages.length - 1] ?? {
-        role: "assistant" as const, content: "",
+      const messages = await deps.sessions.getMessages(input.sessionId);
+      const response: LLMResponse = {
+        content: messages[messages.length - 1]?.content ?? "",
+        finishReason: "stop",
       };
-      const output: RunConversationOutput = {
-        finalMessage,
-        messages: workingMessages,
-        usage: aggregateUsage(usages),
-      };
-      if (ownsTurn) await deps.emit("turn:end", { turnId, reason: "complete" });
-      return output;
+      return { request, response };
     }
-    await deps.emit("llm:request", { request: deepFreeze(structuredClone(request)) });
 
-    let finalResponse: LLMResponse | null = null;
-    try {
-      for await (const ev of deps.llmComplete.complete(request, { signal })) {
-        if (ev.type === "token") {
-          await deps.emit("llm:token", { delta: ev.delta });
-        } else if (ev.type === "reasoning") {
-          await deps.emit("llm:reasoning", { delta: ev.delta });
-        } else if (ev.type === "tool-call") {
-          await deps.emit("llm:tool-call", { toolCall: ev.toolCall });
-        } else if (ev.type === "done") {
-          finalResponse = ev.response;
-          await deps.emit("llm:done", { response: ev.response });
-        } else if (ev.type === "error") {
-          await deps.emit("llm:error", { message: ev.message, cause: ev.cause });
-          throw Object.assign(new Error(ev.message), { name: "LLMError", cause: ev.cause });
-        }
+    await deps.emit("llm:request", {
+      request: deepFreeze(structuredClone(request)),
+      turnId,
+      sessionId: input.sessionId,
+    });
+    return { request, response: await completeOnce(request, input, deps, turnId, signal) };
+  }
+
+  try {
+    const first = await makeRequest();
+    if (first.request.cancelled === true) {
+      const messages = await deps.sessions.getMessages(input.sessionId);
+      const finalMessage = messages[messages.length - 1] ?? { role: "assistant", content: "" };
+      if (ownsTurn) {
+        await turnHandle.commit();
+        await deps.emit("turn:end", { turnId, sessionId: input.sessionId, reason: "complete" });
       }
-    } catch (err: any) {
-      if (err?.name === "AbortError" || signal.aborted) throw err;
-      if (err?.name === "LLMError") throw err;
-      throw err;
+      return { finalMessage, usage: aggregateUsage(usages) };
     }
-
-    if (finalResponse === null) {
-      throw Object.assign(new Error("stream ended without 'done' event"), { name: "LLMError" });
-    }
-
-    if (finalResponse.usage) usages.push(finalResponse.usage);
+    let response = first.response;
+    if (response.usage) usages.push(response.usage);
 
     const assistantMsg: ChatMessage = {
       role: "assistant",
-      content: finalResponse.content,
-      ...(finalResponse.toolCalls ? { toolCalls: finalResponse.toolCalls } : {}),
+      content: response.content,
+      ...(response.toolCalls ? { toolCalls: response.toolCalls } : {}),
     };
-    workingMessages.push(assistantMsg);
+    turnHandle.append(assistantMsg);
 
-    // If no registry/strategy, A-tier path: end turn after one call.
     if (!deps.strategy || !deps.registry) {
-      const finalMessage = workingMessages[workingMessages.length - 1]!;
-      const output: RunConversationOutput = {
-        finalMessage,
-        messages: workingMessages,
-        usage: aggregateUsage(usages),
-      };
-      if (ownsTurn) await deps.emit("turn:end", { turnId, reason: "complete" });
-      return output;
+      if (ownsTurn) {
+        await turnHandle.commit();
+        await deps.emit("turn:end", { turnId, sessionId: input.sessionId, reason: "complete" });
+      }
+      return { finalMessage: assistantMsg, usage: aggregateUsage(usages) };
     }
 
-    // --- multi-step strategy/tool loop ---
-    // The first LLM call has already happened above; feed its response to the strategy now.
-    let response = finalResponse;
     while (true) {
       const appended = await deps.strategy.handleResponse({
         response,
         registry: deps.registry,
         signal,
         emit: deps.emit,
+        turnId,
+        sessionId: input.sessionId,
       });
 
       if (appended.length === 0) {
-        const finalMessage = workingMessages[workingMessages.length - 1]!;
-        const output: RunConversationOutput = {
-          finalMessage,
-          messages: workingMessages,
-          usage: aggregateUsage(usages),
-        };
-        if (ownsTurn) await deps.emit("turn:end", { turnId, reason: "complete" });
-        return output;
-      }
-
-      workingMessages.push(...appended);
-
-      // Next LLM call.
-      const additions2 = await deps.strategy.prepareRequest({
-        availableTools: deps.registry.list(input.toolFilter),
-      });
-      const request2: LLMRequest = {
-        model: input.model,
-        messages: workingMessages.slice(),
-        systemPrompt: await resolveSystemPrompt(input, deps, additions2.systemPromptAppend),
-        tools: additions2.tools,
-      };
-      await deps.emit("llm:before-call", { request: request2, turnId });
-      if (request2.cancelled === true) {
-        const finalMessage = workingMessages[workingMessages.length - 1]!;
-        const output: RunConversationOutput = {
-          finalMessage,
-          messages: workingMessages,
-          usage: aggregateUsage(usages),
-        };
-        if (ownsTurn) await deps.emit("turn:end", { turnId, reason: "complete" });
-        return output;
-      }
-      await deps.emit("llm:request", { request: deepFreeze(structuredClone(request2)) });
-
-      let nextResponse: LLMResponse | null = null;
-      for await (const ev of deps.llmComplete.complete(request2, { signal })) {
-        if (ev.type === "token") {
-          await deps.emit("llm:token", { delta: ev.delta });
-        } else if (ev.type === "reasoning") {
-          await deps.emit("llm:reasoning", { delta: ev.delta });
-        } else if (ev.type === "tool-call") {
-          await deps.emit("llm:tool-call", { toolCall: ev.toolCall });
-        } else if (ev.type === "done") {
-          nextResponse = ev.response;
-          await deps.emit("llm:done", { response: ev.response });
-        } else if (ev.type === "error") {
-          await deps.emit("llm:error", { message: ev.message, cause: ev.cause });
-          throw Object.assign(new Error(ev.message), { name: "LLMError", cause: ev.cause });
+        if (ownsTurn) {
+          await turnHandle.commit();
+          await deps.emit("turn:end", { turnId, sessionId: input.sessionId, reason: "complete" });
         }
+        const messages = await deps.sessions.getMessages(input.sessionId);
+        return {
+          finalMessage: messages[messages.length - 1] ?? assistantMsg,
+          usage: aggregateUsage(usages),
+        };
       }
 
-      if (nextResponse === null) {
-        throw Object.assign(new Error("stream ended without 'done' event"), { name: "LLMError" });
-      }
-      if (nextResponse.usage) usages.push(nextResponse.usage);
+      for (const msg of appended) turnHandle.append(msg);
 
-      const assistantMsg2: ChatMessage = {
+      const next = await makeRequest();
+      if (next.request.cancelled === true) {
+        const messages = await deps.sessions.getMessages(input.sessionId);
+        const finalMessage = messages[messages.length - 1] ?? assistantMsg;
+        if (ownsTurn) {
+          await turnHandle.commit();
+          await deps.emit("turn:end", { turnId, sessionId: input.sessionId, reason: "complete" });
+        }
+        return { finalMessage, usage: aggregateUsage(usages) };
+      }
+      response = next.response;
+      if (response.usage) usages.push(response.usage);
+      const nextAssistant: ChatMessage = {
         role: "assistant",
-        content: nextResponse.content,
-        ...(nextResponse.toolCalls ? { toolCalls: nextResponse.toolCalls } : {}),
+        content: response.content,
+        ...(response.toolCalls ? { toolCalls: response.toolCalls } : {}),
       };
-      workingMessages.push(assistantMsg2);
-      response = nextResponse;
+      turnHandle.append(nextAssistant);
     }
   } catch (err: any) {
     if (ownsTurn) {
+      await turnHandle.rollback();
       const isAbort = err?.name === "AbortError" || signal.aborted;
       const reason = isAbort ? "cancelled" : "error";
       if (reason === "error") {
-        await deps.emit("turn:error", { turnId, message: err?.message ?? String(err), cause: err });
+        await deps.emit("turn:error", {
+          turnId,
+          sessionId: input.sessionId,
+          message: err?.message ?? String(err),
+          cause: err,
+        });
       }
-      await deps.emit("turn:end", { turnId, reason });
+      await deps.emit("turn:end", { turnId, sessionId: input.sessionId, reason });
     }
     throw err;
   }

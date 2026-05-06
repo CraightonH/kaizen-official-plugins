@@ -153,10 +153,10 @@ describe("plugin setup — prompt:system section registration", () => {
     expect(rendered).toBe("");
   });
 
-  it("emits session:error and skips section when prompt:system unavailable", async () => {
+  it("emits harness:error and skips section when prompt:system unavailable", async () => {
     const { ctx, emitted } = makeCtx();
     await plugin.setup(ctx);
-    const errors = emitted.filter(e => e.name === "session:error");
+    const errors = emitted.filter(e => e.name === "harness:error");
     expect(errors.length).toBeGreaterThan(0);
     const msg = (errors[0].payload as any).message as string;
     expect(msg).toContain("prompt:system");

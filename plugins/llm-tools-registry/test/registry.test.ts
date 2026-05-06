@@ -26,6 +26,8 @@ function captureEmit() {
 const ctx = (callId = "c1") => ({
   signal: new AbortController().signal,
   callId,
+  turnId: "turn-1",
+  sessionId: "session-1",
   log: () => {},
 });
 
@@ -129,8 +131,9 @@ describe("makeRegistry — invoke", () => {
     const result = await r.invoke("a", { x: 1 }, ctx());
     expect(result).toEqual({ echoed: { x: 1 } });
     expect(events.map((e) => e.name)).toEqual(["tools:registered", "tool:before-execute", "tool:execute", "tool:result"]);
-    expect(events[1].payload).toMatchObject({ name: "a", args: { x: 1 }, callId: "c1" });
-    expect(events[3].payload).toMatchObject({ name: "a", callId: "c1", result: { echoed: { x: 1 } } });
+    expect(events[1].payload).toMatchObject({ name: "a", args: { x: 1 }, callId: "c1", turnId: "turn-1", sessionId: "session-1" });
+    expect(events[3].payload).toMatchObject({ name: "a", callId: "c1", result: { echoed: { x: 1 } }, turnId: "turn-1", sessionId: "session-1" });
+    expect(events[3].payload.durationMs).toBeNumber();
   });
 
   it("subscriber that mutates args is observed by handler and tool:execute", async () => {
@@ -143,6 +146,16 @@ describe("makeRegistry — invoke", () => {
     expect(seenByHandler).toEqual({ rewritten: true });
     const exec = events.find((e) => e.name === "tool:execute")!;
     expect(exec.payload).toMatchObject({ args: { rewritten: true } });
+  });
+
+  it("omits turnId/sessionId from events when direct callers omit them", async () => {
+    const { emit, events } = captureEmit();
+    const r = makeRegistry(emit as any);
+    r.register(SCHEMA("a"), async () => "ok");
+    await r.invoke("a", {}, { signal: new AbortController().signal, callId: "c", log: () => {} });
+    const exec = events.find((e) => e.name === "tool:execute")!;
+    expect(exec.payload.turnId).toBeUndefined();
+    expect(exec.payload.sessionId).toBeUndefined();
   });
 
   it("subscriber that sets args = CANCEL_TOOL short-circuits", async () => {

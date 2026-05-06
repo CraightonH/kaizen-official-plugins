@@ -4,7 +4,7 @@ Status-bar items for the OpenAI-compatible LLM session — model name, token cou
 
 ## What it does
 
-Subscribes to session/turn/LLM/tool events and translates them into status-bar updates. Each item is a single `key`/`value` pair emitted on change; the TUI plugin owns rendering.
+Subscribes to harness/turn/LLM/tool events and translates them into status-bar updates. Each item is a single `key`/`value` pair emitted on change; the TUI plugin owns rendering.
 
 Items emitted:
 
@@ -19,7 +19,7 @@ Items emitted:
 | `cost-estimate` | `llm:done` | `$0.0123` | Only emitted when a rate table is present and the active model is in it. |
 
 Other behaviors:
-- On `session:start` the plugin renders zero-valued counters and the empty context bar so the status line is populated before any turn runs.
+- On `harness:start` the plugin renders zero-valued counters and the empty context bar so the status line is populated before any turn runs.
 - The context-window ceiling is resolved lazily via `llm:complete.listModels()` and cached per model id; when the driver leaves `model` unset, the single runtime-loaded model (`loadedContextLength`) is used as both the ceiling and the displayed `model` value.
 - All emissions are diffed — repeat events with unchanged values do not re-emit.
 - `conversation:cleared` zeros tokens, throughput, cost, and the context bar; `model` and `turn-state` persist.
@@ -32,7 +32,7 @@ Other behaviors:
 Provides the event names and `ChatMessage` / `LLMRequest` / `LLMResponse` / `status:item-*` payload shapes the plugin subscribes to and emits.
 
 Subscribed events:
-- `session:start`
+- `harness:start`
 - `llm:before-call`
 - `llm:done`
 - `turn:start`

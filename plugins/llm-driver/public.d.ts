@@ -9,19 +9,31 @@ export type {
 } from "llm-events/public";
 
 import type { ChatMessage } from "llm-events/public";
+import type { TurnHandle } from "llm-session-manager/public";
 
-export interface RunConversationInput {
+export type RunConversationInput = {
   systemPrompt: string;
-  messages: ChatMessage[];
+  sessionId: string;
   toolFilter?: { tags?: string[]; names?: string[] };
   model?: string;
   parentTurnId?: string;
   signal?: AbortSignal;
-}
+  trigger?: "user" | "agent";
+} & (
+  | {
+      externalTurnId: string;
+      turnHandle: TurnHandle;
+      userMessage?: never;
+    }
+  | {
+      userMessage: ChatMessage;
+      externalTurnId?: never;
+      turnHandle?: never;
+    }
+);
 
 export interface RunConversationOutput {
   finalMessage: ChatMessage;
-  messages: ChatMessage[];
   usage: { promptTokens: number; completionTokens: number };
 }
 

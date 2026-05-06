@@ -15,7 +15,7 @@ Owns skill discovery and on-demand loading. Scans markdown files with YAML front
 - Initial scan at setup; subsequent scans are throttled and run on `turn:start` (default interval 30 s, configurable).
 - Registers a `prompt:system` section (id `llm-skills:available`, priority 160, title "Available skills") listing one bullet per skill with `~N tokens` and the description. Empty registry → section is dropped by the `prompt:system` registry.
 - Registers `load_skill` into `tools:registry`. Handler returns `{ name, tokens, body }` so the dispatch layer hands the body back as a tool message on the next turn.
-- Bad frontmatter / unreadable files are skipped non-fatally; a `session:error` is emitted so they surface in the UI.
+- Bad frontmatter / unreadable files are skipped non-fatally; a `harness:error` is emitted so they surface in the UI.
 
 ## Wiring
 
@@ -71,7 +71,7 @@ Handler returns `{ name, tokens, body }`. Errors (missing/empty `name`, unknown 
 
 - `skill:available-changed` — `{ count: number }`. Emitted once after the initial scan, then after any rescan whose visible-key set differs from the previous one.
 - `skill:loaded` — `{ name, tokens }`. Emitted from the `load_skill` handler after the body is resolved.
-- `session:error` — `{ message: string }`. Emitted for non-fatal scan failures (bad frontmatter, duplicate name within a layer).
+- `harness:error` — `{ message: string }`. Emitted for non-fatal scan failures (bad frontmatter, duplicate name within a layer).
 
 Events are declared by the `llm-events` VOCAB; this plugin emits them but does not define them.
 

@@ -3,9 +3,10 @@ import type {
   ChatMessage,
   LLMCompleteService,
 } from "llm-events/public";
+import type { SessionsStoreService } from "llm-session-manager/public";
 import type { DriverService, RunConversationInput, RunConversationOutput } from "./public";
 import { runConversation, type RunConversationDeps, type ToolDispatchStrategy, type ToolsRegistryService } from "./loop.ts";
-import { snapshotMessages, type CurrentTurn } from "./state.ts";
+import { type CurrentTurn } from "./state.ts";
 import { newTurnId } from "./ids.ts";
 import { wireCancel } from "./cancel.ts";
 import { pickBusyMessage } from "./busy-messages.ts";
@@ -37,11 +38,11 @@ const DEFAULTS = {
 // through `runConversation(input.model)`.
 const state: {
   currentTurn: CurrentTurn | null;
-  messages: ChatMessage[];
+  activeSessionId: string | null;
   systemPrompt: string;
 } = {
   currentTurn: null,
-  messages: [],
+  activeSessionId: null,
   systemPrompt: "",
 };
 let buildDeps: (() => RunConversationDeps) | null = null;
@@ -50,7 +51,7 @@ let buildDeps: (() => RunConversationDeps) | null = null;
 // line. The flag is set by a subscriber registered in setup() (kaizen forbids
 // ctx.on after init) and consumed/reset in start() per submit.
 let inputHandled = false;
-// `session:exit-requested` flips this so the next loop iteration breaks.
+// `harness:exit-requested` flips this so the next loop iteration breaks.
 // The /exit slash command (and anything else that wants a clean shutdown)
 // emits the event; the driver owns the actual loop termination.
 let exitRequested = false;
@@ -69,6 +70,7 @@ const plugin: KaizenPlugin = {
       "llm-events:vocabulary",
       "llm-tui:channel",
       "llm:complete",
+      "sessions:store",
       "tools:registry",
       "tool-dispatch:strategy",
       "prompt:system",
@@ -80,6 +82,7 @@ const plugin: KaizenPlugin = {
     ctx.consumeService("llm-events:vocabulary");
     ctx.consumeService("llm-tui:channel");
     ctx.consumeService("llm:complete");
+    ctx.consumeService("sessions:store");
     // Optional: when llm-system-prompt is loaded, runConversation pulls
     // systemPrompt from prompt:system.assemble() with a generation-keyed
     // cache (see loop.ts assemblyCache). No prompt:rebuilt listener needed —
@@ -94,7 +97,7 @@ const plugin: KaizenPlugin = {
     // Reset plugin-scoped state on every setup() so test re-setups and
     // re-loads start from a clean slate.
     state.currentTurn = null;
-    state.messages = [];
+    state.activeSessionId = null;
     state.systemPrompt = "";
     inputHandled = false;
     exitRequested = false;
@@ -102,9 +105,11 @@ const plugin: KaizenPlugin = {
 
     // Subscribers
     wireCancel(ctx as any, () => state.currentTurn);
-    ctx.on("conversation:cleared", async () => { state.messages = []; });
     ctx.on("input:handled", () => { inputHandled = true; });
-    ctx.on("session:exit-requested", () => { exitRequested = true; });
+    ctx.on("harness:exit-requested", () => { exitRequested = true; });
+    ctx.on("session:active-changed", (payload: any) => {
+      if (typeof payload?.to === "string") state.activeSessionId = payload.to;
+    });
     // Bridge system messages (slash command output, plugin notices) to the
     // UI so /help and friends are actually visible. Uses moduleUi resolved
     // in start() because kaizen forbids ctx.on registration past setup().
@@ -131,6 +136,7 @@ const plugin: KaizenPlugin = {
       depsCache = {
         emit: ctx.emit.bind(ctx),
         llmComplete: ctx.useService<LLMCompleteService>("llm:complete")!,
+        sessions: ctx.useService<SessionsStoreService>("sessions:store")!,
         registry: safeUse<ToolsRegistryService>("tools:registry"),
         strategy: safeUse<ToolDispatchStrategy>("tool-dispatch:strategy"),
         log: ctx.log.bind(ctx),
@@ -158,9 +164,16 @@ const plugin: KaizenPlugin = {
 
     const cfg = (ctx.config ?? {}) as DriverConfig;
     state.systemPrompt = cfg.defaultSystemPrompt ?? DEFAULTS.defaultSystemPrompt;
+    const sessions = ctx.useService<SessionsStoreService>("sessions:store")!;
 
-    await ctx.emit("session:start");
+    await ctx.emit("harness:start");
     try {
+      if (!state.activeSessionId) {
+        const initial = await sessions.create({});
+        state.activeSessionId = initial.id;
+        await ctx.emit("session:active-changed", { from: null, to: initial.id });
+      }
+
       while (true) {
         const line = await ui.readInput();
         if (line === "") break;
@@ -172,29 +185,36 @@ const plugin: KaizenPlugin = {
         await ctx.emit("input:submit", { text: line });
         if (exitRequested) break;
         if (inputHandled) continue;
+        if (!state.activeSessionId) {
+          const next = await sessions.create({});
+          state.activeSessionId = next.id;
+          await ctx.emit("session:active-changed", { from: null, to: next.id });
+        }
 
         const userMsg: ChatMessage = { role: "user", content: line };
-        const preTurnSnapshot = snapshotMessages(state.messages);
-        state.messages.push(userMsg);
+        const sessionId = state.activeSessionId;
+        const turnId = newTurnId();
+        const handle = sessions.beginTurn(sessionId, turnId);
+        handle.append(userMsg);
         ui.writeUser?.(line);
         await ctx.emit("conversation:user-message", { message: userMsg });
 
-        const turnId = newTurnId();
         const controller = new AbortController();
         state.currentTurn = { id: turnId, controller };
         ui.setBusy(true, pickBusyMessage());
         const turnStartedAt = Date.now();
-        await ctx.emit("turn:start", { turnId, trigger: "user" });
+        await ctx.emit("turn:start", { turnId, sessionId, trigger: "user" });
 
         try {
           const result = await runConversation({
             systemPrompt: state.systemPrompt,
-            messages: state.messages,
+            sessionId,
+            turnHandle: handle,
             signal: controller.signal,
             externalTurnId: turnId,
             trigger: "user",
           }, buildDeps());
-          state.messages = result.messages;
+          await handle.commit();
           // Models sometimes emit leading/trailing whitespace in their reply
           // (Qwen often prefixes with two newlines). Strip outer whitespace
           // so the transcript spacing is driven by layout, not by the model.
@@ -211,18 +231,17 @@ const plugin: KaizenPlugin = {
           const elapsedSec = Math.max(0, Math.round((Date.now() - turnStartedAt) / 1000));
           ui.writeNotice(`✻ ${pickDoneMessage()} for ${elapsedSec}s`);
           await ctx.emit("conversation:assistant-message", { message: result.finalMessage });
-          await ctx.emit("turn:end", { turnId, reason: "complete", durationMs: Date.now() - turnStartedAt });
+          await ctx.emit("turn:end", { turnId, sessionId, reason: "complete", durationMs: Date.now() - turnStartedAt });
         } catch (err: any) {
+          await handle.rollback();
           const isAbort = err?.name === "AbortError" || controller.signal.aborted;
           if (isAbort) {
             ui.writeNotice("↯ cancelled");
-            state.messages = preTurnSnapshot;
-            await ctx.emit("turn:end", { turnId, reason: "cancelled" });
+            await ctx.emit("turn:end", { turnId, sessionId, reason: "cancelled" });
           } else {
             // recoverable error: roll back, surface, continue
-            await ctx.emit("turn:error", { turnId, message: err?.message ?? String(err), cause: err });
-            state.messages = preTurnSnapshot;
-            await ctx.emit("turn:end", { turnId, reason: "error" });
+            await ctx.emit("turn:error", { turnId, sessionId, message: err?.message ?? String(err), cause: err });
+            await ctx.emit("turn:end", { turnId, sessionId, reason: "error" });
           }
         } finally {
           state.currentTurn = null;
@@ -230,9 +249,9 @@ const plugin: KaizenPlugin = {
         }
       }
     } catch (err: any) {
-      await ctx.emit("session:error", { message: err?.message ?? String(err), cause: err });
+      await ctx.emit("harness:error", { message: err?.message ?? String(err), cause: err });
     } finally {
-      await ctx.emit("session:end");
+      await ctx.emit("harness:end");
     }
   },
 };

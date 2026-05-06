@@ -48,6 +48,8 @@ describe("service wiring", () => {
       registry: { register: () => () => {}, list: () => [], invoke: async () => undefined } as any,
       signal: new AbortController().signal,
       emit: async () => {},
+      turnId: "turn-1",
+      sessionId: "session-1",
     });
     expect(out).toEqual([]);
   });

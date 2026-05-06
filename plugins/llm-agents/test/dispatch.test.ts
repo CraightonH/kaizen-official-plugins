@@ -22,8 +22,38 @@ function makeCtx(turnId = "t-parent") {
     signal: new AbortController().signal,
     callId: "c1",
     turnId,
+    sessionId: "parent-session",
     log: () => {},
     emit: async (e: string, p: any) => { events.push({ event: e, payload: p }); },
+  } as any;
+}
+
+function makeSessions() {
+  const records = new Map<string, any>();
+  records.set("parent-session", { id: "parent-session", harness: "h", metadata: {}, createdAt: 1, pluginFingerprint: [] });
+  return {
+    records,
+    createCalls: [] as any[],
+    async create(opts: any) {
+      this.createCalls.push(opts);
+      const id = `${opts.parentSessionId}/${opts.childId}`;
+      const record = { id, harness: "h", parentSessionId: opts.parentSessionId, agentName: opts.agentName, model: opts.model, metadata: {}, createdAt: 1, pluginFingerprint: [] };
+      records.set(id, record);
+      return record;
+    },
+    async load(id: string) {
+      const record = records.get(id);
+      if (!record) throw new Error("not found");
+      return record;
+    },
+    async exists(id: string) {
+      return records.has(id);
+    },
+    async getMessages() { return []; },
+    beginTurn() { throw new Error("not needed"); },
+    async list() { return Array.from(records.values()); },
+    async delete() {},
+    async *readEvents() {},
   } as any;
 }
 
@@ -35,22 +65,24 @@ describe("dispatch_agent", () => {
     const driver = {
       runConversation: mock(async (input: any) => ({
         finalMessage: { role: "assistant", content: "RESULT" },
-        messages: [],
         usage: { promptTokens: 1, completionTokens: 1 },
       })),
     };
+    const sessions = makeSessions();
     const tool = makeDispatchTool({
       registry: reg, tracker, driver,
+      sessions,
       maxDepth: 3,
       hasSkills: () => false,
     });
     const ctx = makeCtx();
-    const result = await tool.handler({ agent_name: "code-reviewer", prompt: "look at file X" }, ctx);
+    const result = await tool.handler({ agent_name: "code-reviewer", prompt: "look at file X", session_id: "review-A" }, ctx);
     expect(result).toBe("RESULT");
     expect(driver.runConversation).toHaveBeenCalledTimes(1);
     const arg = (driver.runConversation as any).mock.calls[0][0];
     expect(arg.systemPrompt).toBe("you are code-reviewer");
-    expect(arg.messages).toEqual([{ role: "user", content: "look at file X" }]);
+    expect(arg.sessionId).toBe("parent-session/review-A");
+    expect(arg.userMessage).toEqual({ role: "user", content: "look at file X" });
     expect(arg.parentTurnId).toBe("t-parent");
     // Always-on dispatch_agent must be present in the filter:
     expect(arg.toolFilter.names).toContain("dispatch_agent");
@@ -62,10 +94,10 @@ describe("dispatch_agent", () => {
     const reg = makeRegistryHandle(makeRegistry([m("a")]));
     const tracker = makeTurnTracker();
     tracker.onTurnStart({ turnId: "t-parent", trigger: "user" });
-    const driver = { runConversation: async () => ({ finalMessage: { role: "assistant", content: "" }, messages: [], usage: { promptTokens: 0, completionTokens: 0 } }) };
-    const tool = makeDispatchTool({ registry: reg, tracker, driver, maxDepth: 3, hasSkills: () => true });
+    const driver = { runConversation: async () => ({ finalMessage: { role: "assistant", content: "" }, usage: { promptTokens: 0, completionTokens: 0 } }) };
+    const tool = makeDispatchTool({ registry: reg, tracker, driver, sessions: makeSessions(), maxDepth: 3, hasSkills: () => true });
     let captured: any;
-    (driver as any).runConversation = async (input: any) => { captured = input; return { finalMessage: { role: "assistant", content: "" }, messages: [], usage: { promptTokens: 0, completionTokens: 0 } }; };
+    (driver as any).runConversation = async (input: any) => { captured = input; return { finalMessage: { role: "assistant", content: "" }, usage: { promptTokens: 0, completionTokens: 0 } }; };
     await tool.handler({ agent_name: "a", prompt: "p" }, makeCtx());
     expect(captured.toolFilter.names).toContain("load_skill");
   });
@@ -74,7 +106,7 @@ describe("dispatch_agent", () => {
     const reg = makeRegistryHandle(makeRegistry([m("a"), m("b")]));
     const tracker = makeTurnTracker();
     tracker.onTurnStart({ turnId: "t-parent", trigger: "user" });
-    const tool = makeDispatchTool({ registry: reg, tracker, driver: { runConversation: async () => ({} as any) }, maxDepth: 3, hasSkills: () => false });
+    const tool = makeDispatchTool({ registry: reg, tracker, driver: { runConversation: async () => ({} as any) }, sessions: makeSessions(), maxDepth: 3, hasSkills: () => false });
     await expect(tool.handler({ agent_name: "ghost", prompt: "p" }, makeCtx())).rejects.toThrow(/Unknown agent 'ghost'.*Known: a, b/);
   });
 
@@ -85,7 +117,7 @@ describe("dispatch_agent", () => {
     tracker.onTurnStart({ turnId: "t1", trigger: "agent", parentTurnId: "t0" });
     tracker.onTurnStart({ turnId: "t2", trigger: "agent", parentTurnId: "t1" });
     tracker.onTurnStart({ turnId: "t3", trigger: "agent", parentTurnId: "t2" });
-    const tool = makeDispatchTool({ registry: reg, tracker, driver: { runConversation: async () => ({} as any) }, maxDepth: 3, hasSkills: () => false });
+    const tool = makeDispatchTool({ registry: reg, tracker, driver: { runConversation: async () => ({} as any) }, sessions: makeSessions(), maxDepth: 3, hasSkills: () => false });
     const ctx = makeCtx("t3");
     await expect(tool.handler({ agent_name: "a", prompt: "p" }, ctx)).rejects.toThrow(/depth limit reached \(max=3\)/);
   });
@@ -95,8 +127,8 @@ describe("dispatch_agent", () => {
     const tracker = makeTurnTracker();
     tracker.onTurnStart({ turnId: "tp", trigger: "user" });
     let captured: AbortSignal | undefined;
-    const driver = { runConversation: async (input: any) => { captured = input.signal; return { finalMessage: { role: "assistant", content: "" }, messages: [], usage: { promptTokens: 0, completionTokens: 0 } }; } };
-    const tool = makeDispatchTool({ registry: reg, tracker, driver, maxDepth: 3, hasSkills: () => false });
+    const driver = { runConversation: async (input: any) => { captured = input.signal; return { finalMessage: { role: "assistant", content: "" }, usage: { promptTokens: 0, completionTokens: 0 } }; } };
+    const tool = makeDispatchTool({ registry: reg, tracker, driver, sessions: makeSessions(), maxDepth: 3, hasSkills: () => false });
     const ac = new AbortController();
     const ctx = { ...makeCtx("tp"), signal: ac.signal };
     await tool.handler({ agent_name: "a", prompt: "p" }, ctx as any);
@@ -108,7 +140,7 @@ describe("dispatch_agent", () => {
     const tracker = makeTurnTracker();
     tracker.onTurnStart({ turnId: "tp", trigger: "user" });
     const driver = { runConversation: async () => { const e: any = new Error("aborted"); e.name = "AbortError"; throw e; } };
-    const tool = makeDispatchTool({ registry: reg, tracker, driver, maxDepth: 3, hasSkills: () => false });
+    const tool = makeDispatchTool({ registry: reg, tracker, driver, sessions: makeSessions(), maxDepth: 3, hasSkills: () => false });
     await expect(tool.handler({ agent_name: "a", prompt: "p" }, makeCtx("tp"))).rejects.toThrow(/Agent 'a' cancelled/);
   });
 
@@ -117,7 +149,7 @@ describe("dispatch_agent", () => {
     const tracker = makeTurnTracker();
     tracker.onTurnStart({ turnId: "tp", trigger: "user" });
     const driver = { runConversation: async () => { throw new Error("boom"); } };
-    const tool = makeDispatchTool({ registry: reg, tracker, driver, maxDepth: 3, hasSkills: () => false });
+    const tool = makeDispatchTool({ registry: reg, tracker, driver, sessions: makeSessions(), maxDepth: 3, hasSkills: () => false });
     await expect(tool.handler({ agent_name: "a", prompt: "p" }, makeCtx("tp"))).rejects.toThrow(/Agent 'a' failed: boom/);
   });
 
@@ -125,7 +157,7 @@ describe("dispatch_agent", () => {
     const reg = makeRegistryHandle(makeRegistry([m("a")]));
     const tracker = makeTurnTracker();
     tracker.onTurnStart({ turnId: "tp", trigger: "user" });
-    const tool = makeDispatchTool({ registry: reg, tracker, driver: { runConversation: async () => ({} as any) }, maxDepth: 3, hasSkills: () => false });
+    const tool = makeDispatchTool({ registry: reg, tracker, driver: { runConversation: async () => ({} as any) }, sessions: makeSessions(), maxDepth: 3, hasSkills: () => false });
     await expect(tool.handler({ agent_name: 1, prompt: "p" } as any, makeCtx("tp"))).rejects.toThrow();
     await expect(tool.handler({ agent_name: "a" } as any, makeCtx("tp"))).rejects.toThrow();
   });
@@ -134,13 +166,87 @@ describe("dispatch_agent", () => {
     const reg = makeRegistryHandle(makeRegistry([m("a")]));
     const tracker = makeTurnTracker();
     tracker.onTurnStart({ turnId: "tp", trigger: "user" });
-    const driver = { runConversation: async () => ({ finalMessage: { role: "assistant", content: "ok" }, messages: [], usage: { promptTokens: 0, completionTokens: 0 } }) };
-    const tool = makeDispatchTool({ registry: reg, tracker, driver, maxDepth: 3, hasSkills: () => false });
+    const driver = { runConversation: async () => ({ finalMessage: { role: "assistant", content: "ok" }, usage: { promptTokens: 0, completionTokens: 0 } }) };
+    const tool = makeDispatchTool({ registry: reg, tracker, driver, sessions: makeSessions(), maxDepth: 3, hasSkills: () => false });
     const ctx = makeCtx("tp");
     await tool.handler({ agent_name: "a", prompt: "p" }, ctx);
     const updateEvent = ctx.events.find((e: any) => e.event === "status:item-update");
     const clearEvent = ctx.events.find((e: any) => e.event === "status:item-clear");
     expect(updateEvent?.payload).toMatchObject({ key: "agents.active", value: "a" });
     expect(clearEvent?.payload).toMatchObject({ key: "agents.active" });
+  });
+
+  it("same session_id continues existing sub-session", async () => {
+    const reg = makeRegistryHandle(makeRegistry([m("a")]));
+    const tracker = makeTurnTracker();
+    tracker.onTurnStart({ turnId: "tp", trigger: "user" });
+    const sessions = makeSessions();
+    sessions.records.set("parent-session/thread", {
+      id: "parent-session/thread",
+      harness: "h",
+      parentSessionId: "parent-session",
+      agentName: "a",
+      metadata: {},
+      createdAt: 1,
+      pluginFingerprint: [],
+    });
+    let captured: any;
+    const driver = { runConversation: async (input: any) => { captured = input; return { finalMessage: { role: "assistant", content: "ok" }, usage: { promptTokens: 0, completionTokens: 0 } }; } };
+    const tool = makeDispatchTool({ registry: reg, tracker, driver, sessions, maxDepth: 3, hasSkills: () => false });
+    await tool.handler({ agent_name: "a", prompt: "p", session_id: "thread" }, makeCtx("tp"));
+    expect(captured.sessionId).toBe("parent-session/thread");
+    expect(sessions.createCalls).toHaveLength(0);
+  });
+
+  it("existing session_id under a different agent throws", async () => {
+    const reg = makeRegistryHandle(makeRegistry([m("a")]));
+    const tracker = makeTurnTracker();
+    tracker.onTurnStart({ turnId: "tp", trigger: "user" });
+    const sessions = makeSessions();
+    sessions.records.set("parent-session/thread", {
+      id: "parent-session/thread",
+      harness: "h",
+      parentSessionId: "parent-session",
+      agentName: "other",
+      metadata: {},
+      createdAt: 1,
+      pluginFingerprint: [],
+    });
+    const tool = makeDispatchTool({ registry: reg, tracker, driver: { runConversation: async () => ({} as any) }, sessions, maxDepth: 3, hasSkills: () => false });
+    await expect(tool.handler({ agent_name: "a", prompt: "p", session_id: "thread" }, makeCtx("tp"))).rejects.toThrow(/different agent/);
+  });
+
+  it("omitted session_id creates a persisted oneshot child session", async () => {
+    const reg = makeRegistryHandle(makeRegistry([m("a")]));
+    const tracker = makeTurnTracker();
+    tracker.onTurnStart({ turnId: "tp", trigger: "user" });
+    const sessions = makeSessions();
+    let captured: any;
+    const driver = { runConversation: async (input: any) => { captured = input; return { finalMessage: { role: "assistant", content: "ok" }, usage: { promptTokens: 0, completionTokens: 0 } }; } };
+    const tool = makeDispatchTool({ registry: reg, tracker, driver, sessions, maxDepth: 3, hasSkills: () => false });
+    await tool.handler({ agent_name: "a", prompt: "p" }, makeCtx("tp"));
+    expect(captured.sessionId).toMatch(/^parent-session\/oneshot-/);
+    expect(sessions.createCalls[0]).toMatchObject({ parentSessionId: "parent-session", agentName: "a" });
+  });
+
+  it("requires turnId and sessionId in ToolExecutionContext", async () => {
+    const reg = makeRegistryHandle(makeRegistry([m("a")]));
+    const tracker = makeTurnTracker();
+    tracker.onTurnStart({ turnId: "tp", trigger: "user" });
+    const tool = makeDispatchTool({ registry: reg, tracker, driver: { runConversation: async () => ({} as any) }, sessions: makeSessions(), maxDepth: 3, hasSkills: () => false });
+    await expect(tool.handler({ agent_name: "a", prompt: "p" }, { ...makeCtx("tp"), sessionId: undefined } as any)).rejects.toThrow(/sessionId missing/);
+    await expect(tool.handler({ agent_name: "a", prompt: "p" }, { ...makeCtx("tp"), turnId: undefined } as any)).rejects.toThrow(/turnId missing/);
+  });
+
+  it("invalid session_id is rejected before store lookup", async () => {
+    const reg = makeRegistryHandle(makeRegistry([m("a")]));
+    const tracker = makeTurnTracker();
+    tracker.onTurnStart({ turnId: "tp", trigger: "user" });
+    const sessions = makeSessions();
+    let existsCalled = false;
+    sessions.exists = async () => { existsCalled = true; return false; };
+    const tool = makeDispatchTool({ registry: reg, tracker, driver: { runConversation: async () => ({} as any) }, sessions, maxDepth: 3, hasSkills: () => false });
+    await expect(tool.handler({ agent_name: "a", prompt: "p", session_id: "bad/slash" }, makeCtx("tp"))).rejects.toThrow(/session_id/);
+    expect(existsCalled).toBe(false);
   });
 });

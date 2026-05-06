@@ -15,6 +15,8 @@ export interface ToolDispatchStrategy {
     registry: ToolsRegistryService;
     signal: AbortSignal;
     emit: (event: string, payload: unknown) => Promise<void>;
+    turnId: string;
+    sessionId: string;
   }): Promise<ChatMessage[]>;
 }
 
@@ -26,7 +28,7 @@ export function makeStrategy(): ToolDispatchStrategy {
       return { tools: availableTools };
     },
 
-    async handleResponse({ response, registry, signal, emit }) {
+    async handleResponse({ response, registry, signal, emit, turnId, sessionId }) {
       const calls = response.toolCalls ?? [];
       if (calls.length === 0) return [];
 
@@ -59,6 +61,8 @@ export function makeStrategy(): ToolDispatchStrategy {
             name: call.name,
             callId: call.id,
             message: "malformed arguments JSON from LLM",
+            turnId,
+            sessionId,
           });
           out.push({
             role: "tool",
@@ -72,6 +76,8 @@ export function makeStrategy(): ToolDispatchStrategy {
         const ctx: ToolExecutionContext = {
           signal,
           callId: call.id,
+          turnId,
+          sessionId,
           log: (msg) => { void emit("status:item-update", { key: `tool:${call.id}`, value: msg }); },
         };
 
@@ -84,6 +90,8 @@ export function makeStrategy(): ToolDispatchStrategy {
               name: call.name,
               callId: call.id,
               message: "result not JSON-serializable, coerced to string",
+              turnId,
+              sessionId,
             });
           }
           content = ser.content;

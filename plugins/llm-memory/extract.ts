@@ -3,7 +3,8 @@ import type { MemoryConfig } from "./config.ts";
 export interface RunConversationFn {
   (input: {
     systemPrompt: string;
-    messages: { role: "system" | "user" | "assistant" | "tool"; content: string }[];
+    sessionId: string;
+    userMessage: { role: "user"; content: string };
     toolFilter?: { tags?: string[]; names?: string[] };
     parentTurnId?: string;
   }): Promise<unknown>;
@@ -19,6 +20,7 @@ export interface TurnEndPayload {
   reason: "complete" | "cancelled" | "error" | string;
   lastUserMessage: string;
   turnId: string;
+  sessionId?: string;
 }
 
 export function hasTrigger(text: string, triggers: string[]): boolean {
@@ -51,10 +53,15 @@ export async function maybeExtract(payload: TurnEndPayload, deps: ExtractDeps): 
     deps.log("llm-memory: autoExtract enabled but driver:run-conversation not available; skipping");
     return;
   }
+  if (!payload.sessionId) {
+    deps.log("llm-memory: autoExtract enabled but turn:end had no sessionId; skipping");
+    return;
+  }
   try {
     await deps.runConversation({
       systemPrompt: SIDE_PROMPT,
-      messages: [{ role: "user", content: payload.lastUserMessage }],
+      sessionId: payload.sessionId,
+      userMessage: { role: "user", content: payload.lastUserMessage },
       toolFilter: { names: ["memory_save"] },
       parentTurnId: payload.turnId,
     });

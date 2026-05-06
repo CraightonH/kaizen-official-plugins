@@ -1,12 +1,8 @@
-import type { ChatMessage, LLMResponse } from "llm-events/public";
+import type { LLMResponse } from "llm-events/public";
 
 export interface CurrentTurn {
   id: string;
   controller: AbortController;
-}
-
-export function snapshotMessages(messages: ChatMessage[]): ChatMessage[] {
-  return messages.slice();
 }
 
 export function aggregateUsage(

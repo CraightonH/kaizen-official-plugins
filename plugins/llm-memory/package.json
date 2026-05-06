@@ -1,6 +1,6 @@
 {
   "name": "llm-memory",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "File-backed persistent memory plugin (memory:store + memory_recall/memory_save tools + llm:before-call injection)",
   "type": "module",
   "exports": {

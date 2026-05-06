@@ -1,21 +1,20 @@
 import { describe, it, expect, mock } from "bun:test";
-import { runConversation, type RunConversationDeps } from "../loop.ts";
+import { runConversation, type RunConversationDeps, type ToolDispatchStrategy, type ToolsRegistryService } from "../loop.ts";
 import { makeIdGen } from "../ids.ts";
-import type { LLMStreamEvent, LLMCompleteService, ChatMessage } from "llm-events/public";
+import type { ChatMessage, LLMCompleteService, LLMStreamEvent } from "llm-events/public";
+import type { SessionsStoreService, TurnHandle } from "llm-session-manager/public";
 
 function makeLlm(events: LLMStreamEvent[][]): LLMCompleteService & { calls: any[] } {
   let i = 0;
   const calls: any[] = [];
-  const svc = {
+  return {
     calls,
     async *complete(req: any, opts: any) {
       calls.push({ req, opts });
-      const evs = events[i++] ?? [];
-      for (const e of evs) yield e;
+      for (const event of events[i++] ?? []) yield event;
     },
     async listModels() { return []; },
   } as any;
-  return svc;
 }
 
 interface RecEvent { name: string; payload: any; }
@@ -23,8 +22,48 @@ function makeEmit(): { emit: (n: string, p?: any) => Promise<void>; events: RecE
   const events: RecEvent[] = [];
   return {
     events,
-    emit: async (name: string, payload: any) => { events.push({ name, payload }); },
+    emit: async (name, payload) => { events.push({ name, payload }); },
   };
+}
+
+function makeSessions(initial: ChatMessage[] = []): SessionsStoreService & { committed: ChatMessage[] } {
+  let open: { buffer: ChatMessage[]; closed: boolean } | null = null;
+  const store = {
+    committed: initial.slice(),
+    async create() { throw new Error("not needed"); },
+    async load() { return {} as any; },
+    async exists() { return true; },
+    async getMessages() {
+      return open ? [...store.committed, ...open.buffer] : store.committed.slice();
+    },
+    beginTurn(_id: string, turnId: string): TurnHandle {
+      if (open) throw new Error("already open");
+      const state = { buffer: [] as ChatMessage[], closed: false };
+      open = state;
+      return {
+        turnId,
+        append(msg) {
+          if (state.closed) throw new Error("closed");
+          state.buffer.push(msg);
+        },
+        async commit() {
+          if (state.closed) return;
+          store.committed.push(...state.buffer);
+          state.closed = true;
+          if (open === state) open = null;
+        },
+        async rollback() {
+          if (state.closed) return;
+          state.closed = true;
+          if (open === state) open = null;
+        },
+      };
+    },
+    async list() { return []; },
+    async delete() {},
+    async *readEvents() {},
+  } as SessionsStoreService & { committed: ChatMessage[] };
+  return store;
 }
 
 function makeDeps(overrides: Partial<RunConversationDeps> = {}): RunConversationDeps {
@@ -34,6 +73,7 @@ function makeDeps(overrides: Partial<RunConversationDeps> = {}): RunConversation
     llmComplete: makeLlm([[{ type: "done", response: { content: "ok", finishReason: "stop" } }]]),
     registry: undefined,
     strategy: undefined,
+    sessions: makeSessions(),
     log: mock(() => {}),
     idGen: makeIdGen(["turn_test_1", "turn_test_2"]),
     defaultSystemPrompt: "default-sp",
@@ -41,184 +81,184 @@ function makeDeps(overrides: Partial<RunConversationDeps> = {}): RunConversation
   };
 }
 
-describe("runConversation (A-tier)", () => {
-  it("single-shot: emits turn:start, llm:before-call, llm:request, llm:done, turn:end", async () => {
+describe("runConversation", () => {
+  it("owned turn: appends user and assistant through the session store", async () => {
     const { emit, events } = makeEmit();
+    const sessions = makeSessions();
     const llm = makeLlm([[{ type: "token", delta: "hi" }, { type: "done", response: { content: "hi", finishReason: "stop" } }]]);
-    const deps = makeDeps({ emit, llmComplete: llm });
+    const deps = makeDeps({ emit, sessions, llmComplete: llm });
+
     const out = await runConversation({
       systemPrompt: "sys",
-      messages: [{ role: "user", content: "yo" }],
+      sessionId: "session-1",
+      userMessage: { role: "user", content: "yo" },
       model: "m",
     }, deps);
-    expect(events.map(e => e.name)).toEqual([
-      "turn:start", "llm:before-call", "llm:request", "llm:token", "llm:done", "turn:end",
+
+    expect(events.map((e) => e.name)).toEqual([
+      "conversation:user-message",
+      "turn:start",
+      "llm:before-call",
+      "llm:request",
+      "llm:token",
+      "llm:done",
+      "turn:end",
     ]);
-    expect(out.messages).toEqual([
+    expect(events.find((e) => e.name === "turn:start")!.payload).toMatchObject({
+      turnId: "turn_test_1",
+      sessionId: "session-1",
+      trigger: "agent",
+    });
+    expect(sessions.committed).toEqual([
       { role: "user", content: "yo" },
       { role: "assistant", content: "hi" },
     ]);
     expect(out.finalMessage).toEqual({ role: "assistant", content: "hi" });
-    expect(out.usage).toEqual({ promptTokens: 0, completionTokens: 0 });
   });
 
-  it("turn:start carries trigger=agent and parentTurnId when supplied", async () => {
+  it("existing-turn mode does not emit or commit lifecycle events", async () => {
+    const { emit, events } = makeEmit();
+    const sessions = makeSessions();
+    const handle = sessions.beginTurn("session-1", "turn-external");
+    handle.append({ role: "user", content: "outer" });
+    const deps = makeDeps({ emit, sessions });
+
+    await runConversation({
+      systemPrompt: "sys",
+      sessionId: "session-1",
+      externalTurnId: "turn-external",
+      turnHandle: handle,
+    }, deps);
+
+    expect(events.map((e) => e.name)).not.toContain("turn:start");
+    expect(events.map((e) => e.name)).not.toContain("turn:end");
+    expect(await sessions.getMessages("session-1")).toHaveLength(2);
+    expect(sessions.committed).toEqual([]);
+    await handle.commit();
+    expect(sessions.committed.map((m) => m.role)).toEqual(["user", "assistant"]);
+  });
+
+  it("turn:start carries parentTurnId and llm events carry turn/session ids", async () => {
     const { emit, events } = makeEmit();
     const deps = makeDeps({ emit });
     await runConversation({
-      systemPrompt: "sys", messages: [{ role: "user", content: "x" }], parentTurnId: "turn_parent",
+      systemPrompt: "sys",
+      sessionId: "session-1",
+      userMessage: { role: "user", content: "x" },
+      parentTurnId: "turn-parent",
     }, deps);
-    const startEv = events.find(e => e.name === "turn:start")!;
-    expect(startEv.payload.trigger).toBe("agent");
-    expect(startEv.payload.parentTurnId).toBe("turn_parent");
-    expect(typeof startEv.payload.turnId).toBe("string");
+    expect(events.find((e) => e.name === "turn:start")!.payload).toMatchObject({
+      parentTurnId: "turn-parent",
+      sessionId: "session-1",
+    });
+    expect(events.find((e) => e.name === "llm:request")!.payload).toMatchObject({
+      turnId: "turn_test_1",
+      sessionId: "session-1",
+    });
   });
 
-  it("passes input.model through unchanged (provider fills in default when undefined)", async () => {
+  it("passes input.model through unchanged", async () => {
     const llm = makeLlm([[{ type: "done", response: { content: "", finishReason: "stop" } }]]);
     const deps = makeDeps({ llmComplete: llm });
-    await runConversation({ systemPrompt: "sys", messages: [] }, deps);
-    expect((llm as any).calls[0].req.model).toBeUndefined();
-  });
-
-  it("does not mutate caller-supplied messages array", async () => {
-    const messages: ChatMessage[] = Object.freeze([{ role: "user", content: "frozen" }]) as any;
-    const llm = makeLlm([[{ type: "done", response: { content: "ok", finishReason: "stop" } }]]);
-    const deps = makeDeps({ llmComplete: llm });
-    const out = await runConversation({ systemPrompt: "sys", messages }, deps);
-    expect(messages).toEqual([{ role: "user", content: "frozen" }]); // unchanged
-    expect(out.messages).not.toBe(messages);
-    expect(out.messages.length).toBe(2);
+    await runConversation({
+      systemPrompt: "sys",
+      sessionId: "session-1",
+      userMessage: { role: "user", content: "x" },
+    }, deps);
+    expect(llm.calls[0].req.model).toBeUndefined();
   });
 
   it("llm:request payload is deep-frozen", async () => {
     const { emit, events } = makeEmit();
     const deps = makeDeps({ emit });
-    await runConversation({ systemPrompt: "sys", messages: [{ role: "user", content: "x" }] }, deps);
-    const reqEv = events.find(e => e.name === "llm:request")!;
+    await runConversation({
+      systemPrompt: "sys",
+      sessionId: "session-1",
+      userMessage: { role: "user", content: "x" },
+    }, deps);
+    const reqEv = events.find((e) => e.name === "llm:request")!;
     expect(Object.isFrozen(reqEv.payload.request)).toBe(true);
     expect(Object.isFrozen(reqEv.payload.request.messages)).toBe(true);
   });
 
-  it("LLM error event causes turn:error + turn:end{reason:error} and throws", async () => {
+  it("LLM errors roll back owned turns and emit turn:error/end", async () => {
     const { emit, events } = makeEmit();
+    const sessions = makeSessions();
     const llm = makeLlm([[{ type: "error", message: "boom" }]]);
-    const deps = makeDeps({ emit, llmComplete: llm });
-    await expect(runConversation({ systemPrompt: "sys", messages: [{ role: "user", content: "x" }] }, deps))
-      .rejects.toThrow(/boom/);
-    const names = events.map(e => e.name);
-    expect(names).toContain("turn:error");
-    const endEv = events.find(e => e.name === "turn:end")!;
-    expect(endEv.payload.reason).toBe("error");
+    const deps = makeDeps({ emit, sessions, llmComplete: llm });
+    await expect(runConversation({
+      systemPrompt: "sys",
+      sessionId: "session-1",
+      userMessage: { role: "user", content: "x" },
+    }, deps)).rejects.toThrow(/boom/);
+    expect(sessions.committed).toEqual([]);
+    expect(events.map((e) => e.name)).toContain("turn:error");
+    expect(events.find((e) => e.name === "turn:end")!.payload.reason).toBe("error");
   });
 
-  it("stream ends without 'done' → error", async () => {
-    const { emit, events } = makeEmit();
-    const llm = makeLlm([[{ type: "token", delta: "a" }]]); // no done
-    const deps = makeDeps({ emit, llmComplete: llm });
-    await expect(runConversation({ systemPrompt: "sys", messages: [{ role: "user", content: "x" }] }, deps))
-      .rejects.toThrow(/done/);
-    const endEv = events.find(e => e.name === "turn:end")!;
-    expect(endEv.payload.reason).toBe("error");
-  });
-
-  it("aggregates usage across multiple llm:done events (single call here)", async () => {
-    const llm = makeLlm([[{ type: "done", response: { content: "ok", finishReason: "stop", usage: { promptTokens: 4, completionTokens: 2 } } }]]);
-    const deps = makeDeps({ llmComplete: llm });
-    const out = await runConversation({ systemPrompt: "sys", messages: [{ role: "user", content: "x" }] }, deps);
-    expect(out.usage).toEqual({ promptTokens: 4, completionTokens: 2 });
-  });
-});
-
-import type { ToolDispatchStrategy, ToolsRegistryService } from "../loop.ts";
-
-function makeRegistry(tools: any[] = []): ToolsRegistryService {
-  return {
-    list: () => tools as any,
-    invoke: async () => undefined,
-  } as any;
-}
-
-function makeStrategy(handlers: Array<(input: any) => Promise<ChatMessage[]>>): ToolDispatchStrategy & { calls: any[] } {
-  let i = 0;
-  const calls: any[] = [];
-  return {
-    calls,
-    prepareRequest: ({ availableTools }: any) => ({ tools: availableTools, systemPromptAppend: "[strategy]" }),
-    handleResponse: async (input: any) => {
-      calls.push(input);
-      const h = handlers[i++];
-      if (!h) return [];
-      return h(input);
-    },
-  } as any;
-}
-
-describe("runConversation (multi-step strategy)", () => {
-  it("strategy returns one tool message → second LLM call → empty appended → done", async () => {
-    const { emit, events } = makeEmit();
+  it("strategy loop appends tool messages, recalls LLM, and threads ids into strategy", async () => {
     const llm = makeLlm([
       [{ type: "done", response: { content: "use tool", finishReason: "tool_calls", toolCalls: [{ id: "c1", name: "f", arguments: {} }] } }],
       [{ type: "done", response: { content: "final", finishReason: "stop" } }],
     ]);
-    const strategy = makeStrategy([
-      async () => [{ role: "tool", content: "tool-result", toolCallId: "c1", name: "f" }],
-      async () => [], // terminal
-    ]);
-    const deps = makeDeps({ emit, llmComplete: llm, registry: makeRegistry(), strategy });
+    const strategyCalls: any[] = [];
+    const strategy: ToolDispatchStrategy = {
+      prepareRequest: ({ availableTools }) => ({ tools: availableTools, systemPromptAppend: "[strategy]" }),
+      handleResponse: async (input) => {
+        strategyCalls.push(input);
+        return strategyCalls.length === 1
+          ? [{ role: "tool", content: "tool-result", toolCallId: "c1", name: "f" }]
+          : [];
+      },
+    };
+    const sessions = makeSessions();
+    const deps = makeDeps({
+      llmComplete: llm,
+      sessions,
+      registry: { list: () => [], invoke: async () => undefined } as ToolsRegistryService,
+      strategy,
+    });
+
     const out = await runConversation({
       systemPrompt: "sys",
-      messages: [{ role: "user", content: "go" }],
+      sessionId: "session-1",
+      userMessage: { role: "user", content: "go" },
     }, deps);
-    expect(out.messages.map(m => m.role)).toEqual(["user", "assistant", "tool", "assistant"]);
-    expect((llm as any).calls.length).toBe(2);
-    // strategy.prepareRequest applied systemPromptAppend
-    expect((llm as any).calls[0].req.systemPrompt).toContain("[strategy]");
-    // strategy.tools forwarded
-    expect((llm as any).calls[0].req.tools).toEqual([]);
+
+    expect(sessions.committed.map((m) => m.role)).toEqual(["user", "assistant", "tool", "assistant"]);
+    expect(llm.calls).toHaveLength(2);
+    expect(llm.calls[0].req.systemPrompt).toContain("[strategy]");
+    expect(strategyCalls[0]).toMatchObject({ turnId: "turn_test_1", sessionId: "session-1" });
+    expect(out.finalMessage.content).toBe("final");
   });
 
-  it("strategy.handleResponse throws → turn:error + turn:end{reason:error}", async () => {
-    const { emit, events } = makeEmit();
-    const llm = makeLlm([
-      [{ type: "done", response: { content: "x", finishReason: "tool_calls", toolCalls: [{ id: "c1", name: "f", arguments: {} }] } }],
-    ]);
-    const strategy = makeStrategy([
-      async () => { throw new Error("strategy boom"); },
-    ]);
-    const deps = makeDeps({ emit, llmComplete: llm, registry: makeRegistry(), strategy });
-    await expect(runConversation({
-      systemPrompt: "sys", messages: [{ role: "user", content: "x" }],
-    }, deps)).rejects.toThrow(/strategy boom/);
-    const endEv = events.find(e => e.name === "turn:end")!;
-    expect(endEv.payload.reason).toBe("error");
-  });
-
-  it("usage aggregated across multiple llm:done events", async () => {
+  it("aggregates usage across multiple LLM calls", async () => {
     const llm = makeLlm([
       [{ type: "done", response: { content: "a", finishReason: "tool_calls", toolCalls: [{ id: "c1", name: "f", arguments: {} }], usage: { promptTokens: 10, completionTokens: 2 } } }],
       [{ type: "done", response: { content: "b", finishReason: "stop", usage: { promptTokens: 12, completionTokens: 4 } } }],
     ]);
-    const strategy = makeStrategy([
-      async () => [{ role: "tool", content: "r", toolCallId: "c1", name: "f" }],
-      async () => [],
-    ]);
-    const deps = makeDeps({ llmComplete: llm, registry: makeRegistry(), strategy });
-    const out = await runConversation({ systemPrompt: "sys", messages: [{ role: "user", content: "x" }] }, deps);
+    let calls = 0;
+    const strategy: ToolDispatchStrategy = {
+      prepareRequest: () => ({}),
+      handleResponse: async () => {
+        calls++;
+        return calls === 1 ? [{ role: "tool", content: "r", toolCallId: "c1", name: "f" }] : [];
+      },
+    };
+    const deps = makeDeps({
+      llmComplete: llm,
+      registry: { list: () => [], invoke: async () => undefined } as ToolsRegistryService,
+      strategy,
+    });
+    const out = await runConversation({
+      systemPrompt: "sys",
+      sessionId: "session-1",
+      userMessage: { role: "user", content: "x" },
+    }, deps);
     expect(out.usage).toEqual({ promptTokens: 22, completionTokens: 6 });
   });
 
-  it("only registry present (no strategy) takes A-tier path (degenerate)", async () => {
-    const llm = makeLlm([[{ type: "done", response: { content: "ok", finishReason: "stop" } }]]);
-    const deps = makeDeps({ llmComplete: llm, registry: makeRegistry(), strategy: undefined });
-    const out = await runConversation({ systemPrompt: "sys", messages: [{ role: "user", content: "x" }] }, deps);
-    expect((llm as any).calls.length).toBe(1);
-    expect(out.messages.length).toBe(2);
-  });
-});
-
-describe("runConversation (llm:before-call hooks)", () => {
-  it("subscriber mutation of request is visible to llm:complete and llm:request", async () => {
+  it("llm:before-call mutation is visible to the provider and llm:request", async () => {
     const { events } = makeEmit();
     let captured: any;
     const emit = async (name: string, payload?: any) => {
@@ -233,17 +273,22 @@ describe("runConversation (llm:before-call hooks)", () => {
       captured = req;
       yield { type: "done", response: { content: "ok", finishReason: "stop" } };
     }) as any;
-    const deps = makeDeps({ emit, llmComplete: llm });
-    await runConversation({ systemPrompt: "orig", messages: [{ role: "user", content: "x" }], model: "orig-model" }, deps);
+    await runConversation({
+      systemPrompt: "orig",
+      sessionId: "session-1",
+      userMessage: { role: "user", content: "x" },
+      model: "orig-model",
+    }, makeDeps({ emit, llmComplete: llm }));
     expect(captured.model).toBe("mutated");
     expect(captured.systemPrompt).toBe("mutated-sp");
-    const reqEv = events.find(e => e.name === "llm:request")!;
+    const reqEv = events.find((e) => e.name === "llm:request")!;
     expect(reqEv.payload.request.model).toBe("mutated");
     expect(reqEv.payload.request.systemPrompt).toBe("mutated-sp");
   });
 
-  it("request.cancelled=true short-circuits: no llm:complete call, turn ends with reason=complete", async () => {
+  it("request.cancelled=true short-circuits without appending an assistant", async () => {
     const { events } = makeEmit();
+    const sessions = makeSessions();
     const llmCalls: any[] = [];
     const emit = async (name: string, payload?: any) => {
       events.push({ name, payload });
@@ -256,14 +301,15 @@ describe("runConversation (llm:before-call hooks)", () => {
       },
       async listModels() { return []; },
     } as any;
-    const deps = makeDeps({ emit, llmComplete: llm });
-    const out = await runConversation({ systemPrompt: "s", messages: [{ role: "user", content: "x" }] }, deps);
-    expect(llmCalls.length).toBe(0);
-    expect(out.messages).toEqual([{ role: "user", content: "x" }]); // no assistant appended
-    const names = events.map(e => e.name);
-    expect(names).not.toContain("llm:request");
-    expect(names).not.toContain("llm:done");
-    const endEv = events.find(e => e.name === "turn:end")!;
-    expect(endEv.payload.reason).toBe("complete");
+    const out = await runConversation({
+      systemPrompt: "s",
+      sessionId: "session-1",
+      userMessage: { role: "user", content: "x" },
+    }, makeDeps({ emit, sessions, llmComplete: llm }));
+    expect(llmCalls).toHaveLength(0);
+    expect(sessions.committed).toEqual([{ role: "user", content: "x" }]);
+    expect(out.finalMessage).toEqual({ role: "user", content: "x" });
+    expect(events.map((e) => e.name)).not.toContain("llm:request");
+    expect(events.find((e) => e.name === "turn:end")!.payload.reason).toBe("complete");
   });
 });

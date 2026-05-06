@@ -27,6 +27,8 @@ describe("integration: registry + strategy", () => {
       registry,
       signal: new AbortController().signal,
       emit: emit as any,
+      turnId: "turn-1",
+      sessionId: "session-1",
     });
 
     expect(out.length).toBe(2);
@@ -53,6 +55,8 @@ describe("integration: registry + strategy", () => {
       registry,
       signal: new AbortController().signal,
       emit: emit as any,
+      turnId: "turn-1",
+      sessionId: "session-1",
     });
 
     expect(out.length).toBe(2);
@@ -87,6 +91,8 @@ describe("integration: registry + strategy", () => {
       registry,
       signal: new AbortController().signal,
       emit: emit as any,
+      turnId: "turn-1",
+      sessionId: "session-1",
     });
 
     expect(out.length).toBe(2);
@@ -118,6 +124,8 @@ describe("integration: registry + strategy", () => {
       registry,
       signal: new AbortController().signal,
       emit: emit as any,
+      turnId: "turn-1",
+      sessionId: "session-1",
     });
     expect(order).toEqual(["a-start", "a-end", "b-start", "b-end"]);
   });

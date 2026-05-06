@@ -35,9 +35,9 @@ describe("llm-status-items setup", () => {
     await plugin.setup(ctx);
     expect(ctx.subscribed.sort()).toEqual([
       "conversation:cleared",
+      "harness:start",
       "llm:before-call",
       "llm:done",
-      "session:start",
       "tool:before-execute",
       "tool:error",
       "tool:result",

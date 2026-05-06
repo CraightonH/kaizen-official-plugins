@@ -10,7 +10,7 @@ Owns the lifecycle of one or more Model Context Protocol (MCP) servers and re-pu
   - **Handshake:** MCP `initialize`, then `tools/list` + `resources/list` based on advertised capabilities.
   - **Health:** periodic MCP `ping` every `healthCheckMs` (default 60s); failure ⇒ reconnect.
   - **Reconnect:** exponential backoff 1s/2s/4s/8s/16s, capped at 60s. After 5 consecutive failures the server is **quarantined**; tool handlers fast-fail with `mcp_server_unavailable: <name>` until a manual reconnect.
-  - **Shutdown:** on session end, close transports, SIGTERM stdio (force-kill after 5s), unregister tools.
+  - **Shutdown:** on harness end, close transports, SIGTERM stdio (force-kill after 5s), unregister tools.
 - Translates server capabilities into registry entries:
   - **Tools** — each MCP tool registered as `mcp:<server>:<toolname>` with tags `["mcp", "mcp:<server>"]`. MCP `inputSchema` is used verbatim as the JSONSchema7 `parameters`. Text-only result content is flattened to a string; mixed/binary content passes through as the structured array.
   - **Resources** — not enumerated. Two global tools are registered once: `read_mcp_resource({ server, uri })` and `list_mcp_resources({ server? })`.
@@ -84,11 +84,11 @@ Semantics:
 - `slash:registry` — **soft.** If absent, the `/mcp:*` commands are not registered; tool surfacing still works.
 
 **Events listened to**
-- `session:end` — runs graceful shutdown for every server (cancel timers, close transports, unregister tools, force-kill stdio after 5s).
+- `harness:end` — runs graceful shutdown for every server (cancel timers, close transports, unregister tools, force-kill stdio after 5s).
 
 **Events emitted**
 - `status:item-update` — `{ key: "mcp", value: "<connected>/<total>[ ⚠]" }`. Refreshed on a 5s tick. The warning marker is appended whenever any server is quarantined.
-- `status:item-clear` — `{ key: "mcp" }`. Emitted when there are zero configured servers and on `session:end`.
+- `status:item-clear` — `{ key: "mcp" }`. Emitted when there are zero configured servers and on `harness:end`.
 - `conversation:system-message` — `{ content: string }`. Emitted from `/mcp:*` slash command handlers to write status output back to the conversation.
 - `tool:error` — emitted indirectly: MCP-backed tool handlers throw, and `tools:registry.invoke` surfaces the error through the standard event. The bridge does not emit `tool:error` itself.
 

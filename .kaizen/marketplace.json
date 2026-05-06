@@ -38,9 +38,17 @@
       "description": "Event vocabulary and shared types for openai-compatible harnesses.",
       "categories": ["events"],
       "versions": [
+        { "version": "0.3.0", "source": { "type": "file", "path": "plugins/llm-events" } },
         { "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-events" } },
         { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-events" } }
       ]
+    },
+    {
+      "kind": "plugin",
+      "name": "llm-session-manager",
+      "description": "Persistent session store and per-session execution trace for openai-compatible harnesses.",
+      "categories": ["sessions", "persistence", "llm"],
+      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-session-manager" } }]
     },
     {
       "kind": "plugin",
@@ -61,21 +69,30 @@
       "name": "llm-skills",
       "description": "Skills registry + default file-loader for ~/.kaizen/skills/ and <project>/.kaizen/skills/.",
       "categories": ["skills"],
-      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-skills" } }]
+      "versions": [
+        { "version": "0.1.1", "source": { "type": "file", "path": "plugins/llm-skills" } },
+        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-skills" } }
+      ]
     },
     {
       "kind": "plugin",
       "name": "llm-mcp-bridge",
       "description": "Bridge MCP servers (tools + resources) into the kaizen tools:registry. v0 — prompts deferred.",
       "categories": ["mcp", "tools"],
-      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-mcp-bridge" } }]
+      "versions": [
+        { "version": "0.1.1", "source": { "type": "file", "path": "plugins/llm-mcp-bridge" } },
+        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-mcp-bridge" } }
+      ]
     },
     {
       "kind": "plugin",
       "name": "llm-tools-registry",
       "description": "Central tool registry and single tool-execution chokepoint for the openai-compatible harness.",
       "categories": ["tools", "registry"],
-      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-tools-registry" } }]
+      "versions": [
+        { "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-tools-registry" } },
+        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-tools-registry" } }
+      ]
     },
     {
       "kind": "plugin",
@@ -89,42 +106,60 @@
       "name": "llm-native-dispatch",
       "description": "Native OpenAI tool-calling dispatch strategy (alternate to code-mode).",
       "categories": ["tools", "dispatch"],
-      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-native-dispatch" } }]
+      "versions": [
+        { "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-native-dispatch" } },
+        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-native-dispatch" } }
+      ]
     },
     {
       "kind": "plugin",
       "name": "llm-codemode-dispatch",
       "description": "Code-mode tool dispatch: LLM writes TypeScript calling kaizen.tools.* in a Bun Worker sandbox. Default dispatch strategy for local LLMs.",
       "categories": ["llm", "tool-dispatch"],
-      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-codemode-dispatch" } }]
+      "versions": [
+        { "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-codemode-dispatch" } },
+        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-codemode-dispatch" } }
+      ]
     },
     {
       "kind": "plugin",
       "name": "llm-driver",
       "description": "Turn loop and conversation state. Provides `driver:run-conversation`.",
       "categories": ["driver", "llm"],
-      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-driver" } }]
+      "versions": [
+        { "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-driver" } },
+        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-driver" } }
+      ]
     },
     {
       "kind": "plugin",
       "name": "llm-agents",
       "description": "Subagent dispatch + file-loader registry for ~/.kaizen/agents/.",
       "categories": ["agents", "llm"],
-      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-agents" } }]
+      "versions": [
+        { "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-agents" } },
+        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-agents" } }
+      ]
     },
     {
       "kind": "plugin",
       "name": "llm-memory",
       "description": "File-backed persistent memory: memory:store service + memory_recall/memory_save tools + llm:before-call injection.",
       "categories": ["memory"],
-      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-memory" } }]
+      "versions": [
+        { "version": "0.1.1", "source": { "type": "file", "path": "plugins/llm-memory" } },
+        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-memory" } }
+      ]
     },
     {
       "kind": "plugin",
       "name": "llm-slash-commands",
       "description": "Slash command registry, dispatcher, and file loader for the openai-compatible harness.",
       "categories": ["slash", "commands"],
-      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-slash-commands" } }]
+      "versions": [
+        { "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-slash-commands" } },
+        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-slash-commands" } }
+      ]
     },
     {
       "kind": "plugin",
@@ -138,7 +173,10 @@
       "name": "llm-status-items",
       "description": "Optional status-bar items (model, tokens, turn-state, optional cost) for the openai-compatible harness.",
       "categories": ["status", "llm"],
-      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-status-items" } }]
+      "versions": [
+        { "version": "0.1.1", "source": { "type": "file", "path": "plugins/llm-status-items" } },
+        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-status-items" } }
+      ]
     },
     {
       "kind": "plugin",

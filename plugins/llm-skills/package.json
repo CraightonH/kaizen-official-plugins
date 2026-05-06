@@ -1,6 +1,6 @@
 {
   "name": "llm-skills",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Skills registry + default file-loader for ~/.kaizen/skills/ and <project>/.kaizen/skills/",
   "type": "module",
   "exports": {
