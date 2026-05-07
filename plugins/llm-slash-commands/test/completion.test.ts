@@ -27,9 +27,10 @@ describe("buildCompletionSource", () => {
     reg.register({ name: "mcp:reload", description: "r", source: "plugin" }, async () => {});
     const src = buildCompletionSource(reg);
     const items = await src.list("");
-    expect(items.length).toBe(3);
+    // Three built-ins (exit, help, history) + one namespaced (mcp:reload).
+    expect(items.length).toBe(4);
     // Built-ins before namespaced.
-    expect(items[0]!.label).toMatch(/^\/(help|exit)$/);
+    expect(items[0]!.label).toMatch(/^\/(help|exit|history)$/);
     expect(items[items.length - 1]!.label).toBe("/mcp:reload");
   });
 

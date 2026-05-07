@@ -24,6 +24,11 @@ const plugin: KaizenPlugin = {
 
   async setup(ctx) {
     ctx.consumeService("llm-events:vocabulary");
+
+    // Plugin-private control events (not in the shared VOCAB; owned by this
+    // plugin per llm-events convention). Peers emit these to drive TUI state.
+    ctx.defineEvent("tui:enter-history");
+
     ctx.defineService("llm-tui:channel", { description: "Pull-style chat I/O channel." });
     ctx.defineService("llm-tui:completion", { description: "Registry of completion sources for the input popup." });
     ctx.defineService("llm-tui:status", { description: "Marker service: subscribes to status:item-* and renders the bar." });
@@ -81,6 +86,11 @@ const plugin: KaizenPlugin = {
       // dispatch errored mid-stream), drop any in-flight reasoning so the
       // box doesn't linger above the next prompt.
       store.clearLiveThinking();
+    });
+
+    // /history slash command → modal audit view.
+    ctx.on("tui:enter-history", async () => {
+      store.enterHistoryMode();
     });
 
     // Status events → store.

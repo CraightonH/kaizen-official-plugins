@@ -51,7 +51,7 @@ describe("llm-slash-commands integration", () => {
 
     // Service provided.
     expect((services["slash:registry"] as any).list().map((m: any) => m.name).sort()).toEqual(
-      ["echo", "exit", "help", "required-args"].sort(),
+      ["echo", "exit", "help", "history", "required-args"].sort(),
     );
 
     // Project shadowed user echo.

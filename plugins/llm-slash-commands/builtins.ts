@@ -106,6 +106,13 @@ export function registerBuiltins(registry: SlashRegistryService, deps: BuiltinDe
     },
   );
 
+  registry.register(
+    { name: "history", description: "Open the session audit view (j/k focus, Enter expand, q quit)", source: "builtin" },
+    async (ctx: SlashCommandContext) => {
+      await ctx.emit("tui:enter-history", {});
+    },
+  );
+
   if (!deps.sessions) return;
   const sessions = deps.sessions;
 

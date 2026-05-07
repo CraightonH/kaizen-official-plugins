@@ -3,8 +3,6 @@ export interface TranscriptLine {
   id: number;
   kind: TranscriptKind;
   text: string;
-  /** thoughts kind: whether the block is currently expanded. Ctrl+R toggles all blocks together. */
-  expanded?: boolean;
 }
 export interface BusyState { active: boolean; message?: string; }
 export interface InputState { value: string; cursor: number; }
@@ -26,6 +24,15 @@ export interface PopupState {
   triggerPos: number;
 }
 
+export type ViewMode = "chat" | "history";
+
+export interface HistoryViewState {
+  /** Index into the *thought-block-only* sub-list of transcript. -1 if none. */
+  focusIdx: number;
+  /** Set of transcript entry ids whose Thoughts block is currently expanded. */
+  expanded: ReadonlySet<number>;
+}
+
 export interface TuiSnapshot {
   transcript: TranscriptLine[];
   busy: BusyState;
@@ -35,6 +42,8 @@ export interface TuiSnapshot {
   history: string[];
   /** Live reasoning text accumulating during the current turn; null when idle. */
   liveThinking: string | null;
+  viewMode: ViewMode;
+  historyView: HistoryViewState;
 }
 
 export class TuiStore {
@@ -45,6 +54,8 @@ export class TuiStore {
   private _status: Record<string, string> = {};
   private _history: string[] = [];
   private _liveThinking: string | null = null;
+  private _viewMode: ViewMode = "chat";
+  private _historyView: HistoryViewState = { focusIdx: -1, expanded: new Set() };
   private _seq = 0;
 
   private _pending: ((line: string) => void) | null = null;
@@ -87,7 +98,7 @@ export class TuiStore {
     if (!text) { this._emit(); return; }
     this._transcript = [
       ...this._transcript,
-      { id: ++this._seq, kind: "thoughts", text, expanded: false },
+      { id: ++this._seq, kind: "thoughts", text },
     ];
     this._emit();
   }
@@ -98,17 +109,52 @@ export class TuiStore {
     this._emit();
   }
 
-  toggleLatestThoughts(): void {
-    // Toggle all thoughts blocks together. If any are collapsed, expand all;
-    // otherwise collapse all. This makes Ctrl+R reveal the full reasoning
-    // history (across multi-turn loops) in one keystroke.
+  enterHistoryMode(): void {
+    if (this._viewMode === "history") return;
     const blocks = this._transcript.filter((e) => e.kind === "thoughts");
-    if (blocks.length === 0) return;
-    const anyCollapsed = blocks.some((e) => !(e.expanded ?? false));
-    const target = anyCollapsed; // expand all if any collapsed; otherwise collapse all
-    this._transcript = this._transcript.map((e) =>
-      e.kind === "thoughts" ? { ...e, expanded: target } : e,
-    );
+    this._viewMode = "history";
+    this._historyView = {
+      focusIdx: blocks.length > 0 ? 0 : -1,
+      expanded: new Set(),
+    };
+    this._emit();
+  }
+
+  exitHistoryMode(): void {
+    if (this._viewMode === "chat") return;
+    this._viewMode = "chat";
+    this._emit();
+  }
+
+  historyMoveFocus(delta: number): void {
+    if (this._viewMode !== "history") return;
+    const blocks = this._transcript.filter((e) => e.kind === "thoughts");
+    if (blocks.length === 0) { this._historyView = { ...this._historyView, focusIdx: -1 }; this._emit(); return; }
+    const cur = this._historyView.focusIdx < 0 ? 0 : this._historyView.focusIdx;
+    const n = blocks.length;
+    const next = ((cur + delta) % n + n) % n;
+    this._historyView = { ...this._historyView, focusIdx: next };
+    this._emit();
+  }
+
+  historyToggleFocused(): void {
+    if (this._viewMode !== "history") return;
+    const blocks = this._transcript.filter((e) => e.kind === "thoughts");
+    const block = blocks[this._historyView.focusIdx];
+    if (!block) return;
+    const next = new Set(this._historyView.expanded);
+    if (next.has(block.id)) next.delete(block.id); else next.add(block.id);
+    this._historyView = { ...this._historyView, expanded: next };
+    this._emit();
+  }
+
+  historySetAllExpanded(expanded: boolean): void {
+    if (this._viewMode !== "history") return;
+    const blocks = this._transcript.filter((e) => e.kind === "thoughts");
+    this._historyView = {
+      ...this._historyView,
+      expanded: expanded ? new Set(blocks.map((b) => b.id)) : new Set(),
+    };
     this._emit();
   }
 
@@ -197,6 +243,8 @@ export class TuiStore {
       status: this._status,
       history: this._history,
       liveThinking: this._liveThinking,
+      viewMode: this._viewMode,
+      historyView: this._historyView,
     };
   }
 

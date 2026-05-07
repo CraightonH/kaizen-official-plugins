@@ -105,4 +105,89 @@ describe("TuiStore", () => {
     s.appendOutput("b");
     expect(count).toBe(1);
   });
+
+  describe("history view mode", () => {
+    function withTwoThoughts() {
+      const s = new TuiStore();
+      s.appendUser("q1");
+      s.appendReasoning("first thought\nmore"); s.finalizeReasoning();
+      s.appendOutput("a1");
+      s.appendUser("q2");
+      s.appendReasoning("second thought"); s.finalizeReasoning();
+      s.appendOutput("a2");
+      return s;
+    }
+
+    it("starts in chat mode with no expanded blocks", () => {
+      const s = new TuiStore();
+      expect(s.snapshot().viewMode).toBe("chat");
+      expect(s.snapshot().historyView.focusIdx).toBe(-1);
+      expect(s.snapshot().historyView.expanded.size).toBe(0);
+    });
+
+    it("enterHistoryMode focuses the first thought block", () => {
+      const s = withTwoThoughts();
+      s.enterHistoryMode();
+      expect(s.snapshot().viewMode).toBe("history");
+      expect(s.snapshot().historyView.focusIdx).toBe(0);
+    });
+
+    it("enterHistoryMode with no thoughts has no focus", () => {
+      const s = new TuiStore();
+      s.appendUser("q"); s.appendOutput("a");
+      s.enterHistoryMode();
+      expect(s.snapshot().historyView.focusIdx).toBe(-1);
+    });
+
+    it("historyMoveFocus wraps", () => {
+      const s = withTwoThoughts();
+      s.enterHistoryMode();
+      s.historyMoveFocus(1);
+      expect(s.snapshot().historyView.focusIdx).toBe(1);
+      s.historyMoveFocus(1);
+      expect(s.snapshot().historyView.focusIdx).toBe(0); // wrap
+      s.historyMoveFocus(-1);
+      expect(s.snapshot().historyView.focusIdx).toBe(1); // wrap backward
+    });
+
+    it("historyToggleFocused toggles only the focused block", () => {
+      const s = withTwoThoughts();
+      s.enterHistoryMode();
+      const blocks = s.snapshot().transcript.filter((e) => e.kind === "thoughts");
+      const [b0, b1] = [blocks[0]!.id, blocks[1]!.id];
+      s.historyToggleFocused();
+      expect(s.snapshot().historyView.expanded.has(b0)).toBe(true);
+      expect(s.snapshot().historyView.expanded.has(b1)).toBe(false);
+      s.historyMoveFocus(1);
+      s.historyToggleFocused();
+      expect(s.snapshot().historyView.expanded.has(b1)).toBe(true);
+      s.historyToggleFocused();
+      expect(s.snapshot().historyView.expanded.has(b1)).toBe(false);
+    });
+
+    it("historySetAllExpanded(true|false) flips every block", () => {
+      const s = withTwoThoughts();
+      s.enterHistoryMode();
+      s.historySetAllExpanded(true);
+      expect(s.snapshot().historyView.expanded.size).toBe(2);
+      s.historySetAllExpanded(false);
+      expect(s.snapshot().historyView.expanded.size).toBe(0);
+    });
+
+    it("history mutations are no-ops in chat mode", () => {
+      const s = withTwoThoughts();
+      s.historyMoveFocus(1);
+      s.historyToggleFocused();
+      s.historySetAllExpanded(true);
+      expect(s.snapshot().viewMode).toBe("chat");
+      expect(s.snapshot().historyView.expanded.size).toBe(0);
+    });
+
+    it("exitHistoryMode returns to chat", () => {
+      const s = withTwoThoughts();
+      s.enterHistoryMode();
+      s.exitHistoryMode();
+      expect(s.snapshot().viewMode).toBe("chat");
+    });
+  });
 });
