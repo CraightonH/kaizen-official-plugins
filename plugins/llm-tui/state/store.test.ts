@@ -190,4 +190,39 @@ describe("TuiStore", () => {
       expect(s.snapshot().viewMode).toBe("chat");
     });
   });
+
+  describe("paste registry", () => {
+    it("registerPaste returns id+placeholder, with line count baked in", () => {
+      const s = new TuiStore();
+      const r1 = s.registerPaste("one line");
+      expect(r1.id).toBe(1);
+      expect(r1.placeholder).toBe("[Pasted text #1 +1 line]");
+      const r2 = s.registerPaste("a\nb\nc");
+      expect(r2.id).toBe(2);
+      expect(r2.placeholder).toBe("[Pasted text #2 +3 lines]");
+    });
+
+    it("resolvePastes substitutes content for placeholders", () => {
+      const s = new TuiStore();
+      const r = s.registerPaste("HELLO\nWORLD");
+      const line = `before ${r.placeholder} after`;
+      expect(s.resolvePastes(line)).toBe("before HELLO\nWORLD after");
+    });
+
+    it("resolvePastes leaves unknown placeholders alone", () => {
+      const s = new TuiStore();
+      const line = "[Pasted text #999 +1 line]";
+      expect(s.resolvePastes(line)).toBe(line);
+    });
+
+    it("clearPastes drops content but does not reset ids", () => {
+      const s = new TuiStore();
+      s.registerPaste("a"); s.registerPaste("b");
+      s.clearPastes();
+      const r = s.registerPaste("c");
+      expect(r.id).toBe(3); // continues from prior seq
+      // Old ids are gone:
+      expect(s.resolvePastes("[Pasted text #1 +1 line]")).toBe("[Pasted text #1 +1 line]");
+    });
+  });
 });

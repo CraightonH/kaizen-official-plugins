@@ -58,6 +58,12 @@ export class TuiStore {
   private _historyView: HistoryViewState = { focusIdx: -1, expanded: new Set() };
   private _seq = 0;
 
+  // Bracketed-paste registry: pasted content is stored here keyed by id; the
+  // visible buffer holds a short "[Pasted text #N +M lines]" placeholder.
+  // resolvePastes() expands placeholders back to the original text on submit.
+  private _pastes = new Map<number, string>();
+  private _pasteSeq = 0;
+
   private _pending: ((line: string) => void) | null = null;
   private _queue: string[] = [];
   private _listeners = new Set<() => void>();
@@ -107,6 +113,34 @@ export class TuiStore {
     if (this._liveThinking === null) return;
     this._liveThinking = null;
     this._emit();
+  }
+
+  /**
+   * Register a pasted block and return the placeholder string the caller
+   * should insert into the visible input buffer. The actual content is held
+   * here and substituted back in by resolvePastes() at submit time.
+   */
+  registerPaste(text: string): { id: number; placeholder: string } {
+    const id = ++this._pasteSeq;
+    this._pastes.set(id, text);
+    const lineCount = text.split("\n").length;
+    const placeholder = `[Pasted text #${id} +${lineCount} line${lineCount === 1 ? "" : "s"}]`;
+    return { id, placeholder };
+  }
+
+  /** Replace any "[Pasted text #N +M lines]" placeholders with their content. */
+  resolvePastes(text: string): string {
+    if (this._pastes.size === 0) return text;
+    return text.replace(/\[Pasted text #(\d+) \+\d+ lines?\]/g, (match, idStr) => {
+      const stored = this._pastes.get(Number(idStr));
+      return stored ?? match;
+    });
+  }
+
+  clearPastes(): void {
+    this._pastes.clear();
+    // _pasteSeq intentionally not reset — keeps placeholder ids stable across
+    // a session even after expansion, which helps when reading scrollback.
   }
 
   enterHistoryMode(): void {

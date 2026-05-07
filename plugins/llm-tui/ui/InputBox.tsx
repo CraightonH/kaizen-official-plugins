@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Box, Text, useInput, useStdout } from "ink";
+import { Box, Text, useInput, usePaste, useStdout } from "ink";
 import { useSyncExternalStore } from "react";
 import type { TuiStore } from "../state/store.ts";
 import type { CompletionRegistry } from "../completion/registry.ts";
@@ -67,6 +67,43 @@ function lineEndPos(s: string, pos: number): number {
   return nl < 0 ? s.length : nl;
 }
 
+// Paste placeholder pattern. Kept identical to TuiStore.resolvePastes() so
+// any form the user can submit is also recognized as an atomic edit unit.
+const PLACEHOLDER_RE = /\[Pasted text #\d+ \+\d+ lines?\]/g;
+
+function placeholderEndingAt(s: string, pos: number): { start: number; end: number } | null {
+  PLACEHOLDER_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = PLACEHOLDER_RE.exec(s)) !== null) {
+    const end = m.index + m[0].length;
+    if (end === pos) return { start: m.index, end };
+    if (m.index >= pos) break;
+  }
+  return null;
+}
+
+// True if `pos` falls strictly inside (not on either edge of) a placeholder.
+function placeholderContaining(s: string, pos: number): { start: number; end: number } | null {
+  PLACEHOLDER_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = PLACEHOLDER_RE.exec(s)) !== null) {
+    const start = m.index;
+    const end = start + m[0].length;
+    if (pos > start && pos < end) return { start, end };
+    if (start >= pos) break;
+  }
+  return null;
+}
+
+// Snap `pos` out of any placeholder it falls inside, to the edge implied by
+// the direction of motion. Used so a single Left/Right step (or word jump)
+// crosses a placeholder atomically instead of landing inside it.
+function snapCursor(s: string, pos: number, direction: -1 | 1): number {
+  const ph = placeholderContaining(s, pos);
+  if (!ph) return pos;
+  return direction < 0 ? ph.start : ph.end;
+}
+
 export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, theme, onSubmit, onCtrlC }) => {
   const snap = useSyncExternalStore(
     (cb) => store.subscribe(cb),
@@ -128,12 +165,27 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
   }, [store, value, cursor]);
 
   const submitLine = useCallback(() => {
-    const line = value;
+    // Expand any [Pasted text #N +M lines] placeholders back to the actual
+    // pasted content before handing the line to the consumer.
+    const line = store.resolvePastes(value);
     store.setInput("", 0);
     store.closePopup();
+    store.clearPastes();
     setHistIdx(null);
     onSubmit(line);
   }, [value, store, onSubmit]);
+
+  // Ink's usePaste activates bracketed paste mode automatically and
+  // delivers the full pasted text as a single string on its own channel,
+  // so newlines inside the paste no longer reach useInput as Enter
+  // keypresses. We register the content with the store, then insert a
+  // short "[Pasted text #N +M lines]" placeholder at the cursor.
+  // resolvePastes() expands these back to original text on submit.
+  usePaste((text) => {
+    const { placeholder } = store.registerPaste(text);
+    const next = value.slice(0, cursor) + placeholder + value.slice(cursor);
+    setBuffer(next, cursor + placeholder.length);
+  });
 
   useInput((input, key) => {
     if (key.ctrl && input === "c") { onCtrlC?.(); return; }
@@ -204,6 +256,15 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
 
     if (key.backspace || key.delete) {
       if (cursor === 0) return;
+      // Atomic deletion of paste placeholders. The "[Pasted text #N +M lines]"
+      // token is treated as a single editable unit even if typed manually,
+      // so one backspace at its trailing "]" wipes the entire token.
+      const ph = placeholderEndingAt(value, cursor);
+      if (ph) {
+        const next = value.slice(0, ph.start) + value.slice(ph.end);
+        setBuffer(next, ph.start);
+        return;
+      }
       const next = value.slice(0, cursor - 1) + value.slice(cursor);
       setBuffer(next, cursor - 1);
       return;
@@ -216,16 +277,18 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
 
     // Word jump: Option+Left/Right (macOS) → meta+arrow.
     // Line jump: Ctrl+Left/Right and Super+Left/Right (Kitty protocol Cmd).
+    // All horizontal motion is snap-corrected so a paste placeholder is
+    // crossed as a single unit (cursor never lands strictly inside it).
     if (key.leftArrow) {
-      if (key.meta) { store.setInput(value, prevWordPos(value, cursor)); return; }
+      if (key.meta) { store.setInput(value, snapCursor(value, prevWordPos(value, cursor), -1)); return; }
       if (key.ctrl || key.super) { store.setInput(value, lineStartPos(value, cursor)); return; }
-      store.setInput(value, Math.max(0, cursor - 1));
+      store.setInput(value, snapCursor(value, Math.max(0, cursor - 1), -1));
       return;
     }
     if (key.rightArrow) {
-      if (key.meta) { store.setInput(value, nextWordPos(value, cursor)); return; }
+      if (key.meta) { store.setInput(value, snapCursor(value, nextWordPos(value, cursor), 1)); return; }
       if (key.ctrl || key.super) { store.setInput(value, lineEndPos(value, cursor)); return; }
-      store.setInput(value, Math.min(value.length, cursor + 1));
+      store.setInput(value, snapCursor(value, Math.min(value.length, cursor + 1), 1));
       return;
     }
 
