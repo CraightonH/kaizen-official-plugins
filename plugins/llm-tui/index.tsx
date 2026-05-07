@@ -9,6 +9,8 @@ import type {
 } from "./public.d.ts";
 import { TuiStore } from "./state/store.ts";
 import { makeCompletionRegistry } from "./completion/registry.ts";
+import { makeToolRendererRegistry } from "./tool-renderers/registry.ts";
+import type { TuiToolRendererService } from "./tool-renderers/registry.ts";
 import { loadTheme, realThemeDeps, type TuiTheme } from "./theme/loader.ts";
 import { App } from "./ui/App.tsx";
 import { createFallbackChannel } from "./fallback.ts";
@@ -18,7 +20,7 @@ const plugin: KaizenPlugin = {
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
   services: {
-    provides: ["llm-tui:channel", "llm-tui:completion", "llm-tui:status", "llm-tui:theme"],
+    provides: ["llm-tui:channel", "llm-tui:completion", "llm-tui:status", "llm-tui:theme", "llm-tui:tool-renderer"],
     consumes: ["llm-events:vocabulary"],
   },
 
@@ -33,6 +35,7 @@ const plugin: KaizenPlugin = {
     ctx.defineService("llm-tui:completion", { description: "Registry of completion sources for the input popup." });
     ctx.defineService("llm-tui:status", { description: "Marker service: subscribes to status:item-* and renders the bar." });
     ctx.defineService("llm-tui:theme", { description: "Read-only theme tokens." });
+    ctx.defineService("llm-tui:tool-renderer", { description: "Per-tool TUI rendering registry." });
 
     // Theme: harness defaults from plugin config, user override from config file.
     const harnessDefaults = (ctx.config as any)?.theme as Partial<TuiTheme> | undefined;
@@ -48,6 +51,8 @@ const plugin: KaizenPlugin = {
     const store = new TuiStore();
     const registry = makeCompletionRegistry();
     ctx.provideService<TuiCompletionService>("llm-tui:completion", registry.service);
+    const toolRenderers = makeToolRendererRegistry();
+    ctx.provideService<TuiToolRendererService>("llm-tui:tool-renderer", toolRenderers.service);
 
     // Triggers are derived from registered sources. We track the set live by
     // wrapping register() so the InputBox always sees the current trigger map
@@ -86,11 +91,44 @@ const plugin: KaizenPlugin = {
       // dispatch errored mid-stream), drop any in-flight reasoning so the
       // box doesn't linger above the next prompt.
       store.clearLiveThinking();
+      store.clearLiveToolCalls();
     });
 
     // /history slash command → modal audit view.
     ctx.on("tui:enter-history", async () => {
       store.enterHistoryMode();
+    });
+
+    // Tool lifecycle events → live tool calls + finalized transcript entries.
+    ctx.on("tool:execute", async (payload: any) => {
+      if (!payload || typeof payload.callId !== "string" || typeof payload.name !== "string") return;
+      store.appendLiveToolCall(payload.callId, payload.name, payload.args);
+    });
+    ctx.on("tool:progress", async (payload: any) => {
+      if (!payload || typeof payload.callId !== "string" || typeof payload.delta !== "string") return;
+      store.updateLiveToolCall(payload.callId, { stdoutDelta: payload.delta });
+    });
+    ctx.on("tool:result", async (payload: any) => {
+      if (!payload || typeof payload.callId !== "string") return;
+      const result = typeof payload.result === "string" ? payload.result : safeJson(payload.result);
+      if (store.hasLiveToolCall(payload.callId)) {
+        store.updateLiveToolCall(payload.callId, { result });
+        store.finalizeLiveToolCall(payload.callId, "done");
+      } else {
+        const name = typeof payload.name === "string" ? payload.name : "(unknown)";
+        store.appendToolCallToTranscript(payload.callId, name, undefined, "done", result);
+      }
+    });
+    ctx.on("tool:error", async (payload: any) => {
+      if (!payload || typeof payload.callId !== "string") return;
+      const msg = typeof payload.message === "string" ? payload.message : "tool error";
+      if (store.hasLiveToolCall(payload.callId)) {
+        store.updateLiveToolCall(payload.callId, { errorMessage: msg });
+        store.finalizeLiveToolCall(payload.callId, "error");
+      } else {
+        const name = typeof payload.name === "string" ? payload.name : "(unknown)";
+        store.appendToolCallToTranscript(payload.callId, name, undefined, "error", undefined, msg);
+      }
     });
 
     // Status events → store.
@@ -133,6 +171,7 @@ const plugin: KaizenPlugin = {
       <App
         store={store}
         registry={registry}
+        toolRenderers={toolRenderers}
         triggers={triggers}
         theme={theme}
         onSubmit={onSubmit}
@@ -164,3 +203,7 @@ const plugin: KaizenPlugin = {
 };
 
 export default plugin;
+
+function safeJson(v: unknown): string {
+  try { return JSON.stringify(v); } catch { return String(v); }
+}

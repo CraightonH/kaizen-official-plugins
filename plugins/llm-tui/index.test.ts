@@ -29,13 +29,14 @@ describe("llm-tui plugin", () => {
     expect(plugin.permissions?.tier).toBe("unscoped");
   });
 
-  it("provides all four services in non-TTY mode", async () => {
+  it("provides all five services in non-TTY mode", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
     expect(ctx.provided["llm-tui:channel"]).toBeDefined();
     expect(ctx.provided["llm-tui:completion"]).toBeDefined();
     expect(ctx.provided["llm-tui:status"]).toBeDefined();
     expect(ctx.provided["llm-tui:theme"]).toBeDefined();
+    expect(ctx.provided["llm-tui:tool-renderer"]).toBeDefined();
   });
 
   it("subscribes to status:item-update and status:item-clear", async () => {
