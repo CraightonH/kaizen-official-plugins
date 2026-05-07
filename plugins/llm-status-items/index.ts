@@ -17,11 +17,6 @@ const SUBSCRIBED = [
   "session:active-changed",
 ] as const;
 
-/** Render a uuid-shaped session id as its short 8-char prefix for the status bar. */
-function shortSessionId(id: string): string {
-  return id.length > 8 ? id.slice(0, 8) : id;
-}
-
 const plugin: KaizenPlugin = {
   name: "llm-status-items",
   apiVersion: "3.0.0",
@@ -111,8 +106,8 @@ const plugin: KaizenPlugin = {
     }
 
     async function emitDiff() {
-      // session — short uuid prefix; cleared when no session is active.
-      const sessionDisplay = state.sessionId ? shortSessionId(state.sessionId) : null;
+      // session — full uuid so it can be copy/pasted to resume; cleared when no session is active.
+      const sessionDisplay = state.sessionId ?? null;
       if (sessionDisplay !== lastEmitted.session) {
         if (sessionDisplay === null) {
           await ctx.emit("status:item-clear", { key: "session" });

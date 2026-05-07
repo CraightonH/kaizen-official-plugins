@@ -47,12 +47,12 @@ describe("llm-status-items setup", () => {
     ]);
   });
 
-  it("emits short session id on session:active-changed; clears on logout", async () => {
+  it("emits full session id on session:active-changed; clears on logout", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
     await ctx.handlers["session:active-changed"]!({ from: null, to: "abc12345-6789-0000-0000-000000000000" });
     const upd = ctx.emits.find((e: Emit) => e.event === "status:item-update" && e.payload?.key === "session");
-    expect(upd?.payload.value).toBe("abc12345");
+    expect(upd?.payload.value).toBe("abc12345-6789-0000-0000-000000000000");
     await ctx.handlers["session:active-changed"]!({ from: "abc12345-6789-0000-0000-000000000000", to: null });
     const clr = ctx.emits.find((e: Emit) => e.event === "status:item-clear" && e.payload?.key === "session");
     expect(clr).toBeDefined();
