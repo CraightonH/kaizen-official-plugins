@@ -168,7 +168,7 @@ export interface ToolsRegistryService {
   invoke(name: string, args: unknown, ctx: ToolExecutionContext): Promise<unknown>;
 }
 
-// ---------- tool-dispatch:strategy (owned by `llm-native-dispatch`, `llm-codemode-dispatch`) ----------
+// ---------- tool-dispatch:strategy (owned by `llm-native-dispatch`) ----------
 
 /**
  * Bridge between LLM output and tool execution. Multiple strategies may exist;
