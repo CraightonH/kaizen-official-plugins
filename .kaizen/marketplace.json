@@ -38,6 +38,7 @@
       "description": "Event vocabulary and shared types for openai-compatible harnesses.",
       "categories": ["events"],
       "versions": [
+        { "version": "0.4.0", "source": { "type": "file", "path": "plugins/llm-events" } },
         { "version": "0.3.0", "source": { "type": "file", "path": "plugins/llm-events" } },
         { "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-events" } },
         { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-events" } }
@@ -55,7 +56,10 @@
       "name": "llm-tui",
       "description": "Generic LLM-chat TUI primitives: input, output, status bar, completion popup, theme.",
       "categories": ["ui", "terminal"],
-      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-tui" } }]
+      "versions": [
+        { "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-tui" } },
+        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-tui" } }
+      ]
     },
     {
       "kind": "plugin",
@@ -107,6 +111,7 @@
       "description": "Native OpenAI tool-calling dispatch strategy (alternate to code-mode).",
       "categories": ["tools", "dispatch"],
       "versions": [
+        { "version": "0.3.0", "source": { "type": "file", "path": "plugins/llm-native-dispatch" } },
         { "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-native-dispatch" } },
         { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-native-dispatch" } }
       ]
@@ -119,6 +124,15 @@
       "versions": [
         { "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-codemode-dispatch" } },
         { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-codemode-dispatch" } }
+      ]
+    },
+    {
+      "kind": "plugin",
+      "name": "llm-codemode",
+      "description": "Registers execute_typescript as a single tool that runs LLM-emitted TypeScript in a Bun Worker sandbox with the kaizen.tools.* typed API.",
+      "categories": ["llm", "tools", "sandbox"],
+      "versions": [
+        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-codemode" } }
       ]
     },
     {
