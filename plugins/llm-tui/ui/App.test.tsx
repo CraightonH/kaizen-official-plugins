@@ -4,6 +4,7 @@ import { render } from "ink-testing-library";
 import { App } from "./App.tsx";
 import { TuiStore } from "../state/store.ts";
 import { makeCompletionRegistry } from "../completion/registry.ts";
+import { makeToolRendererRegistry } from "../tool-renderers/registry.ts";
 import { DEFAULT_THEME } from "../theme/loader.ts";
 
 const tick = (ms = 30) => new Promise((r) => setTimeout(r, ms));
@@ -19,7 +20,7 @@ describe("App", () => {
   it("renders prompt label and rounded box", async () => {
     const ctx = setup();
     const { lastFrame } = render(
-      <App store={ctx.store} registry={ctx.reg} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={() => {}} />,
     );
     await tick();
     expect(lastFrame()).toContain("kaizen");
@@ -29,7 +30,7 @@ describe("App", () => {
   it("appendOutput shows in the transcript", async () => {
     const ctx = setup();
     const { lastFrame } = render(
-      <App store={ctx.store} registry={ctx.reg} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={() => {}} />,
     );
     await tick();
     ctx.store.appendOutput("hello world");
@@ -40,7 +41,7 @@ describe("App", () => {
   it("setBusy renders SpinnerLine, then removes it", async () => {
     const ctx = setup();
     const { lastFrame } = render(
-      <App store={ctx.store} registry={ctx.reg} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={() => {}} />,
     );
     await tick();
     ctx.store.setBusy(true, "streaming");
@@ -54,7 +55,7 @@ describe("App", () => {
   it("upsertStatus renders into the status bar", async () => {
     const ctx = setup();
     const { lastFrame } = render(
-      <App store={ctx.store} registry={ctx.reg} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={() => {}} />,
     );
     await tick();
     ctx.store.upsertStatus("branch", "main");
@@ -69,7 +70,7 @@ describe("App", () => {
     ctx.triggers.add("/");
     ctx.reg.service.register({ id: "a", trigger: "/", list: () => [{ label: "/help", insertText: "/help " }] });
     const { stdin, lastFrame } = render(
-      <App store={ctx.store} registry={ctx.reg} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={() => {}} />,
     );
     await tick();
     stdin.write("/");

@@ -9,17 +9,21 @@ import { InputBox } from "./InputBox.tsx";
 import { ThinkingBox } from "./ThinkingBox.tsx";
 import { ThoughtsBlock } from "./ThoughtsBlock.tsx";
 import { HistoryView } from "./HistoryView.tsx";
+import { ToolCallBlock } from "./ToolCallBlock.tsx";
+import { LiveToolCalls } from "./LiveToolCalls.tsx";
+import type { ToolRendererRegistry } from "../tool-renderers/registry.ts";
 
 export interface AppProps {
   store: TuiStore;
   registry: CompletionRegistry;
+  toolRenderers: ToolRendererRegistry;
   triggers: Set<string>;
   theme: TuiTheme;
   onSubmit: (text: string) => void;
   onCtrlC?: () => void;
 }
 
-export const App: React.FC<AppProps> = ({ store, registry, triggers, theme, onSubmit, onCtrlC }) => {
+export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, triggers, theme, onSubmit, onCtrlC }) => {
   const snap = useSyncExternalStore(
     (cb) => store.subscribe(cb),
     () => store.snapshot(),
@@ -56,6 +60,9 @@ export const App: React.FC<AppProps> = ({ store, registry, triggers, theme, onSu
       // Always render collapsed in chat. Use /history (or Ctrl+R) to expand.
       return <ThoughtsBlock text={e.text} color={theme.noticeColor} />;
     }
+    if (e.kind === "tool_call") {
+      return <ToolCallBlock entry={e} registry={toolRenderers} theme={theme} />;
+    }
     return (
       <Text color={e.kind === "notice" ? theme.noticeColor : theme.outputColor} dimColor={e.kind === "notice"}>
         {e.text}
@@ -77,6 +84,7 @@ export const App: React.FC<AppProps> = ({ store, registry, triggers, theme, onSu
         <HistoryView store={store} theme={theme} />
       ) : (
         <>
+          <LiveToolCalls store={store} registry={toolRenderers} theme={theme} />
           {snap.busy.active && snap.liveThinking && (
             <ThinkingBox text={snap.liveThinking} color={theme.noticeColor} />
           )}
