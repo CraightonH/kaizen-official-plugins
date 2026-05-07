@@ -1,5 +1,14 @@
 # llm-codemode Tool Pivot — Implementation Plan
 
+## Post-implementation notes
+
+Tracked here so the archived plan reflects what actually shipped:
+
+- **Esc-cancel UX (commit 72f8f40).** Ctrl+C now uses Ink's default (process exit). Esc, when no popup is open, emits `turn:cancel` if the harness is busy. Discovered during Phase D smoke testing — Ctrl+C exits cleanly which is the expected POSIX contract; cancellation needed a separate keystroke. Affects `plugins/llm-tui/index.tsx`, `plugins/llm-tui/ui/App.tsx`, `plugins/llm-tui/ui/InputBox.tsx`. The prop renamed from `onCtrlC` → `onCancel`.
+- **Marketplace TTL workaround (no commit).** `~/.kaizen/kaizen.json` was set to `marketplaceUpdateTTL: 31536000` to stop kaizen's background `pullMarketplace` from clobbering local edits to `~/.kaizen/marketplaces/official/repo/` during smoke testing. Once these changes are pushed to origin/main, the TTL can be reverted to default.
+- **Phase D check 3d (cancellation rollback).** Verified working with Esc. Live tool-call row clears via `turn:end` handler; rollback drops uncommitted messages so the next LLM request has no dangling `tool_call_id`.
+- **Phase D check 3a/3b/3c.** All passed against the local LM Studio model the user tested with.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace `llm-codemode-dispatch` (prose-fence dispatch + fake user-message results) with a new `llm-codemode` plugin that registers `execute_typescript` as a normal OpenAI tool, and surface tool calls as a first-class transcript kind in `llm-tui`. Side effect: fixes `docs/TODO.md` item #2.

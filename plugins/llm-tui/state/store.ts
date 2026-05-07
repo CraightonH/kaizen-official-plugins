@@ -1,9 +1,25 @@
-export type TranscriptKind = "output" | "notice" | "user" | "thoughts";
-export interface TranscriptLine {
+export type TranscriptKind = "output" | "notice" | "user" | "thoughts" | "tool_call";
+export type ToolCallStatus = "running" | "done" | "error";
+
+export interface PlainTranscriptLine {
   id: number;
-  kind: TranscriptKind;
+  kind: "output" | "notice" | "user" | "thoughts";
   text: string;
 }
+
+export interface ToolCallEntry {
+  id: number;
+  kind: "tool_call";
+  callId: string;
+  name: string;
+  args: unknown;
+  status: ToolCallStatus;
+  stdout: string;
+  result?: string;
+  errorMessage?: string;
+}
+
+export type TranscriptLine = PlainTranscriptLine | ToolCallEntry;
 export interface BusyState { active: boolean; message?: string; }
 export interface InputState { value: string; cursor: number; }
 
@@ -42,6 +58,8 @@ export interface TuiSnapshot {
   history: string[];
   /** Live reasoning text accumulating during the current turn; null when idle. */
   liveThinking: string | null;
+  /** Tool calls currently in flight (started but not finalized). Rendered outside <Static>. */
+  liveToolCalls: ReadonlyMap<string, ToolCallEntry>;
   viewMode: ViewMode;
   historyView: HistoryViewState;
 }
@@ -54,6 +72,7 @@ export class TuiStore {
   private _status: Record<string, string> = {};
   private _history: string[] = [];
   private _liveThinking: string | null = null;
+  private _liveToolCalls: Map<string, ToolCallEntry> = new Map();
   private _viewMode: ViewMode = "chat";
   private _historyView: HistoryViewState = { focusIdx: -1, expanded: new Set() };
   private _seq = 0;
@@ -88,6 +107,81 @@ export class TuiStore {
 
   appendUser(text: string): void {
     this._transcript = [...this._transcript, { id: ++this._seq, kind: "user", text }];
+    this._emit();
+  }
+
+  appendLiveToolCall(callId: string, name: string, args: unknown): void {
+    const entry: ToolCallEntry = {
+      id: ++this._seq,
+      kind: "tool_call",
+      callId,
+      name,
+      args,
+      status: "running",
+      stdout: "",
+    };
+    this._liveToolCalls = new Map(this._liveToolCalls).set(callId, entry);
+    this._emit();
+  }
+
+  updateLiveToolCall(callId: string, patch: {
+    result?: string;
+    errorMessage?: string;
+    stdoutDelta?: string;
+  }): void {
+    const cur = this._liveToolCalls.get(callId);
+    if (!cur) return;
+    const next: ToolCallEntry = {
+      ...cur,
+      ...(patch.result !== undefined ? { result: patch.result } : {}),
+      ...(patch.errorMessage !== undefined ? { errorMessage: patch.errorMessage } : {}),
+      stdout: patch.stdoutDelta !== undefined ? cur.stdout + patch.stdoutDelta : cur.stdout,
+    };
+    this._liveToolCalls = new Map(this._liveToolCalls).set(callId, next);
+    this._emit();
+  }
+
+  finalizeLiveToolCall(callId: string, finalStatus: "done" | "error"): void {
+    const cur = this._liveToolCalls.get(callId);
+    if (!cur) return;
+    const finalized: ToolCallEntry = { ...cur, status: finalStatus };
+    const nextMap = new Map(this._liveToolCalls);
+    nextMap.delete(callId);
+    this._liveToolCalls = nextMap;
+    this._transcript = [...this._transcript, finalized];
+    this._emit();
+  }
+
+  hasLiveToolCall(callId: string): boolean {
+    return this._liveToolCalls.has(callId);
+  }
+
+  appendToolCallToTranscript(
+    callId: string,
+    name: string,
+    args: unknown,
+    status: "done" | "error",
+    result?: string,
+    errorMessage?: string,
+  ): void {
+    const entry: ToolCallEntry = {
+      id: ++this._seq,
+      kind: "tool_call",
+      callId,
+      name,
+      args,
+      status,
+      stdout: "",
+      ...(result !== undefined ? { result } : {}),
+      ...(errorMessage !== undefined ? { errorMessage } : {}),
+    };
+    this._transcript = [...this._transcript, entry];
+    this._emit();
+  }
+
+  clearLiveToolCalls(): void {
+    if (this._liveToolCalls.size === 0) return;
+    this._liveToolCalls = new Map();
     this._emit();
   }
 
@@ -145,7 +239,7 @@ export class TuiStore {
 
   enterHistoryMode(): void {
     if (this._viewMode === "history") return;
-    const blocks = this._transcript.filter((e) => e.kind === "thoughts");
+    const blocks = this._transcript.filter((e) => e.kind === "thoughts" || e.kind === "tool_call");
     this._viewMode = "history";
     this._historyView = {
       focusIdx: blocks.length > 0 ? 0 : -1,
@@ -162,7 +256,7 @@ export class TuiStore {
 
   historyMoveFocus(delta: number): void {
     if (this._viewMode !== "history") return;
-    const blocks = this._transcript.filter((e) => e.kind === "thoughts");
+    const blocks = this._transcript.filter((e) => e.kind === "thoughts" || e.kind === "tool_call");
     if (blocks.length === 0) { this._historyView = { ...this._historyView, focusIdx: -1 }; this._emit(); return; }
     const cur = this._historyView.focusIdx < 0 ? 0 : this._historyView.focusIdx;
     const n = blocks.length;
@@ -173,7 +267,7 @@ export class TuiStore {
 
   historyToggleFocused(): void {
     if (this._viewMode !== "history") return;
-    const blocks = this._transcript.filter((e) => e.kind === "thoughts");
+    const blocks = this._transcript.filter((e) => e.kind === "thoughts" || e.kind === "tool_call");
     const block = blocks[this._historyView.focusIdx];
     if (!block) return;
     const next = new Set(this._historyView.expanded);
@@ -184,7 +278,7 @@ export class TuiStore {
 
   historySetAllExpanded(expanded: boolean): void {
     if (this._viewMode !== "history") return;
-    const blocks = this._transcript.filter((e) => e.kind === "thoughts");
+    const blocks = this._transcript.filter((e) => e.kind === "thoughts" || e.kind === "tool_call");
     this._historyView = {
       ...this._historyView,
       expanded: expanded ? new Set(blocks.map((b) => b.id)) : new Set(),
@@ -277,6 +371,7 @@ export class TuiStore {
       status: this._status,
       history: this._history,
       liveThinking: this._liveThinking,
+      liveToolCalls: new Map(this._liveToolCalls),
       viewMode: this._viewMode,
       historyView: this._historyView,
     };

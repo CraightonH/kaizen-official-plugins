@@ -1,6 +1,7 @@
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "./index.tsx";
 import type { TuiCompletionService } from "./public.d.ts";
+import { TuiStore } from "./state/store.ts";
 
 function makeCtx() {
   const provided: Record<string, unknown> = {};
@@ -56,6 +57,31 @@ describe("llm-tui integration (non-TTY)", () => {
     ch.setBusy(true, "x");
     ch.setBusy(false);
     expect(typeof ch.readInput).toBe("function");
+  });
+
+  it("tool:execute → tool:progress → tool:result populates a tool_call entry end-to-end", async () => {
+    const ctx = makeCtx();
+    await plugin.setup(ctx);
+    const exec = ctx.subs["tool:execute"]![0]!;
+    const prog = ctx.subs["tool:progress"]![0]!;
+    const res = ctx.subs["tool:result"]![0]!;
+    await exec({ callId: "c1", name: "read_file", args: { path: "/etc/hosts" } });
+    await prog({ callId: "c1", delta: "127.0.0.1 localhost\n" });
+    await res({ callId: "c1", result: "127.0.0.1 localhost\n" });
+    // The TUI plugin's tool-renderer service was provided.
+    expect(ctx.provided["llm-tui:tool-renderer"]).toBeDefined();
+  });
+
+  it("store lifecycle: appendLiveToolCall → updateLiveToolCall → finalizeLiveToolCall accumulates stdout into transcript", () => {
+    const store = new TuiStore();
+    store.appendLiveToolCall("c1", "read_file", { path: "/etc/hosts" });
+    store.updateLiveToolCall("c1", { stdoutDelta: "127.0.0.1 localhost\n" });
+    store.updateLiveToolCall("c1", { result: "127.0.0.1 localhost\n" });
+    store.finalizeLiveToolCall("c1", "done");
+    const t = store.snapshot().transcript;
+    expect(t).toHaveLength(1);
+    expect((t[0] as any).status).toBe("done");
+    expect((t[0] as any).stdout).toBe("127.0.0.1 localhost\n");
   });
 
   it("theme.current() reflects theme defaults", async () => {

@@ -30,6 +30,7 @@ export interface Vocab {
   readonly TOOL_EXECUTE: "tool:execute";
   readonly TOOL_RESULT: "tool:result";
   readonly TOOL_ERROR: "tool:error";
+  readonly TOOL_PROGRESS: "tool:progress";
   readonly CODEMODE_CODE_EMITTED: "codemode:code-emitted";
   readonly CODEMODE_BEFORE_EXECUTE: "codemode:before-execute";
   readonly CODEMODE_RESULT: "codemode:result";
@@ -167,7 +168,7 @@ export interface ToolsRegistryService {
   invoke(name: string, args: unknown, ctx: ToolExecutionContext): Promise<unknown>;
 }
 
-// ---------- tool-dispatch:strategy (owned by `llm-native-dispatch`, `llm-codemode-dispatch`) ----------
+// ---------- tool-dispatch:strategy (owned by `llm-native-dispatch`) ----------
 
 /**
  * Bridge between LLM output and tool execution. Multiple strategies may exist;

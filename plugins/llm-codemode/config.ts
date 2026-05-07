@@ -24,7 +24,7 @@ export interface ConfigDeps {
 }
 
 export function defaultConfigPath(home: string): string {
-  return `${home}/.kaizen/plugins/llm-codemode-dispatch/config.json`;
+  return `${home}/.kaizen/plugins/llm-codemode/config.json`;
 }
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -32,11 +32,11 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 }
 
 function validate(cfg: CodeModeConfig): void {
-  if (cfg.timeoutMs <= 0) throw new Error("llm-codemode-dispatch: timeoutMs must be > 0");
-  if (cfg.maxStdoutBytes <= 0) throw new Error("llm-codemode-dispatch: maxStdoutBytes must be > 0");
-  if (cfg.maxReturnBytes <= 0) throw new Error("llm-codemode-dispatch: maxReturnBytes must be > 0");
-  if (cfg.maxBlocksPerResponse <= 0) throw new Error("llm-codemode-dispatch: maxBlocksPerResponse must be > 0");
-  if (cfg.sandbox !== "bun-worker") throw new Error("llm-codemode-dispatch: sandbox must be 'bun-worker'");
+  if (cfg.timeoutMs <= 0) throw new Error("llm-codemode: timeoutMs must be > 0");
+  if (cfg.maxStdoutBytes <= 0) throw new Error("llm-codemode: maxStdoutBytes must be > 0");
+  if (cfg.maxReturnBytes <= 0) throw new Error("llm-codemode: maxReturnBytes must be > 0");
+  if (cfg.maxBlocksPerResponse <= 0) throw new Error("llm-codemode: maxBlocksPerResponse must be > 0");
+  if (cfg.sandbox !== "bun-worker") throw new Error("llm-codemode: sandbox must be 'bun-worker'");
 }
 
 export async function loadConfig(deps: ConfigDeps): Promise<CodeModeConfig> {
@@ -51,7 +51,7 @@ export async function loadConfig(deps: ConfigDeps): Promise<CodeModeConfig> {
       // there. Missing default path == "happy path, use defaults" and
       // shouldn't add to startup noise.
       if (userOverridePath) {
-        deps.log(`llm-codemode-dispatch: KAIZEN_LLM_CODEMODE_CONFIG=${path} not found; using defaults`);
+        deps.log(`llm-codemode: KAIZEN_LLM_CODEMODE_CONFIG=${path} not found; using defaults`);
       }
       return { ...DEFAULT_CONFIG };
     }
@@ -59,9 +59,9 @@ export async function loadConfig(deps: ConfigDeps): Promise<CodeModeConfig> {
   }
   let parsed: unknown;
   try { parsed = JSON.parse(raw); } catch (err) {
-    throw new Error(`llm-codemode-dispatch config at ${path} malformed: ${(err as Error).message}`);
+    throw new Error(`llm-codemode config at ${path} malformed: ${(err as Error).message}`);
   }
-  if (!isPlainObject(parsed)) throw new Error(`llm-codemode-dispatch config at ${path} must be a JSON object`);
+  if (!isPlainObject(parsed)) throw new Error(`llm-codemode config at ${path} must be a JSON object`);
   const merged: CodeModeConfig = { ...DEFAULT_CONFIG, ...(parsed as object) } as CodeModeConfig;
   validate(merged);
   return merged;

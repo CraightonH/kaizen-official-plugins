@@ -1,5 +1,7 @@
 # `llm-codemode-dispatch` — Code-Mode Tool Dispatch (Spec 5)
 
+> **Superseded by:** [`2026-05-07-llm-codemode-tool-pivot-design.md`](2026-05-07-llm-codemode-tool-pivot-design.md). This document describes the retired `llm-codemode-dispatch` plugin.
+
 **Status:** draft
 **Date:** 2026-04-30
 **Tier:** 2 (B milestone — tool calls)

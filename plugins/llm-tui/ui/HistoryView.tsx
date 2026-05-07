@@ -30,7 +30,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ store, theme }) => {
     if (input === "c")                  { store.historySetAllExpanded(false); return; }
   });
 
-  const blocks = snap.transcript.filter((e: TranscriptLine) => e.kind === "thoughts");
+  const blocks = snap.transcript.filter(
+    (e: TranscriptLine) => e.kind === "thoughts" || e.kind === "tool_call",
+  );
   const focusedId = blocks[snap.historyView.focusIdx]?.id ?? null;
   const expanded = snap.historyView.expanded;
 
@@ -38,7 +40,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ store, theme }) => {
     <Box flexDirection="column">
       <Box flexDirection="column" borderStyle="round" borderColor={theme.promptColor} paddingX={1}>
         <Text color={theme.promptColor} bold>
-          📜 History — {blocks.length} thought block{blocks.length === 1 ? "" : "s"}
+          📜 History — {blocks.length} entr{blocks.length === 1 ? "y" : "ies"}
         </Text>
         <Text color={theme.promptColor} dimColor>
           j/k focus · Enter expand · e all · c none · q quit
@@ -46,30 +48,48 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ store, theme }) => {
       </Box>
 
       {blocks.length === 0 ? (
-        <Text color={theme.outputColor} dimColor>(no thought blocks yet)</Text>
+        <Text color={theme.outputColor} dimColor>(no entries yet)</Text>
       ) : (
         blocks.map((e, i) => {
           const isFocused = e.id === focusedId;
           const isOpen = expanded.has(e.id);
-          const lineCount = e.text.split("\n").filter((l) => l.length > 0).length || 1;
           const caret = isOpen ? "▼" : "▶";
           const focusMarker = isFocused ? "▎ " : "  ";
+          if (e.kind === "thoughts") {
+            const lineCount = e.text.split("\n").filter((l) => l.length > 0).length || 1;
+            return (
+              <Box key={e.id} flexDirection="column" borderStyle={isFocused ? "double" : "round"}
+                   borderColor={isFocused ? theme.promptColor : theme.noticeColor} paddingX={1}>
+                <Text color={isFocused ? theme.promptColor : theme.noticeColor} dimColor={!isFocused}>
+                  {`${focusMarker}${caret} 💭 Thoughts ${i + 1} (${lineCount} line${lineCount === 1 ? "" : "s"})`}
+                </Text>
+                {isOpen && (
+                  <Box flexDirection="column">
+                    {e.text.split("\n").map((l, j) => (
+                      <Text key={j} color={theme.noticeColor} dimColor>{l.length === 0 ? " " : l}</Text>
+                    ))}
+                  </Box>
+                )}
+              </Box>
+            );
+          }
+          // tool_call
+          const status = e.status === "running" ? "…" : e.status === "done" ? "✓" : "✗";
           return (
-            <Box
-              key={e.id}
-              flexDirection="column"
-              borderStyle={isFocused ? "double" : "round"}
-              borderColor={isFocused ? theme.promptColor : theme.noticeColor}
-              paddingX={1}
-            >
+            <Box key={e.id} flexDirection="column" borderStyle={isFocused ? "double" : "round"}
+                 borderColor={isFocused ? theme.promptColor : theme.noticeColor} paddingX={1}>
               <Text color={isFocused ? theme.promptColor : theme.noticeColor} dimColor={!isFocused}>
-                {`${focusMarker}${caret} 💭 Block ${i + 1} (${lineCount} line${lineCount === 1 ? "" : "s"})`}
+                {`${focusMarker}${caret} 🔧 ${e.name} ${status}`}
               </Text>
               {isOpen && (
                 <Box flexDirection="column">
-                  {e.text.split("\n").map((l, j) => (
-                    <Text key={j} color={theme.noticeColor} dimColor>{l.length === 0 ? " " : l}</Text>
+                  <Text color={theme.outputColor} dimColor>args: {safeJson(e.args)}</Text>
+                  {e.stdout && <Text color={theme.outputColor} dimColor>stdout:</Text>}
+                  {e.stdout && e.stdout.split("\n").map((l, j) => (
+                    <Text key={`s${j}`} color={theme.outputColor} dimColor>{l.length === 0 ? " " : l}</Text>
                   ))}
+                  {e.result && <Text color={theme.outputColor} dimColor>result: {e.result}</Text>}
+                  {e.errorMessage && <Text color={theme.noticeColor}>error: {e.errorMessage}</Text>}
                 </Box>
               )}
             </Box>
@@ -79,3 +99,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ store, theme }) => {
     </Box>
   );
 };
+
+function safeJson(v: unknown): string {
+  try { return JSON.stringify(v); } catch { return String(v); }
+}

@@ -93,6 +93,7 @@ export async function runInSandbox(
   emit?: (event: string, payload: unknown) => Promise<void>,
   turnId?: string,
   sessionId?: string,
+  outerCallId?: string,
 ): Promise<SandboxRunResult> {
   const wrap = wrapCode(userCode);
   if (wrap.transpileError) {
@@ -141,6 +142,9 @@ export async function runInSandbox(
         const slice = Buffer.byteLength(msg.chunk, "utf8") <= remaining ? msg.chunk : msg.chunk.slice(0, remaining);
         stdout += slice;
         stdoutBytes += Buffer.byteLength(slice, "utf8");
+        if (outerCallId && emit) {
+          void emit("tool:progress", { callId: outerCallId, delta: slice, turnId, sessionId });
+        }
         return;
       }
       if (msg.type === "tool-invoke") {

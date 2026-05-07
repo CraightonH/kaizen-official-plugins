@@ -67,7 +67,7 @@ describe("handleResponse — terminal", () => {
 });
 
 describe("handleResponse — tool calls", () => {
-  it("one tool call → [assistant, tool] with serialized result", async () => {
+  it("one tool call → [tool] with serialized result", async () => {
     const s = makeStrategy();
     const r: LLMResponse = {
       content: "",
@@ -80,9 +80,8 @@ describe("handleResponse — tool calls", () => {
       signal: new AbortController().signal,
       emit: noEmit,
     }));
-    expect(out.length).toBe(2);
-    expect(out[0]).toMatchObject({ role: "assistant", toolCalls: r.toolCalls });
-    expect(out[1]).toMatchObject({
+    expect(out.length).toBe(1);
+    expect(out[0]).toMatchObject({
       role: "tool",
       toolCallId: "c1",
       name: "echo",
@@ -90,7 +89,7 @@ describe("handleResponse — tool calls", () => {
     });
   });
 
-  it("three tool calls → [assistant, t1, t2, t3] in order, sequential", async () => {
+  it("three tool calls → [t1, t2, t3] in order, sequential", async () => {
     const s = makeStrategy();
     const order: string[] = [];
     const reg = fakeRegistry({
@@ -110,8 +109,8 @@ describe("handleResponse — tool calls", () => {
       emit: noEmit,
     }));
     expect(order).toEqual(["a", "b", "c"]);
-    expect(out.length).toBe(4);
-    expect(out.slice(1).map((m) => (m as any).toolCallId)).toEqual(["1", "2", "3"]);
+    expect(out.length).toBe(3);
+    expect(out.map((m) => (m as any).toolCallId)).toEqual(["1", "2", "3"]);
   });
 
   it("handler throw → tool message with serialized error; subsequent calls still execute", async () => {
@@ -131,8 +130,8 @@ describe("handleResponse — tool calls", () => {
       signal: new AbortController().signal,
       emit: noEmit,
     }));
-    expect((out[1] as any).content).toBe('{"error":"boom"}');
-    expect((out[2] as any).content).toBe("ok");
+    expect((out[0] as any).content).toBe('{"error":"boom"}');
+    expect((out[1] as any).content).toBe("ok");
   });
 
   it("unknown tool name → serialized error tool message", async () => {
@@ -148,7 +147,7 @@ describe("handleResponse — tool calls", () => {
       signal: new AbortController().signal,
       emit: noEmit,
     }));
-    expect((out[1] as any).content).toMatch(/unknown tool/);
+    expect((out[0] as any).content).toMatch(/unknown tool/);
   });
 
   it("malformed arguments (string) skips registry.invoke and emits tool:error", async () => {
@@ -166,7 +165,7 @@ describe("handleResponse — tool calls", () => {
       signal: new AbortController().signal,
       emit: emit as any,
     }));
-    const parsed = JSON.parse((out[1] as any).content);
+    const parsed = JSON.parse((out[0] as any).content);
     expect(parsed.error).toMatch(/malformed/);
     expect(parsed.raw).toBe("{not json");
     const calls = (emit as any).mock.calls.map((c: any[]) => c[0]);
@@ -215,10 +214,10 @@ describe("handleResponse — tool calls", () => {
       signal: ac.signal,
       emit: noEmit,
     }));
-    expect(out.length).toBe(4);
-    expect((out[1] as any).content).toBe("ra");
+    expect(out.length).toBe(3);
+    expect((out[0] as any).content).toBe("ra");
+    expect(JSON.parse((out[1] as any).content)).toEqual({ error: "cancelled" });
     expect(JSON.parse((out[2] as any).content)).toEqual({ error: "cancelled" });
-    expect(JSON.parse((out[3] as any).content)).toEqual({ error: "cancelled" });
   });
 
   it("circular result emits tool:error and falls back to String() content", async () => {
@@ -238,7 +237,7 @@ describe("handleResponse — tool calls", () => {
       signal: new AbortController().signal,
       emit: emit as any,
     }));
-    expect((out[1] as any).content).toBe(String(o));
+    expect((out[0] as any).content).toBe(String(o));
     const evNames = (emit as any).mock.calls.map((c: any[]) => c[0]);
     expect(evNames).toContain("tool:error");
   });
@@ -257,7 +256,7 @@ describe("handleResponse — tool calls", () => {
       signal: new AbortController().signal,
       emit: noEmit,
     }));
-    expect((out[1] as any).content).toBe("");
+    expect((out[0] as any).content).toBe("");
   });
 
   it("ctx.log forwards to emit('status:item-update')", async () => {

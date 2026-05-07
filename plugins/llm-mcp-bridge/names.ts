@@ -1,6 +1,6 @@
 export const MCP_NAME_RE = /^[a-z0-9][a-z0-9_-]*$/;
 
-// Duplicated from plugins/llm-codemode-dispatch/assembler.ts — keep in sync.
+// Duplicated from plugins/llm-codemode/assembler.ts — keep in sync.
 export function normalizeServerName(name: string): string {
   let n = name.replace(/[^A-Za-z0-9_]/g, "_");
   if (/^[0-9]/.test(n)) n = `_${n}`;

@@ -15,7 +15,7 @@ Official kaizen plugin marketplace. Hosts plugins and harnesses for [kaizen](htt
 - **llm-local-tools** — built-in local-development toolset (`read_file`, `write_file`, `create_file`, `edit_file`, `glob`, `grep`, `bash`). NOT sandboxed.
 - **llm-mcp-bridge** — bridges MCP servers (tools + resources) into the tools registry. Configure servers at `~/.kaizen/mcp/servers.json`.
 - **llm-native-dispatch** — native OpenAI tool-calling dispatch strategy (`tool_calls` JSON).
-- **llm-codemode-dispatch** — code-mode dispatch: LLM writes TypeScript calling `kaizen.tools.*` in a Bun Worker sandbox. Default strategy for local LLMs.
+- **llm-codemode** — registers `execute_typescript` as a single tool. The LLM writes TypeScript calling `kaizen.tools.*` in a Bun Worker sandbox; results round-trip via standard `tool` role messages through `llm-native-dispatch`.
 
 ### Conversation
 
@@ -88,7 +88,7 @@ kaizen --harness ./harnesses/openai-compatible.json
 │   ├── llm-local-tools/      # built-in filesystem + shell tools
 │   ├── llm-mcp-bridge/       # MCP server bridge
 │   ├── llm-native-dispatch/  # OpenAI native tool-calling strategy
-│   ├── llm-codemode-dispatch/# code-mode tool dispatch (default)
+│   ├── llm-codemode/         # execute_typescript tool (sandbox)
 │   ├── llm-driver/           # turn loop (driver:run-conversation)
 │   ├── llm-skills/           # skills registry + loader
 │   ├── llm-memory/           # persistent memory

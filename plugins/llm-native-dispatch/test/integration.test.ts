@@ -31,9 +31,8 @@ describe("integration: registry + strategy", () => {
       sessionId: "session-1",
     });
 
-    expect(out.length).toBe(2);
-    expect(out[0]).toMatchObject({ role: "assistant" });
-    expect(out[1]).toMatchObject({ role: "tool", toolCallId: "c1", name: "echo", content: '{"got":{"x":1}}' });
+    expect(out.length).toBe(1);
+    expect(out[0]).toMatchObject({ role: "tool", toolCallId: "c1", name: "echo", content: '{"got":{"x":1}}' });
 
     const toolEvents = events.filter((e) => e.name.startsWith("tool:")).map((e) => e.name);
     expect(toolEvents).toEqual(["tool:before-execute", "tool:execute", "tool:result"]);
@@ -59,8 +58,8 @@ describe("integration: registry + strategy", () => {
       sessionId: "session-1",
     });
 
-    expect(out.length).toBe(2);
-    expect((out[1] as any).content).toMatch(/unknown tool/);
+    expect(out.length).toBe(1);
+    expect((out[0] as any).content).toMatch(/unknown tool/);
     const toolErr = events.find((e) => e.name === "tool:error");
     expect(toolErr).toBeDefined();
     expect(toolErr?.payload).toMatchObject({ name: "missing", callId: "c1" });
@@ -95,8 +94,8 @@ describe("integration: registry + strategy", () => {
       sessionId: "session-1",
     });
 
-    expect(out.length).toBe(2);
-    const parsed = JSON.parse((out[1] as any).content);
+    expect(out.length).toBe(1);
+    const parsed = JSON.parse((out[0] as any).content);
     expect(parsed.error).toMatch(/cancelled/);
   });
 

@@ -28,12 +28,18 @@ export interface FormatInputOk { ok: true; returnValue: unknown; stdout: string;
 export interface FormatInputErr { ok: false; errorName: string; errorMessage: string; stdout: string; ignoredBlocks?: number; }
 export type FormatInput = FormatInputOk | FormatInputErr;
 
-export function formatResultMessage(
+/**
+ * Produces the string content for a `tool` role message after running the
+ * sandbox. Unlike the old codemode-dispatch `formatResultMessage`, this output
+ * does NOT carry the `[code execution result]` prefix — the role label `tool`
+ * already signals to the LLM that this is runtime output.
+ */
+export function formatToolResult(
   input: FormatInput,
   caps: { maxStdoutBytes: number; maxReturnBytes: number; maxBlocksPerResponse?: number },
 ): string {
   const stdout = truncate(input.stdout ?? "", caps.maxStdoutBytes);
-  const lines: string[] = ["[code execution result]"];
+  const lines: string[] = [];
   if (input.ok) {
     lines.push("exit: ok");
     const ret = truncate(stringifyReturn(input.returnValue), caps.maxReturnBytes);
@@ -44,9 +50,5 @@ export function formatResultMessage(
   }
   lines.push("stdout:");
   lines.push(stdout);
-  if (input.ignoredBlocks && input.ignoredBlocks > 0) {
-    const limit = caps.maxBlocksPerResponse ?? 8;
-    lines.push(`note: ${input.ignoredBlocks} additional code block(s) were ignored because the limit is ${limit}`);
-  }
   return lines.join("\n");
 }

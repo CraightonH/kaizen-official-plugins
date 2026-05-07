@@ -17,8 +17,8 @@ describe("config", () => {
     expect(cfg).toEqual(DEFAULT_CONFIG);
   });
 
-  it("default path uses ~/.kaizen/plugins/llm-codemode-dispatch", () => {
-    expect(defaultConfigPath("/home/u")).toBe("/home/u/.kaizen/plugins/llm-codemode-dispatch/config.json");
+  it("default path uses ~/.kaizen/plugins/llm-codemode", () => {
+    expect(defaultConfigPath("/home/u")).toBe("/home/u/.kaizen/plugins/llm-codemode/config.json");
   });
 
   it("KAIZEN_LLM_CODEMODE_CONFIG env overrides path", async () => {

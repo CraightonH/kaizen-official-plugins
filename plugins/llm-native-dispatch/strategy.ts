@@ -32,12 +32,10 @@ export function makeStrategy(): ToolDispatchStrategy {
       const calls = response.toolCalls ?? [];
       if (calls.length === 0) return [];
 
-      const assistant: ChatMessage = {
-        role: "assistant",
-        content: response.content ?? "",
-        toolCalls: calls,
-      };
-      const out: ChatMessage[] = [assistant];
+      // The driver pre-appends the assistant message before calling handleResponse
+      // (see plugins/llm-driver/loop.ts:237). We must NOT include it here, or it
+      // duplicates in the conversation.
+      const out: ChatMessage[] = [];
 
       for (let i = 0; i < calls.length; i++) {
         const call = calls[i]!;

@@ -39,6 +39,7 @@ describe("llm-events", () => {
     expect(VOCAB.LLM_DONE).toBe("llm:done");
     expect(VOCAB.LLM_ERROR).toBe("llm:error");
     expect(VOCAB.TOOL_BEFORE_EXECUTE).toBe("tool:before-execute");
+    expect(VOCAB.TOOL_PROGRESS).toBe("tool:progress");
     expect(VOCAB.TURN_START).toBe("turn:start");
   });
 
@@ -77,6 +78,7 @@ describe("llm-events", () => {
       "tool:execute",
       "tool:result",
       "tool:error",
+      "tool:progress",
       "codemode:code-emitted",
       "codemode:before-execute",
       "codemode:result",

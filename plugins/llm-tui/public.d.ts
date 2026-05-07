@@ -1,5 +1,8 @@
 import type { TuiTheme } from "./theme/loader.ts";
 
+export type { TuiToolRendererService, TuiToolRenderer } from "./tool-renderers/registry";
+export type { ToolCallStatus } from "./state/store";
+
 export interface TuiChannelService {
   writeOutput(chunk: string): void;
   writeNotice(text: string): void;
