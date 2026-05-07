@@ -101,4 +101,11 @@ describe("applyEvent", () => {
     s = step(s, "turn:end", { turnId: "t-1", reason: "complete" });
     expect(s.turnState).toBe("ready");
   });
+
+  it("session:active-changed records the new session id", () => {
+    let s = step(initialState(), "session:active-changed", { from: null, to: "abc12345-6789-0000-0000-000000000000" });
+    expect(s.sessionId).toBe("abc12345-6789-0000-0000-000000000000");
+    s = step(s, "session:active-changed", { from: s.sessionId, to: null });
+    expect(s.sessionId).toBeNull();
+  });
 });

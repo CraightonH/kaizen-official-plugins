@@ -16,6 +16,8 @@ export interface StatusState {
   contextLength: number | null;
   /** promptTokens from the most recent llm:done — what the model actually saw on its last call. */
   lastPromptTokens: number;
+  /** Active session id; null until the harness emits session:active-changed. */
+  sessionId: string | null;
 }
 
 export function initialState(): StatusState {
@@ -32,6 +34,7 @@ export function initialState(): StatusState {
     turnStartedAt: null,
     contextLength: null,
     lastPromptTokens: 0,
+    sessionId: null,
   };
 }
 
@@ -100,6 +103,12 @@ export function applyEvent(prev: StatusState, name: string, payload: any): Statu
       s.turnInFlight = false;
       s.currentTool = null;
       s.turnStartedAt = null;
+      return recompute(s);
+    }
+
+    case "session:active-changed": {
+      const to = payload?.to;
+      s.sessionId = typeof to === "string" && to.length > 0 ? to : null;
       return recompute(s);
     }
 

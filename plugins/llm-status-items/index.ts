@@ -14,7 +14,13 @@ const SUBSCRIBED = [
   "tool:result",
   "tool:error",
   "conversation:cleared",
+  "session:active-changed",
 ] as const;
+
+/** Render a uuid-shaped session id as its short 8-char prefix for the status bar. */
+function shortSessionId(id: string): string {
+  return id.length > 8 ? id.slice(0, 8) : id;
+}
 
 const plugin: KaizenPlugin = {
   name: "llm-status-items",
@@ -50,6 +56,7 @@ const plugin: KaizenPlugin = {
       turnState: null as string | null,
       cost: null as string | null,
       ctx: null as string | null,
+      session: null as string | null,
     };
 
     // Per-model context-window cache. listModels() is called lazily the first
@@ -104,6 +111,16 @@ const plugin: KaizenPlugin = {
     }
 
     async function emitDiff() {
+      // session — short uuid prefix; cleared when no session is active.
+      const sessionDisplay = state.sessionId ? shortSessionId(state.sessionId) : null;
+      if (sessionDisplay !== lastEmitted.session) {
+        if (sessionDisplay === null) {
+          await ctx.emit("status:item-clear", { key: "session" });
+        } else {
+          await ctx.emit("status:item-update", { key: "session", value: sessionDisplay });
+        }
+        lastEmitted.session = sessionDisplay;
+      }
       // model
       if (state.model && state.model !== lastEmitted.model) {
         await ctx.emit("status:item-update", { key: "model", value: state.model });
