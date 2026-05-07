@@ -30,7 +30,7 @@ The user has confirmed that the codemode plugin's target audience is models that
 
 ### Architecture
 
-**One concept, one path.** Every machine action — whether a one-shot `read_file` or a code-mode dispatch — flows through OpenAI's `tool_calls` mechanism. There is no second dispatch path, no per-strategy branching, no "is this code-mode or native?" decision in the driver. The driver routes each entry in the LLM's `tool_calls` response to the registered handler for that tool.
+**One concept, one path.** Every machine action — whether a one-shot `read_file` or a code-mode dispatch — flows through OpenAI's `tool_calls` mechanism. The driver continues to consume a single `tool-dispatch:strategy` service; in the post-pivot harness, that strategy is `llm-native-dispatch` (which calls `registry.invoke()` per `tool_calls` entry and produces standard `tool` role messages). The codemode plugin no longer provides a strategy — it registers `execute_typescript` as a normal tool that the native strategy invokes like any other.
 
 **Codemode is a tool, not a strategy.** The new `llm-codemode` plugin registers exactly one tool with the standard tool registry:
 
@@ -70,14 +70,14 @@ updateToolCall(id: string, patch: {
 
 Implementation replaces the entry rather than mutating in place, preserving the snapshot-identity invariant. Other transcript kinds remain immutable.
 
-**Driver-level lifecycle events.** New events in the `llm-events` vocab, emitted by the driver around the handler invocation:
+**Lifecycle events: reuse what the registry already emits, add one new event.** The `llm-tools-registry` plugin already wraps every `registry.invoke()` with `tool:before-execute`, `tool:execute`, `tool:result`, and `tool:error` (see `plugins/llm-tools-registry/registry.ts`). The TUI subscribes to those existing events; no driver changes are required to surface tool-call lifecycle.
 
-- `tool:start { id, name, args, turnId, sessionId }` → emitted before the handler runs; TUI appends a `tool_call` entry, status `running`.
-- `tool:progress { id, delta, turnId, sessionId }` → optional, opt-in by the handler; TUI appends to the live stdout buffer of the matching entry. The codemode plugin emits these from the sandbox host on stdout messages from the worker.
-- `tool:done { id, result, turnId, sessionId }` → emitted after the handler resolves; TUI transitions the entry to `done`, attaches result.
-- `tool:error { id, error, turnId, sessionId }` → emitted if the handler throws; TUI transitions to `error`, attaches message.
+- `tool:execute { name, args, callId }` (existing) → TUI appends a `tool_call` entry, status `running`.
+- `tool:result { name, callId, result }` (existing) → TUI transitions the entry to `done`, attaches result.
+- `tool:error { name, callId, message, cause? }` (existing) → TUI transitions the entry to `error`, attaches message.
+- `tool:progress { callId, delta }` **(NEW — added to `llm-events` VOCAB)** → optional, opt-in by the handler; TUI appends to the live stdout buffer of the matching entry. The new `llm-codemode` plugin emits these from the sandbox host on stdout messages from the worker.
 
-The existing `codemode:*` event family becomes internal sandbox telemetry; the TUI no longer subscribes to it. (The events may stay or be folded into `tool:progress` — implementation choice during step 3 of the migration.)
+`tool:before-execute` is a registry mutation hook — the TUI does not subscribe to it (would create a flicker entry that gets reassigned on cancellation). The `codemode:*` event family becomes internal sandbox telemetry only; the TUI does not subscribe to it.
 
 **Default renderer (collapsed):**
 
@@ -159,17 +159,17 @@ There is no translation layer between what the LLM produced and what we send bac
 
 The pivot ships in five independently-shippable steps. Each step is reversible until step 5.
 
-### Step 1 — TUI changes (no codemode dependency)
+### Step 1 — Add `tool:progress` to the events vocabulary
 
-Add the `tool_call` transcript kind, store methods (`appendToolCall`, `updateToolCall`), event subscriptions for `tool:start | tool:progress | tool:done | tool:error`, the default renderer, and the `llm-tui:tool-renderer` registry service. Generalize `/history` to include `tool_call` entries.
+Add `TOOL_PROGRESS: "tool:progress"` to `plugins/llm-events/index.ts` VOCAB and the matching `Vocab` interface entry in `plugins/llm-events/public.d.ts`. Bump `llm-events` minor version. The other lifecycle events (`tool:before-execute`, `tool:execute`, `tool:result`, `tool:error`) already exist in the vocab and are emitted by the registry — no change needed there.
 
-These improvements apply to *any* tool calls (native or future) and are useful even if the codemode pivot were never shipped. Lowest-risk first step. Fully tested against the existing native tool-call path before subsequent steps land.
+### Step 2 — TUI changes (no codemode dependency)
 
-### Step 2 — Driver lifecycle events
+Add the `tool_call` transcript kind, store methods (`appendToolCall`, `updateToolCall`), event subscriptions for `tool:execute | tool:progress | tool:result | tool:error`, the default renderer, and the `llm-tui:tool-renderer` registry service. Generalize `/history` to include `tool_call` entries.
 
-In `llm-driver`, wherever the dispatcher invokes a registered handler for a `tool_calls` entry, wrap with `tool:start` before and `tool:done` / `tool:error` after. Progress emission (`tool:progress`) is opt-in by the handler — codemode emits, trivial tools do not.
+These improvements apply to *any* tool calls (the existing `llm-native-dispatch` already drives them via `registry.invoke()`) and are useful even if the codemode pivot were never shipped. Lowest-risk first step. The driver loop and `llm-native-dispatch` are not modified.
 
-Update truncation logic to treat `(assistant_message_with_tool_calls + matching tool messages)` as atomic units.
+(Truncation: the existing `llm-native-dispatch` already pairs the assistant `toolCalls` message with its tool results in one `handleResponse` return, so the conversation always satisfies the OpenAI invariant. No truncation logic exists in the driver today that could break that pairing — if such logic is added later, it must respect the pairing constraint.)
 
 ### Step 3 — New `llm-codemode` plugin
 
@@ -208,11 +208,15 @@ This is the empirical step. If any target model fails it, that is a real finding
 
 This is the cutover. Bundle into one change to keep the harness consistent at every commit:
 
-- Update `harnesses/openai-compatible.json` to remove `llm-codemode-dispatch` from the plugin list and add `llm-codemode` in its place. **The openai-compatible harness migrates to the new plugin as part of this step.** Without this update, retiring the old plugin breaks the harness for existing users.
+- Update `harnesses/openai-compatible.json` with a three-way swap:
+  - **Remove** `llm-codemode-dispatch@0.2.0`.
+  - **Add** `llm-native-dispatch@0.2.0` (already exists in `plugins/`, just not in this harness manifest yet — it provides the `tool-dispatch:strategy` that consumes registered tools, including the new `execute_typescript`).
+  - **Add** `llm-codemode@0.1.0` (the new plugin that registers `execute_typescript`).
+  Without this swap, retiring `llm-codemode-dispatch` leaves the harness with no `tool-dispatch:strategy` provider, breaking it.
 - Remove `llm-codemode-dispatch` from `~/.kaizen/marketplaces/official/repo/` (the local marketplace mirror) and from `plugins/`.
-- Delete the `tool-dispatch:strategy` service contract from Spec 0 (no remaining consumers after retirement).
-- Rewrite Spec 6 (`2026-04-30-llm-codemode-dispatch-design.md`) — or supersede it with this document as the new authoritative spec for codemode behavior.
-- Update the architecture memory at `~/.claude/projects/-Users-chancock-git-kaizen-official-plugins/memory/openai_compatible_harness_arch.md` — specifically the "Code-mode dispatch is the default tool-dispatch strategy" decision is no longer accurate. The replacement framing: "Codemode is a tool, registered via the standard registry. Native tool-calling is the only dispatch protocol."
+- The `tool-dispatch:strategy` service contract **stays** in `llm-events/public.d.ts` — `llm-native-dispatch` continues to implement it. Update the comment header on that interface to remove the `llm-codemode-dispatch` co-owner reference.
+- Supersede Spec 6 (`2026-04-30-llm-codemode-dispatch-design.md`) with this document as the new authoritative spec for codemode behavior. Add a `**Superseded by:** 2026-05-07-llm-codemode-tool-pivot-design.md` header line at the top of the old spec.
+- Update the architecture memory at `~/.claude/projects/-Users-chancock-git-kaizen-official-plugins/memory/openai_compatible_harness_arch.md` — specifically the "Code-mode dispatch is the default tool-dispatch strategy" decision is no longer accurate. The replacement framing: "Codemode is a tool, registered via the standard `tools:registry`. The harness uses `llm-native-dispatch` as its sole `tool-dispatch:strategy`; `execute_typescript` is just one more tool that strategy invokes."
 - Move this spec from `docs/superpowers/specs/` to `docs/superpowers/archive/specs/` once shipped.
 
 ## Risks and unknowns
@@ -235,8 +239,8 @@ This is the cutover. Bundle into one change to keep the harness consistent at ev
 - Fake `user` role messages carrying tool results.
 - Any "is this a tool result or a user message?" disambiguation at the LLM seam.
 - The mental gap between "what the user sees" and "what the LLM sees" — they are the same conversation, rendered differently.
-- The `tool-dispatch:strategy` service contract.
-- `extractor.ts` (mdast fence parsing) and `handle-response.ts` (prose-extraction lifecycle) from the codemode codebase.
+- The `llm-codemode-dispatch` plugin (provider of `tool-dispatch:strategy`). The contract itself stays; `llm-native-dispatch` remains its sole implementer.
+- `extractor.ts` (mdast fence parsing), `prepare-request.ts` (system-prompt injection), and `handle-response.ts` (prose-extraction lifecycle) from the codemode codebase.
 
 ## What this preserves
 
