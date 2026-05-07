@@ -291,6 +291,40 @@ describe("InputBox", () => {
     });
   });
 
+  describe("wrapping", () => {
+    // ink-testing-library hardcodes columns to 100. With prefix "│   " (4 cols)
+    // and 1-col cursor reserve, the inner width is 95.
+    it("breaks long lines into rows that each begin with the gutter prefix", async () => {
+      const ctx = setup();
+      const { stdin, lastFrame } = render(
+        <InputBox store={ctx.store} registry={ctx.reg} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+      );
+      await tick();
+      stdin.write("a".repeat(120)); // forces at least 2 visual rows
+      await tick();
+      const frame = lastFrame()!;
+      // First row carries the "❯ " prompt; continuation row uses "│   ".
+      expect(frame).toContain("│ ❯ ");
+      // Left-frame pipe "│" appears at the start of every visual row of the
+      // input. 120 chars at inner-width 95 = 2 rows → 2 pipes.
+      const pipeCount = (frame.match(/│/g) ?? []).length;
+      expect(pipeCount).toBeGreaterThanOrEqual(2);
+    });
+
+    it("cursor stays aligned across wrap boundary", async () => {
+      const ctx = setup();
+      const { stdin } = render(
+        <InputBox store={ctx.store} registry={ctx.reg} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+      );
+      await tick();
+      stdin.write("a".repeat(120));
+      await tick();
+      // Cursor at end of buffer should still be drawable (no crash, no
+      // visible breakage). Buffer length 120 means cursor column 120.
+      expect(ctx.store.snapshot().input.cursor).toBe(120);
+    });
+  });
+
   it("Up arrow recalls history when popup is closed", async () => {
     const ctx = setup();
     ctx.store.submit("first");

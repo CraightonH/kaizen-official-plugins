@@ -327,35 +327,77 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
   const topLine = topPrefix + "─".repeat(Math.max(0, cols - topPrefix.length - 1));
   const bottomLine = "╰" + "─".repeat(Math.max(0, cols - 2));
 
-  // Multiline-aware render. Map the flat cursor offset into (row, col) over
-  // the value's logical lines, then render one row per line. The cursor is
-  // a filled inverse-color block at its column on its row.
-  const lines = value.split("\n");
-  let cursorRow = 0;
-  let cursorCol = cursor;
-  for (let i = 0; i < lines.length; i++) {
-    const len = lines[i]!.length;
-    if (cursorCol <= len) { cursorRow = i; break; }
-    cursorCol -= len + 1; // +1 for the consumed "\n"
-    cursorRow = i + 1;
+  // Manually wrap the buffer so each visual row gets the "│   " gutter and
+  // the cursor stays aligned. Letting Ink wrap the line text on its own
+  // produces continuations without the prefix and a misplaced cursor.
+  //
+  // PREFIX = "│ ❯ " or "│   " (4 cols). Reserve 1 column past the wrapped
+  // text so the inverse cursor block at end-of-line still fits inside the
+  // terminal. Hence inner = cols - 4 - 1.
+  const PREFIX_LEN = 4;
+  const inner = Math.max(1, cols - PREFIX_LEN - 1);
+
+  // First map the flat cursor offset to (logical line, col within that line).
+  const logicalLines = value.split("\n");
+  let logicalRow = 0;
+  let logicalCol = cursor;
+  for (let i = 0; i < logicalLines.length; i++) {
+    const len = logicalLines[i]!.length;
+    if (logicalCol <= len) { logicalRow = i; break; }
+    logicalCol -= len + 1; // +1 for the consumed "\n"
+    logicalRow = i + 1;
+  }
+
+  // Then break each logical line into visual rows of `inner` chars each.
+  type VisualRow = { logicalIdx: number; rowIdx: number; startCol: number; text: string };
+  const visualRows: VisualRow[] = [];
+  for (let li = 0; li < logicalLines.length; li++) {
+    const line = logicalLines[li]!;
+    if (line.length === 0) {
+      visualRows.push({ logicalIdx: li, rowIdx: 0, startCol: 0, text: "" });
+      continue;
+    }
+    let off = 0, ri = 0;
+    while (off < line.length) {
+      visualRows.push({ logicalIdx: li, rowIdx: ri, startCol: off, text: line.slice(off, off + inner) });
+      off += inner;
+      ri++;
+    }
+  }
+
+  // Find which visual row holds the cursor. For a non-last visual row of a
+  // logical line, the cursor ranges over [startCol, startCol+inner); for the
+  // last row of a line it can sit one past the last char (end-of-line).
+  let visualCursorRow = 0;
+  let visualCursorCol = 0;
+  for (let i = 0; i < visualRows.length; i++) {
+    const vr = visualRows[i]!;
+    if (vr.logicalIdx !== logicalRow) continue;
+    const next = visualRows[i + 1];
+    const isLastOfLogical = !next || next.logicalIdx !== vr.logicalIdx;
+    const local = logicalCol - vr.startCol;
+    const inThis = isLastOfLogical
+      ? (local >= 0 && local <= vr.text.length)
+      : (local >= 0 && local < inner);
+    if (inThis) { visualCursorRow = i; visualCursorCol = local; break; }
   }
 
   return (
     <Box flexDirection="column">
       <Text color={theme.promptColor}>{topLine}</Text>
-      {lines.map((line, i) => {
-        const prefix = i === 0 ? "│ ❯ " : "│   ";
-        if (i !== cursorRow) {
+      {visualRows.map((vr, i) => {
+        const prefix = (vr.logicalIdx === 0 && vr.rowIdx === 0) ? "│ ❯ " : "│   ";
+        if (i !== visualCursorRow) {
           return (
             <Box key={i}>
               <Text color={theme.promptColor}>{prefix}</Text>
-              <Text color={theme.outputColor}>{line.length === 0 ? " " : line}</Text>
+              <Text color={theme.outputColor}>{vr.text.length === 0 ? " " : vr.text}</Text>
             </Box>
           );
         }
-        const before = line.slice(0, cursorCol);
-        const at = line[cursorCol] ?? " ";
-        const after = line.slice(cursorCol + 1);
+        const before = vr.text.slice(0, visualCursorCol);
+        const at = vr.text[visualCursorCol] ?? " ";
+        const after = vr.text.slice(visualCursorCol + 1);
         return (
           <Box key={i}>
             <Text color={theme.promptColor}>{prefix}</Text>
