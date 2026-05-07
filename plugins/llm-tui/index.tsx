@@ -177,6 +177,7 @@ const plugin: KaizenPlugin = {
         onSubmit={onSubmit}
         onCtrlC={onCtrlC}
       />,
+      { exitOnCtrlC: false },
     );
 
     const channel: TuiChannelService = {
