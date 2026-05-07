@@ -62,7 +62,7 @@ describe("registerBuiltins", () => {
     });
     await reg.get("session:new")!.handler(ctx as any);
     expect(active).toBe("s1");
-    expect(emitted).toContainEqual({ event: "session:active-changed", payload: { from: null, to: "s1" } });
+    expect(emitted).toContainEqual({ event: "session:active-changed", payload: { from: null, to: "s1", alias: null } });
     await reg.get("session:list")!.handler(ctx as any);
     expect(printed.join("\n")).toContain("s1");
   });
@@ -112,7 +112,7 @@ describe("registerBuiltins", () => {
     registerBuiltins(reg, { sessions: sessions as any, getActiveSessionId: () => "s-old" });
     const { ctx, emitted } = makeCtx();
     await reg.get("clear")!.handler(ctx as any);
-    expect(emitted).toContainEqual({ event: "session:active-changed", payload: { from: "s-old", to: "s-new" } });
+    expect(emitted).toContainEqual({ event: "session:active-changed", payload: { from: "s-old", to: "s-new", alias: null } });
     expect(emitted).toContainEqual({ event: "conversation:cleared", payload: { from: "s-old", to: "s-new" } });
   });
 
@@ -136,7 +136,7 @@ describe("registerBuiltins", () => {
     ctx.args = "s1 --cascade";
     await reg.get("session:delete")!.handler(ctx as any);
     expect(deleted).toEqual([{ id: "s1", opts: { cascade: true } }]);
-    expect(emitted).toContainEqual({ event: "session:active-changed", payload: { from: "s1", to: "replacement" } });
+    expect(emitted).toContainEqual({ event: "session:active-changed", payload: { from: "s1", to: "replacement", alias: null } });
   });
 
   it("/help with no args groups all registered commands", async () => {

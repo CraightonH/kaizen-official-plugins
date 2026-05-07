@@ -15,6 +15,7 @@ const SUBSCRIBED = [
   "tool:error",
   "conversation:cleared",
   "session:active-changed",
+  "session:renamed",
 ] as const;
 
 const plugin: KaizenPlugin = {
@@ -106,8 +107,11 @@ const plugin: KaizenPlugin = {
     }
 
     async function emitDiff() {
-      // session — full uuid so it can be copy/pasted to resume; cleared when no session is active.
-      const sessionDisplay = state.sessionId ?? null;
+      // session — full uuid so it can be copy/pasted to resume; appended
+      // with the alias in parens when set. Cleared when no session is active.
+      const sessionDisplay = state.sessionId
+        ? (state.sessionAlias ? `${state.sessionId} (${state.sessionAlias})` : state.sessionId)
+        : null;
       if (sessionDisplay !== lastEmitted.session) {
         if (sessionDisplay === null) {
           await ctx.emit("status:item-clear", { key: "session" });

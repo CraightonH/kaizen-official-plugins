@@ -172,7 +172,7 @@ const plugin: KaizenPlugin = {
       if (!state.activeSessionId) {
         const initial = await sessions.create({});
         state.activeSessionId = initial.id;
-        await ctx.emit("session:active-changed", { from: null, to: initial.id });
+        await ctx.emit("session:active-changed", { from: null, to: initial.id, alias: initial.alias ?? null });
       }
 
       while (true) {
@@ -189,7 +189,7 @@ const plugin: KaizenPlugin = {
         if (!state.activeSessionId) {
           const next = await sessions.create({});
           state.activeSessionId = next.id;
-          await ctx.emit("session:active-changed", { from: null, to: next.id });
+          await ctx.emit("session:active-changed", { from: null, to: next.id, alias: next.alias ?? null });
         }
 
         const userMsg: ChatMessage = { role: "user", content: line };

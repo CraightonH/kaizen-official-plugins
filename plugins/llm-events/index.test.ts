@@ -57,6 +57,7 @@ describe("llm-events", () => {
       "session:resumed",
       "session:deleted",
       "session:active-changed",
+      "session:renamed",
       "input:submit",
       "input:handled",
       "conversation:user-message",

@@ -39,12 +39,33 @@ describe("llm-status-items setup", () => {
       "llm:before-call",
       "llm:done",
       "session:active-changed",
+      "session:renamed",
       "tool:before-execute",
       "tool:error",
       "tool:result",
       "turn:end",
       "turn:start",
     ]);
+  });
+
+  it("session:renamed re-emits session item with `id (alias)` formatting", async () => {
+    const ctx = makeCtx();
+    await plugin.setup(ctx);
+    await ctx.handlers["session:active-changed"]!({ from: null, to: "abc12345-6789-0000-0000-000000000000", alias: null });
+    await ctx.handlers["session:renamed"]!({ id: "abc12345-6789-0000-0000-000000000000", alias: "test" });
+    const lastSession = [...ctx.emits].reverse().find((e: Emit) => e.payload?.key === "session");
+    expect(lastSession?.event).toBe("status:item-update");
+    expect(lastSession?.payload.value).toBe("abc12345-6789-0000-0000-000000000000 (test)");
+  });
+
+  it("session:renamed for a non-active session is ignored", async () => {
+    const ctx = makeCtx();
+    await plugin.setup(ctx);
+    await ctx.handlers["session:active-changed"]!({ from: null, to: "abc12345-6789-0000-0000-000000000000", alias: null });
+    const before = ctx.emits.filter((e: Emit) => e.payload?.key === "session").length;
+    await ctx.handlers["session:renamed"]!({ id: "ffffffff-0000-0000-0000-000000000000", alias: "other" });
+    const after = ctx.emits.filter((e: Emit) => e.payload?.key === "session").length;
+    expect(after).toBe(before);
   });
 
   it("emits full session id on session:active-changed; clears on logout", async () => {

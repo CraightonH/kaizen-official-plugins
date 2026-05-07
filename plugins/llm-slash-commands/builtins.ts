@@ -121,7 +121,7 @@ export function registerBuiltins(registry: SlashRegistryService, deps: BuiltinDe
     async (ctx) => {
       const from = deps.getActiveSessionId?.() ?? null;
       const next = await sessions.create({});
-      await ctx.emit("session:active-changed", { from, to: next.id });
+      await ctx.emit("session:active-changed", { from, to: next.id, alias: next.alias ?? null });
       await ctx.emit("conversation:cleared", { from, to: next.id });
       await ctx.print(`Active session: ${next.id}`);
     },
@@ -132,7 +132,7 @@ export function registerBuiltins(registry: SlashRegistryService, deps: BuiltinDe
     async (ctx) => {
       const from = deps.getActiveSessionId?.() ?? null;
       const next = await sessions.create({});
-      await ctx.emit("session:active-changed", { from, to: next.id });
+      await ctx.emit("session:active-changed", { from, to: next.id, alias: next.alias ?? null });
       await ctx.print(`Active session: ${next.id}`);
     },
   );
@@ -152,7 +152,7 @@ export function registerBuiltins(registry: SlashRegistryService, deps: BuiltinDe
       const token = ctx.args.trim();
       const record = await resolveSession(sessions, token);
       const from = deps.getActiveSessionId?.() ?? null;
-      await ctx.emit("session:active-changed", { from, to: record.id });
+      await ctx.emit("session:active-changed", { from, to: record.id, alias: record.alias ?? null });
       await ctx.emit("session:resumed", { id: record.id });
       await ctx.print(`Active session: ${record.id}`);
     },
@@ -207,7 +207,7 @@ export function registerBuiltins(registry: SlashRegistryService, deps: BuiltinDe
         }
         throw err;
       }
-      await ctx.emit("session:active-changed", { from: id, to: replacement.id });
+      await ctx.emit("session:active-changed", { from: id, to: replacement.id, alias: replacement.alias ?? null });
       await ctx.print(`Active session: ${replacement.id}`);
     },
   );

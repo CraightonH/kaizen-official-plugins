@@ -9,6 +9,7 @@ export interface Vocab {
   readonly SESSION_RESUMED: "session:resumed";
   readonly SESSION_DELETED: "session:deleted";
   readonly SESSION_ACTIVE_CHANGED: "session:active-changed";
+  readonly SESSION_RENAMED: "session:renamed";
   readonly INPUT_SUBMIT: "input:submit";
   readonly INPUT_HANDLED: "input:handled";
   readonly CONVERSATION_USER_MESSAGE: "conversation:user-message";

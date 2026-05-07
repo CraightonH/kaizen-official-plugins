@@ -18,6 +18,8 @@ export interface StatusState {
   lastPromptTokens: number;
   /** Active session id; null until the harness emits session:active-changed. */
   sessionId: string | null;
+  /** Active session alias; null when unset. Updated on rename. */
+  sessionAlias: string | null;
 }
 
 export function initialState(): StatusState {
@@ -35,6 +37,7 @@ export function initialState(): StatusState {
     contextLength: null,
     lastPromptTokens: 0,
     sessionId: null,
+    sessionAlias: null,
   };
 }
 
@@ -109,6 +112,18 @@ export function applyEvent(prev: StatusState, name: string, payload: any): Statu
     case "session:active-changed": {
       const to = payload?.to;
       s.sessionId = typeof to === "string" && to.length > 0 ? to : null;
+      // Reset alias on switch; emitter passes the new alias when known.
+      const alias = payload?.alias;
+      s.sessionAlias = typeof alias === "string" && alias.length > 0 ? alias : null;
+      return recompute(s);
+    }
+
+    case "session:renamed": {
+      // Only apply if the rename targets the active session.
+      const id = payload?.id;
+      if (typeof id !== "string" || id !== s.sessionId) return recompute(s);
+      const alias = payload?.alias;
+      s.sessionAlias = typeof alias === "string" && alias.length > 0 ? alias : null;
       return recompute(s);
     }
 
