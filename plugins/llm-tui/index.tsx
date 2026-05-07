@@ -81,10 +81,20 @@ const plugin: KaizenPlugin = {
       const delta = typeof payload?.delta === "string" ? payload.delta : "";
       if (delta) store.appendReasoning(delta);
     });
-    ctx.on("llm:done", async () => {
+    // Streamed completion tokens → bump the spinner counter live.
+    ctx.on("llm:token", async () => {
+      store.incrementBusyTokens(1);
+    });
+    ctx.on("llm:done", async (payload: any) => {
       // Move accumulated reasoning into the transcript as a Thoughts block,
       // sitting between the user message and the assistant reply.
       store.finalizeReasoning();
+      // Replace the streaming estimate with the authoritative count if the
+      // provider reported usage.
+      const usage = payload?.response?.usage;
+      if (usage && typeof usage.completionTokens === "number") {
+        store.updateBusyTokens(usage.completionTokens);
+      }
     });
     ctx.on("turn:end", async () => {
       // Belt-and-suspenders: if a turn ended without an llm:done (e.g. tool
@@ -92,6 +102,7 @@ const plugin: KaizenPlugin = {
       // box doesn't linger above the next prompt.
       store.clearLiveThinking();
       store.clearLiveToolCalls();
+      store.clearBusyTiming();
     });
 
     // /history slash command → modal audit view.
@@ -183,6 +194,9 @@ const plugin: KaizenPlugin = {
       writeNotice: (text: string) => store.appendNotice(text),
       writeUser: (text: string) => store.appendUser(text),
       setBusy: (busy: boolean, message?: string) => store.setBusy(busy, message),
+      setBusyTiming: (startedAt: number) => store.setBusyTiming(startedAt),
+      updateBusyTokens: (deltaTokens: number) => store.updateBusyTokens(deltaTokens),
+      incrementBusyTokens: (n?: number) => store.incrementBusyTokens(n),
       appendReasoning: (delta: string) => store.appendReasoning(delta),
       finalizeReasoning: () => store.finalizeReasoning(),
       clearLiveThinking: () => store.clearLiveThinking(),

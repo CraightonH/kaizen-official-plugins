@@ -10,6 +10,7 @@ function makeUi(lines: string[]) {
     out,
     readInput: async () => i < lines.length ? lines[i++]! : "",
     setBusy: mock((_b: boolean, _m?: string) => {}),
+    setBusyTiming: mock((_s: number) => {}),
     writeOutput: (s: string) => out.push(s),
     writeNotice: (s: string) => out.push(`[notice]${s}`),
   };

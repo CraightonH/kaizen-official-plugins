@@ -13,6 +13,12 @@ export interface TuiChannelService {
    */
   writeUser(text: string): void;
   setBusy(state: boolean, message?: string): void;
+  /** Set the start time for the current busy period (called on turn:start). */
+  setBusyTiming(startedAt: number): void;
+  /** Set the absolute completion-token count for the current busy period. */
+  updateBusyTokens(deltaTokens: number): void;
+  /** Increment the completion-token count by `n` (used during streaming). */
+  incrementBusyTokens(n?: number): void;
   readInput(): Promise<string>;
   /** Append a reasoning/thinking delta to the live thinking buffer (rendered above input while busy). */
   appendReasoning(delta: string): void;

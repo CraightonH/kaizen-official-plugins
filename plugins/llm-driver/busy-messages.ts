@@ -5,6 +5,9 @@ export const BUSY_MESSAGES: readonly string[] = Object.freeze([
   "kneading bytes…",
   "pondering the orb…",
   "shuffling electrons…",
+  "Honking…",
+  "Summoning the spirits…",
+  "Warming up the silicon…",
 ]);
 
 export function pickBusyMessage(): string {

@@ -20,7 +20,14 @@ export interface ToolCallEntry {
 }
 
 export type TranscriptLine = PlainTranscriptLine | ToolCallEntry;
-export interface BusyState { active: boolean; message?: string; }
+export interface BusyState {
+  active: boolean;
+  message?: string;
+  /** Wall-clock ms when the current busy period started (set on turn:start). */
+  startedAt?: number;
+  /** Completion tokens streamed/observed so far during this busy period. */
+  deltaTokens?: number;
+}
 export interface InputState { value: string; cursor: number; }
 
 export interface CompletionItem {
@@ -288,6 +295,31 @@ export class TuiStore {
 
   setBusy(active: boolean, message?: string): void {
     this._busy = active ? { active: true, message } : { active: false };
+    this._emit();
+  }
+
+  /** Set the start time for the current busy period (called on turn:start). */
+  setBusyTiming(startedAt: number): void {
+    this._busy = { ...this._busy, active: true, startedAt, deltaTokens: 0 };
+    this._emit();
+  }
+
+  /** Set the absolute completion-token count for the current busy period. */
+  updateBusyTokens(deltaTokens: number): void {
+    this._busy = { ...this._busy, deltaTokens };
+    this._emit();
+  }
+
+  /** Increment the completion-token count by `n` (used during streaming). */
+  incrementBusyTokens(n: number = 1): void {
+    const cur = this._busy.deltaTokens ?? 0;
+    this._busy = { ...this._busy, deltaTokens: cur + n };
+    this._emit();
+  }
+
+  /** Clear busy timing data (called on turn:end). */
+  clearBusyTiming(): void {
+    this._busy = { active: false };
     this._emit();
   }
 

@@ -40,6 +40,7 @@ describe("llm-driver integration (synthetic llm:complete)", () => {
       i: 0,
       readInput: async function () { return this.i++ === 0 ? "hello" : ""; },
       setBusy: () => {},
+      setBusyTiming: () => {},
       writeOutput: () => {},
       writeNotice: () => {},
     };

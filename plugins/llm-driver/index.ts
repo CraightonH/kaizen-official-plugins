@@ -15,6 +15,7 @@ import { pickDoneMessage } from "./done-messages.ts";
 interface UiChannel {
   readInput(): Promise<string>;
   setBusy(b: boolean, msg?: string): void;
+  setBusyTiming(startedAt: number): void;
   writeOutput(s: string): void;
   writeNotice(s: string): void;
   writeUser?(s: string): void;
@@ -201,8 +202,9 @@ const plugin: KaizenPlugin = {
 
         const controller = new AbortController();
         state.currentTurn = { id: turnId, controller };
-        ui.setBusy(true, pickBusyMessage());
         const turnStartedAt = Date.now();
+        ui.setBusy(true, pickBusyMessage());
+        ui.setBusyTiming(turnStartedAt);
         await ctx.emit("turn:start", { turnId, sessionId, trigger: "user" });
 
         try {

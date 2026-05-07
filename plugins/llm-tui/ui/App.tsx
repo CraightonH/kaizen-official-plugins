@@ -88,7 +88,14 @@ export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, trigge
           {snap.busy.active && snap.liveThinking && (
             <ThinkingBox text={snap.liveThinking} color={theme.noticeColor} />
           )}
-          {snap.busy.active && <SpinnerLine color={theme.busyColor} message={snap.busy.message} />}
+          {snap.busy.active && (
+            <SpinnerLine
+              color={theme.busyColor}
+              message={snap.busy.message}
+              startedAt={snap.busy.startedAt}
+              deltaTokens={snap.busy.deltaTokens}
+            />
+          )}
           <InputBox
             store={store}
             registry={registry}

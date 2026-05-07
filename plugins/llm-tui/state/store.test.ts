@@ -29,6 +29,41 @@ describe("TuiStore", () => {
     expect(s.snapshot().busy.active).toBe(false);
   });
 
+  it("setBusyTiming records start time and zeroes the token delta", () => {
+    const s = new TuiStore();
+    const now = Date.now();
+    s.setBusy(true, "thinking");
+    s.setBusyTiming(now);
+    expect(s.snapshot().busy).toEqual({ active: true, message: "thinking", startedAt: now, deltaTokens: 0 });
+  });
+
+  it("updateBusyTokens sets the absolute count", () => {
+    const s = new TuiStore();
+    s.setBusy(true, "thinking");
+    s.setBusyTiming(Date.now());
+    s.updateBusyTokens(856);
+    expect(s.snapshot().busy.deltaTokens).toBe(856);
+  });
+
+  it("incrementBusyTokens accumulates streamed tokens", () => {
+    const s = new TuiStore();
+    s.setBusy(true, "thinking");
+    s.setBusyTiming(Date.now());
+    s.incrementBusyTokens();
+    s.incrementBusyTokens();
+    s.incrementBusyTokens(3);
+    expect(s.snapshot().busy.deltaTokens).toBe(5);
+  });
+
+  it("clearBusyTiming resets everything", () => {
+    const s = new TuiStore();
+    s.setBusy(true, "thinking");
+    s.setBusyTiming(Date.now());
+    s.updateBusyTokens(856);
+    s.clearBusyTiming();
+    expect(s.snapshot().busy).toEqual({ active: false });
+  });
+
   it("upsertStatus and clearStatus manage the status map", () => {
     const s = new TuiStore();
     s.upsertStatus("git", "main");
