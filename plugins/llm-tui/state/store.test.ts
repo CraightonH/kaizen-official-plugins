@@ -183,6 +183,18 @@ describe("TuiStore", () => {
       expect(s.snapshot().historyView.expanded.size).toBe(0);
     });
 
+    it("enterHistoryMode focuses across thoughts and tool_calls in transcript order", () => {
+      const store = new TuiStore();
+      store.appendUser("hi");
+      store.appendReasoning("thinking…");
+      store.finalizeReasoning();
+      store.appendToolCallToTranscript("c1", "read_file", { path: "/x" }, "done", "ok");
+      store.enterHistoryMode();
+      const snap = store.snapshot();
+      expect(snap.viewMode).toBe("history");
+      expect(snap.historyView.focusIdx).toBe(0); // thoughts first (transcript order)
+    });
+
     it("exitHistoryMode returns to chat", () => {
       const s = withTwoThoughts();
       s.enterHistoryMode();

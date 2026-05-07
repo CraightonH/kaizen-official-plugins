@@ -239,7 +239,7 @@ export class TuiStore {
 
   enterHistoryMode(): void {
     if (this._viewMode === "history") return;
-    const blocks = this._transcript.filter((e) => e.kind === "thoughts");
+    const blocks = this._transcript.filter((e) => e.kind === "thoughts" || e.kind === "tool_call");
     this._viewMode = "history";
     this._historyView = {
       focusIdx: blocks.length > 0 ? 0 : -1,
@@ -256,7 +256,7 @@ export class TuiStore {
 
   historyMoveFocus(delta: number): void {
     if (this._viewMode !== "history") return;
-    const blocks = this._transcript.filter((e) => e.kind === "thoughts");
+    const blocks = this._transcript.filter((e) => e.kind === "thoughts" || e.kind === "tool_call");
     if (blocks.length === 0) { this._historyView = { ...this._historyView, focusIdx: -1 }; this._emit(); return; }
     const cur = this._historyView.focusIdx < 0 ? 0 : this._historyView.focusIdx;
     const n = blocks.length;
@@ -267,7 +267,7 @@ export class TuiStore {
 
   historyToggleFocused(): void {
     if (this._viewMode !== "history") return;
-    const blocks = this._transcript.filter((e) => e.kind === "thoughts");
+    const blocks = this._transcript.filter((e) => e.kind === "thoughts" || e.kind === "tool_call");
     const block = blocks[this._historyView.focusIdx];
     if (!block) return;
     const next = new Set(this._historyView.expanded);
@@ -278,7 +278,7 @@ export class TuiStore {
 
   historySetAllExpanded(expanded: boolean): void {
     if (this._viewMode !== "history") return;
-    const blocks = this._transcript.filter((e) => e.kind === "thoughts");
+    const blocks = this._transcript.filter((e) => e.kind === "thoughts" || e.kind === "tool_call");
     this._historyView = {
       ...this._historyView,
       expanded: expanded ? new Set(blocks.map((b) => b.id)) : new Set(),

@@ -26,7 +26,7 @@ describe("HistoryView", () => {
     await tick();
     const frame = lastFrame();
     expect(frame).toContain("History");
-    expect(frame).toContain("2 thought block");
+    expect(frame).toContain("2 entr");
     expect(frame).toContain("j/k focus");
   });
 
@@ -98,6 +98,15 @@ describe("HistoryView", () => {
     s.enterHistoryMode();
     const { lastFrame } = render(<HistoryView store={s} theme={DEFAULT_THEME} />);
     await tick();
-    expect(lastFrame()).toContain("no thought blocks");
+    expect(lastFrame()).toContain("no entries yet");
+  });
+
+  it("renders a tool_call entry with wrench glyph in history", () => {
+    const s = new TuiStore();
+    s.appendToolCallToTranscript("c1", "read_file", { path: "/etc/hosts" }, "done", "ok");
+    s.enterHistoryMode();
+    const { lastFrame } = render(<HistoryView store={s} theme={DEFAULT_THEME} />);
+    expect(lastFrame() ?? "").toContain("read_file");
+    expect(lastFrame() ?? "").toContain("🔧");
   });
 });
