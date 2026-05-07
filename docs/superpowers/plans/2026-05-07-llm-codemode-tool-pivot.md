@@ -4,7 +4,9 @@
 
 **Goal:** Replace `llm-codemode-dispatch` (prose-fence dispatch + fake user-message results) with a new `llm-codemode` plugin that registers `execute_typescript` as a normal OpenAI tool, and surface tool calls as a first-class transcript kind in `llm-tui`. Side effect: fixes `docs/TODO.md` item #2.
 
-**Architecture:** Drop the codemode-specific `tool-dispatch:strategy` provider; switch the openai-compatible harness to the existing `llm-native-dispatch` strategy and add a new `llm-codemode` plugin that registers exactly one tool (`execute_typescript`) via `tools:registry`. The native strategy invokes that tool like any other, producing standard `tool` role messages that the LLM recognizes on recall. Add a `tool:progress` event for sandbox stdout streaming, and add a `tool_call` transcript kind plus a tool-renderer service to `llm-tui`.
+**Architecture:** Drop the codemode-specific `tool-dispatch:strategy` provider; switch the openai-compatible harness to the existing `llm-native-dispatch` strategy and add a new `llm-codemode` plugin that registers exactly one tool (`execute_typescript`) via `tools:registry`. The native strategy invokes that tool like any other, producing standard `tool` role messages that the LLM recognizes on recall. Add a `tool:progress` event for sandbox stdout streaming, and add a `tool_call` transcript kind plus a tool-renderer service to `llm-tui`. Live tool-call rows render outside Ink's `<Static>` (which never repaints) and finalize into the static transcript on completion.
+
+**Pre-existing-bug callout:** `llm-native-dispatch/strategy.ts` returns the assistant message as the first element of its response array, but `llm-driver/loop.ts:237` already pre-appends the assistant message before invoking the strategy. The current codemode-dispatch path masks the bug because its return doesn't lead with an assistant entry. The harness swap exposes the bug. Phase A includes a fix to `llm-native-dispatch` to drop the leading assistant from its return.
 
 **Tech Stack:** Bun (test runner, transpiler, Worker), TypeScript, React + Ink (TUI), `json-schema-to-typescript` (DTS rendering), `mdast-util-from-markdown` (no longer needed — drops out).
 
@@ -14,26 +16,33 @@
 
 ## File structure
 
-### Phase A — `tool:progress` event
+### Phase A — `tool:progress` event + `llm-native-dispatch` contract fix
 
 - Modify: `plugins/llm-events/index.ts` — add `TOOL_PROGRESS: "tool:progress"` to VOCAB, add `defineEvent` call.
 - Modify: `plugins/llm-events/public.d.ts` — add matching `Vocab` interface entry.
 - Modify: `plugins/llm-events/index.test.ts` — add to expected set + spot-check.
 - Modify: `plugins/llm-events/package.json` — bump minor version.
+- Modify: `plugins/llm-native-dispatch/strategy.ts` — drop the leading assistant message from the `handleResponse` return.
+- Modify: `plugins/llm-native-dispatch/CLAUDE.md` — update the "Assistant message is included iff tool calls exist" invariant.
+- Modify: `plugins/llm-native-dispatch/test/strategy.test.ts` — update assertions to match the new return shape.
+- Create: `plugins/llm-native-dispatch/test/driver-integration.test.ts` — exercises the strategy through the real driver and asserts no assistant duplication.
+- Modify: `plugins/llm-native-dispatch/package.json` — bump minor version.
 
 ### Phase B — TUI changes (no codemode dependency)
 
-- Modify: `plugins/llm-tui/state/store.ts` — extend `TranscriptKind`, add `ToolCallEntry` shape, add `appendToolCall` / `updateToolCall`.
-- Modify: `plugins/llm-tui/state/store.test.ts` — tests for new methods.
+- Modify: `plugins/llm-tui/state/store.ts` — extend `TranscriptKind`, add `ToolCallEntry` shape, add `liveToolCalls` map, add `appendLiveToolCall` / `updateLiveToolCall` / `finalizeLiveToolCall` / `hasLiveToolCall` / `appendToolCallToTranscript`.
+- Modify: `plugins/llm-tui/state/store.test.ts` — tests for new methods, including the live→transcript transition and the "tool:error with no preceding tool:execute" path.
 - Create: `plugins/llm-tui/tool-renderers/registry.ts` — `makeToolRendererRegistry()` returns `{ service, lookup }`.
 - Create: `plugins/llm-tui/tool-renderers/registry.test.ts`.
-- Modify: `plugins/llm-tui/public.d.ts` — export `TuiToolRendererService`, `TuiToolRenderer`, `ToolCallStatus`.
+- Modify: `plugins/llm-tui/public.d.ts` — export `TuiToolRendererService`, `TuiToolRenderer`, `ToolCallStatus`, `ToolCallEntry`.
 - Create: `plugins/llm-tui/ui/ToolCallBlock.tsx` — collapsed/expanded views, default renderer for unknown tool names.
 - Create: `plugins/llm-tui/ui/ToolCallBlock.test.tsx`.
-- Modify: `plugins/llm-tui/ui/App.tsx` — add `tool_call` branch to `renderEntry`.
-- Modify: `plugins/llm-tui/ui/HistoryView.tsx` — generalize to include `tool_call` entries alongside `thoughts`.
+- Create: `plugins/llm-tui/ui/LiveToolCalls.tsx` — renders `liveToolCalls` outside `<Static>`, alongside `ThinkingBox`.
+- Create: `plugins/llm-tui/ui/LiveToolCalls.test.tsx`.
+- Modify: `plugins/llm-tui/ui/App.tsx` — add `tool_call` branch to `renderEntry`; render `<LiveToolCalls>` in the live area.
+- Modify: `plugins/llm-tui/ui/HistoryView.tsx` — generalize to include finalized `tool_call` entries alongside `thoughts`.
 - Modify: `plugins/llm-tui/ui/HistoryView.test.tsx`.
-- Modify: `plugins/llm-tui/index.tsx` — define service, subscribe to `tool:execute | tool:progress | tool:result | tool:error`, plumb registry through props.
+- Modify: `plugins/llm-tui/index.tsx` — define service, subscribe to `tool:execute | tool:progress | tool:result | tool:error` and `turn:end` (drop unfinalized live calls on rollback), plumb registry through props.
 
 ### Phase C — New `llm-codemode` plugin
 
@@ -134,77 +143,296 @@ git add plugins/llm-events/
 git commit -m "feat(llm-events): add tool:progress event for streaming tool stdout"
 ```
 
+### Task A3: Fix `llm-native-dispatch` to not duplicate the assistant message
+
+**Files:**
+- Modify: `plugins/llm-native-dispatch/strategy.ts`
+- Modify: `plugins/llm-native-dispatch/test/strategy.test.ts`
+- Modify: `plugins/llm-native-dispatch/CLAUDE.md`
+- Modify: `plugins/llm-native-dispatch/package.json`
+- Create: `plugins/llm-native-dispatch/test/driver-integration.test.ts`
+
+The driver pre-appends the assistant message at `plugins/llm-driver/loop.ts:237` before invoking the strategy. The current `handleResponse` returns the assistant message as the first array element, so when the driver iterates returned messages and appends each, the assistant ends up duplicated. The codemode-dispatch path masks this because its return doesn't lead with an assistant entry. Fix the contract here.
+
+- [ ] **Step 1: Write a failing integration test**
+
+Create `plugins/llm-native-dispatch/test/driver-integration.test.ts`:
+
+```typescript
+import { test, expect } from "bun:test";
+import { runConversation, type RunConversationDeps } from "llm-driver/loop";
+import { makeStrategy } from "../strategy.ts";
+import type { ChatMessage, ToolSchema } from "llm-events/public";
+
+function makeFakeServices() {
+  const messages: ChatMessage[] = [];
+  const sessions = {
+    beginTurn: () => ({
+      append: (m: ChatMessage) => { messages.push(m); },
+      commit: async () => {},
+      rollback: async () => {},
+    }),
+    getMessages: async () => [...messages],
+  };
+  return { sessions, messages };
+}
+
+test("native dispatch + driver does not duplicate the assistant message", async () => {
+  const { sessions, messages } = makeFakeServices();
+  const tool: ToolSchema = { name: "echo", description: "", parameters: { type: "object" } };
+
+  // Two-step LLM stream: first call returns a tool_call, second returns terminal text.
+  let callIdx = 0;
+  const llmComplete = {
+    async *complete() {
+      if (callIdx === 0) {
+        callIdx++;
+        yield { type: "done" as const, response: {
+          content: "I'll echo.",
+          toolCalls: [{ id: "c1", name: "echo", arguments: { msg: "hi" } }],
+          finishReason: "tool_calls" as const,
+        }};
+      } else {
+        yield { type: "done" as const, response: {
+          content: "Done.",
+          finishReason: "stop" as const,
+        }};
+      }
+    },
+    async listModels() { return []; },
+  };
+
+  const registry = {
+    list: () => [tool],
+    invoke: async () => "hi back",
+  };
+
+  const deps: RunConversationDeps = {
+    emit: async () => {},
+    llmComplete,
+    registry: registry as any,
+    strategy: makeStrategy(),
+    sessions: sessions as any,
+    log: () => {},
+    idGen: () => "turn-1",
+    defaultSystemPrompt: "",
+  };
+
+  await runConversation(
+    { sessionId: "s1", systemPrompt: "", userMessage: { role: "user", content: "echo hi" } },
+    deps,
+  );
+
+  const assistants = messages.filter((m) => m.role === "assistant");
+  // Expect exactly two assistant turns: the tool_call turn + the terminal turn.
+  expect(assistants).toHaveLength(2);
+  // First assistant carries the tool_calls.
+  expect(assistants[0]?.toolCalls?.[0]?.name).toBe("echo");
+  // Sequence: user, assistant(tool_calls), tool, assistant(terminal).
+  const roles = messages.map((m) => m.role);
+  expect(roles).toEqual(["user", "assistant", "tool", "assistant"]);
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails on the duplication bug**
+
+Run: `cd plugins/llm-native-dispatch && bun test test/driver-integration.test.ts`
+Expected: FAIL — likely with `Expected length: 2, Received: 3` (the duplicate assistant) or roles `["user","assistant","assistant","tool","assistant"]`.
+
+- [ ] **Step 3: Fix the strategy return**
+
+In `plugins/llm-native-dispatch/strategy.ts`, locate the block that builds the result array starting with the assistant:
+
+```typescript
+const assistant: ChatMessage = {
+  role: "assistant",
+  content: response.content ?? "",
+  toolCalls: calls,
+};
+const out: ChatMessage[] = [assistant];
+```
+
+Replace with:
+
+```typescript
+// The driver pre-appends the assistant message before calling handleResponse
+// (see plugins/llm-driver/loop.ts:237). We must NOT include it here, or it
+// duplicates in the conversation.
+const out: ChatMessage[] = [];
+```
+
+- [ ] **Step 4: Update the existing strategy unit tests**
+
+Open `plugins/llm-native-dispatch/test/strategy.test.ts`. Find any test that asserts the return array starts with an assistant message — those assertions need to drop. Specifically, replace assertions like:
+
+```typescript
+expect(result[0]?.role).toBe("assistant");
+expect(result[1]?.role).toBe("tool");
+```
+
+with:
+
+```typescript
+expect(result[0]?.role).toBe("tool");
+```
+
+Also remove assertions on the assistant entry's `toolCalls` field — that field is now driver-owned.
+
+- [ ] **Step 5: Update the CLAUDE.md invariant**
+
+In `plugins/llm-native-dispatch/CLAUDE.md`, replace this line in the Invariants section:
+
+```
+- **Assistant message is included iff tool calls exist.** Terminal (no tool calls) → return `[]` and the driver handles the assistant message. Non-terminal → first element of the returned array MUST be the assistant message with `toolCalls` attached. The driver detects "non-terminal" purely by `newMessages.length > 0`; do not signal it any other way.
+```
+
+with:
+
+```
+- **Strategy never returns the assistant message.** The driver pre-appends the assistant message itself at `loop.ts:237`. The strategy's return contains only `tool` role messages (one per tool call, in `response.toolCalls` order). Terminal (no tool calls) → return `[]`. Non-terminal → return one `tool` message per call. The driver detects "non-terminal" by `newMessages.length > 0`.
+```
+
+- [ ] **Step 6: Run all native-dispatch tests**
+
+Run: `cd plugins/llm-native-dispatch && bun test`
+Expected: PASS.
+
+- [ ] **Step 7: Bump minor version**
+
+In `plugins/llm-native-dispatch/package.json`, change `"version": "0.2.0"` to `"version": "0.3.0"`.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add plugins/llm-native-dispatch/
+git commit -m "fix(llm-native-dispatch): drop leading assistant from handleResponse return
+
+The driver pre-appends the assistant message; including it in the strategy's
+return duplicates it in the conversation. The bug is masked today because the
+openai-compatible harness uses llm-codemode-dispatch (whose return doesn't lead
+with an assistant). Bug reproducer added as test/driver-integration.test.ts."
+```
+
+- [ ] **Step 9: Local deploy of `llm-native-dispatch`**
+
+```bash
+mkdir -p ~/.kaizen/marketplaces/official/plugins/llm-native-dispatch@0.3.0
+cp -R plugins/llm-native-dispatch/. ~/.kaizen/marketplaces/official/plugins/llm-native-dispatch@0.3.0/
+(cd ~/.kaizen/marketplaces/official/plugins/llm-native-dispatch@0.3.0 \
+  && bun build --target=bun --outfile=dist/index.js index.ts)
+```
+
 ---
 
 ## Phase B: TUI changes
 
-### Task B1: Extend `TranscriptKind` and add tool_call entry shape
+### Task B1: Extend `TranscriptKind` and split live vs finalized tool calls
 
 **Files:**
 - Modify: `plugins/llm-tui/state/store.ts`
 - Modify: `plugins/llm-tui/state/store.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+Live tool calls live in a separate `liveToolCalls` map (rendered outside Ink's `<Static>`); only finalized ones are appended to `transcript`. This mirrors the `liveThinking → finalizeReasoning` pattern that already exists for streaming reasoning.
+
+- [ ] **Step 1: Write the failing tests**
 
 Append to `plugins/llm-tui/state/store.test.ts`:
 
 ```typescript
-test("appendToolCall adds a running tool_call entry", () => {
+test("appendLiveToolCall adds to liveToolCalls, not transcript", () => {
   const store = new TuiStore();
-  store.appendToolCall("call-1", "read_file", { path: "/etc/hosts" });
-  const t = store.snapshot().transcript;
-  expect(t).toHaveLength(1);
-  expect(t[0]?.kind).toBe("tool_call");
-  expect((t[0] as ToolCallEntry).callId).toBe("call-1");
-  expect((t[0] as ToolCallEntry).name).toBe("read_file");
-  expect((t[0] as ToolCallEntry).status).toBe("running");
-  expect((t[0] as ToolCallEntry).args).toEqual({ path: "/etc/hosts" });
+  store.appendLiveToolCall("call-1", "read_file", { path: "/etc/hosts" });
+  const snap = store.snapshot();
+  expect(snap.transcript).toHaveLength(0);
+  expect(snap.liveToolCalls.size).toBe(1);
+  const e = snap.liveToolCalls.get("call-1")!;
+  expect(e.name).toBe("read_file");
+  expect(e.status).toBe("running");
+  expect(e.args).toEqual({ path: "/etc/hosts" });
 });
 
-test("updateToolCall transitions status and attaches result", () => {
+test("updateLiveToolCall accumulates stdout deltas in liveToolCalls", () => {
   const store = new TuiStore();
-  store.appendToolCall("call-1", "read_file", { path: "/etc/hosts" });
-  store.updateToolCall("call-1", { status: "done", result: "127.0.0.1 localhost\n" });
-  const e = store.snapshot().transcript[0] as ToolCallEntry;
+  store.appendLiveToolCall("c1", "execute_typescript", { code: "x" });
+  store.updateLiveToolCall("c1", { stdoutDelta: "a" });
+  store.updateLiveToolCall("c1", { stdoutDelta: "b" });
+  const e = store.snapshot().liveToolCalls.get("c1")!;
+  expect(e.stdout).toBe("ab");
+});
+
+test("updateLiveToolCall on unknown id is a no-op", () => {
+  const store = new TuiStore();
+  expect(() => store.updateLiveToolCall("missing", { stdoutDelta: "x" })).not.toThrow();
+  expect(store.snapshot().liveToolCalls.size).toBe(0);
+});
+
+test("finalizeLiveToolCall moves entry from liveToolCalls into transcript", () => {
+  const store = new TuiStore();
+  store.appendLiveToolCall("c1", "read_file", { path: "/x" });
+  store.updateLiveToolCall("c1", { result: "data" });
+  store.finalizeLiveToolCall("c1", "done");
+  const snap = store.snapshot();
+  expect(snap.liveToolCalls.size).toBe(0);
+  expect(snap.transcript).toHaveLength(1);
+  const e = snap.transcript[0] as ToolCallEntry;
+  expect(e.kind).toBe("tool_call");
   expect(e.status).toBe("done");
-  expect(e.result).toBe("127.0.0.1 localhost\n");
+  expect(e.result).toBe("data");
 });
 
-test("updateToolCall accumulates stdoutDelta", () => {
+test("finalizeLiveToolCall on unknown id is a no-op", () => {
   const store = new TuiStore();
-  store.appendToolCall("call-1", "execute_typescript", { code: "console.log(1)" });
-  store.updateToolCall("call-1", { stdoutDelta: "1\n" });
-  store.updateToolCall("call-1", { stdoutDelta: "2\n" });
-  const e = store.snapshot().transcript[0] as ToolCallEntry;
-  expect(e.stdout).toBe("1\n2\n");
-});
-
-test("updateToolCall on unknown id is a no-op", () => {
-  const store = new TuiStore();
-  expect(() => store.updateToolCall("missing", { status: "done" })).not.toThrow();
+  expect(() => store.finalizeLiveToolCall("missing", "done")).not.toThrow();
   expect(store.snapshot().transcript).toHaveLength(0);
 });
 
-test("updateToolCall replaces the entry (snapshot identity changes)", () => {
+test("hasLiveToolCall reflects liveToolCalls membership", () => {
   const store = new TuiStore();
-  store.appendToolCall("call-1", "read_file", {});
-  const before = store.snapshot().transcript[0];
-  store.updateToolCall("call-1", { status: "done", result: "ok" });
-  const after = store.snapshot().transcript[0];
-  expect(after).not.toBe(before);
+  expect(store.hasLiveToolCall("c1")).toBe(false);
+  store.appendLiveToolCall("c1", "x", {});
+  expect(store.hasLiveToolCall("c1")).toBe(true);
+  store.finalizeLiveToolCall("c1", "done");
+  expect(store.hasLiveToolCall("c1")).toBe(false);
+});
+
+test("appendToolCallToTranscript appends a finalized entry directly (no live phase)", () => {
+  const store = new TuiStore();
+  store.appendToolCallToTranscript("c1", "read_file", { path: "/x" }, "error", undefined, "unknown tool");
+  const snap = store.snapshot();
+  expect(snap.liveToolCalls.size).toBe(0);
+  expect(snap.transcript).toHaveLength(1);
+  const e = snap.transcript[0] as ToolCallEntry;
+  expect(e.status).toBe("error");
+  expect(e.errorMessage).toBe("unknown tool");
+});
+
+test("clearLiveToolCalls drops in-flight entries (used on turn:end rollback)", () => {
+  const store = new TuiStore();
+  store.appendLiveToolCall("c1", "read_file", {});
+  store.clearLiveToolCalls();
+  expect(store.snapshot().liveToolCalls.size).toBe(0);
+});
+
+test("snapshot identity changes on every mutation", () => {
+  const store = new TuiStore();
+  const s1 = store.snapshot();
+  store.appendLiveToolCall("c1", "x", {});
+  const s2 = store.snapshot();
+  expect(s2).not.toBe(s1);
+  expect(s2.liveToolCalls).not.toBe(s1.liveToolCalls);
 });
 ```
 
-Add `ToolCallEntry` to the existing imports from `../state/store.ts` at the top of the test file.
+Add `ToolCallEntry` to the existing type imports from `../state/store.ts` at the top of the test file.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run tests to verify they fail**
 
 Run: `cd plugins/llm-tui && bun test state/store.test.ts`
-Expected: FAIL with errors like "ToolCallEntry is not exported" and "appendToolCall is not a function".
+Expected: FAIL — `ToolCallEntry` not exported, `appendLiveToolCall` not a function, etc.
 
-- [ ] **Step 3: Implement the new types**
+- [ ] **Step 3: Update the type definitions**
 
-In `plugins/llm-tui/state/store.ts`, modify the type definitions at the top of the file. Replace this block:
+In `plugins/llm-tui/state/store.ts`, replace the existing type definitions at the top of the file:
 
 ```typescript
 export type TranscriptKind = "output" | "notice" | "user" | "thoughts";
@@ -219,7 +447,6 @@ with:
 
 ```typescript
 export type TranscriptKind = "output" | "notice" | "user" | "thoughts" | "tool_call";
-
 export type ToolCallStatus = "running" | "done" | "error";
 
 export interface PlainTranscriptLine {
@@ -243,12 +470,58 @@ export interface ToolCallEntry {
 export type TranscriptLine = PlainTranscriptLine | ToolCallEntry;
 ```
 
-- [ ] **Step 4: Add the store methods**
+- [ ] **Step 4: Extend `TuiSnapshot` and `TuiStore` state**
+
+In `plugins/llm-tui/state/store.ts`, locate the `TuiSnapshot` interface and add a `liveToolCalls` field. Replace:
+
+```typescript
+export interface TuiSnapshot {
+  transcript: TranscriptLine[];
+  busy: BusyState;
+  input: InputState;
+  popup: PopupState | null;
+  status: Record<string, string>;
+  history: string[];
+  /** Live reasoning text accumulating during the current turn; null when idle. */
+  liveThinking: string | null;
+  viewMode: ViewMode;
+  historyView: HistoryViewState;
+}
+```
+
+with:
+
+```typescript
+export interface TuiSnapshot {
+  transcript: TranscriptLine[];
+  busy: BusyState;
+  input: InputState;
+  popup: PopupState | null;
+  status: Record<string, string>;
+  history: string[];
+  /** Live reasoning text accumulating during the current turn; null when idle. */
+  liveThinking: string | null;
+  /** Tool calls currently in flight (started but not finalized). Rendered outside <Static>. */
+  liveToolCalls: ReadonlyMap<string, ToolCallEntry>;
+  viewMode: ViewMode;
+  historyView: HistoryViewState;
+}
+```
+
+In the `TuiStore` class, locate the existing private fields (after `_liveThinking`) and add:
+
+```typescript
+private _liveToolCalls: Map<string, ToolCallEntry> = new Map();
+```
+
+In the `_build()` method, add `liveToolCalls: new Map(this._liveToolCalls)` to the returned snapshot. (Always copy: snapshot identity must change on each mutation, and consumers must not be able to mutate the live state.)
+
+- [ ] **Step 5: Add the store methods**
 
 In `plugins/llm-tui/state/store.ts`, locate the `appendUser` method and add directly below it:
 
 ```typescript
-appendToolCall(callId: string, name: string, args: unknown): void {
+appendLiveToolCall(callId: string, name: string, args: unknown): void {
   const entry: ToolCallEntry = {
     id: ++this._seq,
     kind: "tool_call",
@@ -258,47 +531,82 @@ appendToolCall(callId: string, name: string, args: unknown): void {
     status: "running",
     stdout: "",
   };
-  this._transcript = [...this._transcript, entry];
+  this._liveToolCalls = new Map(this._liveToolCalls).set(callId, entry);
   this._emit();
 }
 
-updateToolCall(callId: string, patch: {
-  status?: ToolCallStatus;
+updateLiveToolCall(callId: string, patch: {
   result?: string;
   errorMessage?: string;
   stdoutDelta?: string;
 }): void {
-  const idx = this._transcript.findIndex(
-    (e) => e.kind === "tool_call" && (e as ToolCallEntry).callId === callId,
-  );
-  if (idx < 0) return;
-  const cur = this._transcript[idx] as ToolCallEntry;
+  const cur = this._liveToolCalls.get(callId);
+  if (!cur) return;
   const next: ToolCallEntry = {
     ...cur,
-    ...(patch.status !== undefined ? { status: patch.status } : {}),
     ...(patch.result !== undefined ? { result: patch.result } : {}),
     ...(patch.errorMessage !== undefined ? { errorMessage: patch.errorMessage } : {}),
     stdout: patch.stdoutDelta !== undefined ? cur.stdout + patch.stdoutDelta : cur.stdout,
   };
-  this._transcript = [
-    ...this._transcript.slice(0, idx),
-    next,
-    ...this._transcript.slice(idx + 1),
-  ];
+  this._liveToolCalls = new Map(this._liveToolCalls).set(callId, next);
+  this._emit();
+}
+
+finalizeLiveToolCall(callId: string, finalStatus: "done" | "error"): void {
+  const cur = this._liveToolCalls.get(callId);
+  if (!cur) return;
+  const finalized: ToolCallEntry = { ...cur, status: finalStatus };
+  const nextMap = new Map(this._liveToolCalls);
+  nextMap.delete(callId);
+  this._liveToolCalls = nextMap;
+  this._transcript = [...this._transcript, finalized];
+  this._emit();
+}
+
+hasLiveToolCall(callId: string): boolean {
+  return this._liveToolCalls.has(callId);
+}
+
+appendToolCallToTranscript(
+  callId: string,
+  name: string,
+  args: unknown,
+  status: "done" | "error",
+  result?: string,
+  errorMessage?: string,
+): void {
+  const entry: ToolCallEntry = {
+    id: ++this._seq,
+    kind: "tool_call",
+    callId,
+    name,
+    args,
+    status,
+    stdout: "",
+    ...(result !== undefined ? { result } : {}),
+    ...(errorMessage !== undefined ? { errorMessage } : {}),
+  };
+  this._transcript = [...this._transcript, entry];
+  this._emit();
+}
+
+clearLiveToolCalls(): void {
+  if (this._liveToolCalls.size === 0) return;
+  this._liveToolCalls = new Map();
   this._emit();
 }
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [ ] **Step 6: Run tests to verify they pass**
 
 Run: `cd plugins/llm-tui && bun test state/store.test.ts`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add plugins/llm-tui/state/
-git commit -m "feat(llm-tui): add tool_call transcript kind with mutable status"
+git commit -m "feat(llm-tui): split live tool calls (outside Static) from finalized transcript entries"
 ```
 
 ### Task B2: Add the tool-renderer registry service
@@ -582,6 +890,141 @@ git add plugins/llm-tui/ui/ToolCallBlock.tsx plugins/llm-tui/ui/ToolCallBlock.te
 git commit -m "feat(llm-tui): default ToolCallBlock renderer"
 ```
 
+### Task B3a: `LiveToolCalls` component (renders the live area, outside `<Static>`)
+
+**Files:**
+- Create: `plugins/llm-tui/ui/LiveToolCalls.tsx`
+- Create: `plugins/llm-tui/ui/LiveToolCalls.test.tsx`
+
+- [ ] **Step 1: Write the failing test**
+
+Create `plugins/llm-tui/ui/LiveToolCalls.test.tsx`:
+
+```typescript
+import React from "react";
+import { test, expect } from "bun:test";
+import { render } from "ink-testing-library";
+import { LiveToolCalls } from "./LiveToolCalls.tsx";
+import { TuiStore } from "../state/store.ts";
+import { makeToolRendererRegistry } from "../tool-renderers/registry.ts";
+
+const theme = {
+  promptColor: "cyan",
+  outputColor: "white",
+  noticeColor: "gray",
+  busyColor: "yellow",
+  statusBarColor: "blue",
+} as const;
+
+test("renders nothing when no live tool calls exist", () => {
+  const store = new TuiStore();
+  const reg = makeToolRendererRegistry();
+  const { lastFrame } = render(
+    <LiveToolCalls store={store} registry={reg} theme={theme as any} />
+  );
+  expect((lastFrame() ?? "").trim()).toBe("");
+});
+
+test("renders one running entry per live tool call", () => {
+  const store = new TuiStore();
+  const reg = makeToolRendererRegistry();
+  store.appendLiveToolCall("c1", "read_file", { path: "/etc/hosts" });
+  store.appendLiveToolCall("c2", "execute_typescript", { code: "1+1" });
+  const { lastFrame } = render(
+    <LiveToolCalls store={store} registry={reg} theme={theme as any} />
+  );
+  const out = lastFrame() ?? "";
+  expect(out).toContain("read_file");
+  expect(out).toContain("execute_typescript");
+});
+
+test("repaints when stdoutDelta arrives (smoke check the subscribe wiring)", async () => {
+  const store = new TuiStore();
+  const reg = makeToolRendererRegistry();
+  store.appendLiveToolCall("c1", "execute_typescript", { code: "console.log(1)" });
+  const { lastFrame, rerender } = render(
+    <LiveToolCalls store={store} registry={reg} theme={theme as any} />
+  );
+  store.updateLiveToolCall("c1", { stdoutDelta: "hello\n" });
+  // useSyncExternalStore drives this — give Ink a tick to flush.
+  await new Promise((r) => setTimeout(r, 10));
+  rerender(<LiveToolCalls store={store} registry={reg} theme={theme as any} />);
+  expect(lastFrame() ?? "").toContain("hello");
+});
+```
+
+- [ ] **Step 2: Run to verify it fails**
+
+```bash
+cd plugins/llm-tui && bun test ui/LiveToolCalls.test.tsx
+```
+
+Expected: FAIL — module not found.
+
+- [ ] **Step 3: Implement the component**
+
+Create `plugins/llm-tui/ui/LiveToolCalls.tsx`:
+
+```typescript
+import React, { useSyncExternalStore } from "react";
+import { Box, Text } from "ink";
+import type { TuiStore } from "../state/store.ts";
+import type { ToolRendererRegistry } from "../tool-renderers/registry.ts";
+import type { TuiTheme } from "../theme/loader.ts";
+import { ToolCallBlock } from "./ToolCallBlock.tsx";
+
+export interface LiveToolCallsProps {
+  store: TuiStore;
+  registry: ToolRendererRegistry;
+  theme: TuiTheme;
+}
+
+/**
+ * Renders the in-flight tool calls. Lives OUTSIDE the App's <Static> wrapper
+ * so each frame can repaint as stdout streams in and status transitions.
+ */
+export const LiveToolCalls: React.FC<LiveToolCallsProps> = ({ store, registry, theme }) => {
+  const snap = useSyncExternalStore(
+    (cb) => store.subscribe(cb),
+    () => store.snapshot(),
+  );
+
+  if (snap.liveToolCalls.size === 0) return null;
+
+  return (
+    <Box flexDirection="column">
+      {[...snap.liveToolCalls.values()].map((entry) => (
+        <Box key={entry.callId} flexDirection="column">
+          <ToolCallBlock entry={entry} registry={registry} theme={theme} />
+          {entry.stdout && (
+            <Box flexDirection="column" paddingLeft={2}>
+              {entry.stdout.split("\n").map((line, i) => (
+                <Text key={i} color={theme.outputColor} dimColor>{line.length === 0 ? " " : line}</Text>
+              ))}
+            </Box>
+          )}
+        </Box>
+      ))}
+    </Box>
+  );
+};
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+cd plugins/llm-tui && bun test ui/LiveToolCalls.test.tsx
+```
+
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add plugins/llm-tui/ui/LiveToolCalls.tsx plugins/llm-tui/ui/LiveToolCalls.test.tsx
+git commit -m "feat(llm-tui): LiveToolCalls component renders in-flight calls outside <Static>"
+```
+
 ### Task B4: Wire `tool_call` rendering into `App.tsx`
 
 **Files:**
@@ -653,6 +1096,39 @@ const renderEntry = (e: TranscriptLine) => {
     </Text>
   );
 };
+```
+
+- [ ] **Step 2a: Render `<LiveToolCalls>` in the live area**
+
+In the same file, find the JSX block that renders the live area (the section showing `ThinkingBox` and `SpinnerLine` when `snap.viewMode !== "history"`). Add `<LiveToolCalls>` directly above the `ThinkingBox`:
+
+```typescript
+{snap.viewMode === "history" ? (
+  <HistoryView store={store} theme={theme} />
+) : (
+  <>
+    <LiveToolCalls store={store} registry={toolRenderers} theme={theme} />
+    {snap.busy.active && snap.liveThinking && (
+      <ThinkingBox text={snap.liveThinking} color={theme.noticeColor} />
+    )}
+    {snap.busy.active && <SpinnerLine color={theme.busyColor} message={snap.busy.message} />}
+    <InputBox
+      store={store}
+      registry={registry}
+      triggers={triggers}
+      theme={theme}
+      onSubmit={onSubmit}
+      onCtrlC={onCtrlC}
+    />
+    <StatusBar items={snap.status} color={theme.statusBarColor} />
+  </>
+)}
+```
+
+Add to the imports at the top:
+
+```typescript
+import { LiveToolCalls } from "./LiveToolCalls.tsx";
 ```
 
 - [ ] **Step 3: Run the existing App test to confirm no regression**
@@ -931,21 +1407,47 @@ In `plugins/llm-tui/index.tsx`, locate the existing block that subscribes to `st
 ```typescript
 ctx.on("tool:execute", async (payload: any) => {
   if (!payload || typeof payload.callId !== "string" || typeof payload.name !== "string") return;
-  store.appendToolCall(payload.callId, payload.name, payload.args);
+  store.appendLiveToolCall(payload.callId, payload.name, payload.args);
 });
 ctx.on("tool:progress", async (payload: any) => {
   if (!payload || typeof payload.callId !== "string" || typeof payload.delta !== "string") return;
-  store.updateToolCall(payload.callId, { stdoutDelta: payload.delta });
+  store.updateLiveToolCall(payload.callId, { stdoutDelta: payload.delta });
 });
 ctx.on("tool:result", async (payload: any) => {
   if (!payload || typeof payload.callId !== "string") return;
   const result = typeof payload.result === "string" ? payload.result : safeJson(payload.result);
-  store.updateToolCall(payload.callId, { status: "done", result });
+  if (store.hasLiveToolCall(payload.callId)) {
+    store.updateLiveToolCall(payload.callId, { result });
+    store.finalizeLiveToolCall(payload.callId, "done");
+  } else {
+    // tool:result without preceding tool:execute is unexpected, but render
+    // it as a finalized success row rather than swallowing the event.
+    const name = typeof payload.name === "string" ? payload.name : "(unknown)";
+    store.appendToolCallToTranscript(payload.callId, name, undefined, "done", result);
+  }
 });
 ctx.on("tool:error", async (payload: any) => {
   if (!payload || typeof payload.callId !== "string") return;
   const msg = typeof payload.message === "string" ? payload.message : "tool error";
-  store.updateToolCall(payload.callId, { status: "error", errorMessage: msg });
+  if (store.hasLiveToolCall(payload.callId)) {
+    store.updateLiveToolCall(payload.callId, { errorMessage: msg });
+    store.finalizeLiveToolCall(payload.callId, "error");
+  } else {
+    // tool:error can fire WITHOUT a prior tool:execute when the registry
+    // short-circuits: unknown tool, malformed args (from native-dispatch),
+    // or CANCEL_TOOL via tool:before-execute. Render the error directly.
+    const name = typeof payload.name === "string" ? payload.name : "(unknown)";
+    store.appendToolCallToTranscript(payload.callId, name, undefined, "error", undefined, msg);
+  }
+});
+```
+
+Update the existing `turn:end` handler to also drop unfinalized live tool calls (a turn rollback should leave no orphan rows):
+
+```typescript
+ctx.on("turn:end", async () => {
+  store.clearLiveThinking();
+  store.clearLiveToolCalls();
 });
 ```
 
@@ -1140,6 +1642,8 @@ git commit -m "feat(llm-codemode): scaffold new plugin (no implementation yet)"
 - Create: `plugins/llm-codemode/rpc-types.ts`
 - Create: `plugins/llm-codemode/dts-render.ts`
 - Create: `plugins/llm-codemode/assembler.ts`
+
+`assembler.ts` is the load-bearing module here: it exports `renderSurface(listRegistrations())` which produces the **grouped** TypeScript namespace blocks (`kaizen.tools.X`, `kaizen.mcp.<server>.X`, `kaizen.agents.X`, `kaizen.skills.X`, `kaizen.memory.X`) that match what the sandbox actually exposes. Task C6 uses this, not `dts-render.ts` (which produces a flat surface and is kept only for tests / future use).
 
 - [ ] **Step 1: Copy unchanged source files**
 
@@ -1608,7 +2112,7 @@ Create `plugins/llm-codemode/index.ts`:
 import type { KaizenPlugin } from "kaizen/types";
 import type { ToolHandler, ToolSchema, ToolsRegistryService, ToolExecutionContext } from "llm-events/public";
 import { loadConfig, realDeps } from "./config.ts";
-import { renderDts } from "./dts-render.ts";
+import { renderSurface, surfaceHash } from "./assembler.ts";
 import { runInSandbox, type SandboxRunResult } from "./sandbox-host.ts";
 import { formatToolResult } from "./serialize.ts";
 
@@ -1619,7 +2123,7 @@ const PARAMETERS = {
   properties: {
     code: {
       type: "string" as const,
-      description: "TypeScript source. Top-level await is allowed. Trailing expressions are returned. Use the kaizen.* APIs documented above to call tools, MCP servers, agents, skills, and memory.",
+      description: "TypeScript source. Top-level await is allowed. Trailing expressions are returned. Use the kaizen.* APIs documented in this tool's description to call tools, MCP servers, agents, skills, and memory.",
     },
   },
   required: ["code"],
@@ -1628,7 +2132,11 @@ const PARAMETERS = {
 
 const PREAMBLE = `Executes TypeScript in a sandboxed Bun Worker. Top-level await is allowed; the trailing expression's value is returned. Console output is captured as stdout. The sandbox exposes a typed \`kaizen\` global with the runtime's tools, MCP servers, agents, skills, and memory grouped by source. Prefer composing many operations in one code block over many sequential tool calls.
 
-Available API surface:`;
+Available API surface (regenerated from the live registry on every LLM call so late MCP/agent registrations are always visible):`;
+
+interface RegistryWithListRegistrations extends ToolsRegistryService {
+  listRegistrations(): Array<{ schema: ToolSchema; source: any }>;
+}
 
 const plugin: KaizenPlugin = {
   name: "llm-codemode",
@@ -1643,24 +2151,34 @@ const plugin: KaizenPlugin = {
 
     const config = await loadConfig(realDeps((m) => ctx.log(m)));
 
-    const toolsRegistry = ctx.useService?.("tools:registry") as
-      | (ToolsRegistryService & { listRegistrations?: () => Array<{ schema: ToolSchema; source: any }> })
-      | undefined;
-    if (!toolsRegistry) {
-      ctx.log("llm-codemode: tools:registry not available; nothing to register");
+    const toolsRegistry = ctx.useService?.("tools:registry") as RegistryWithListRegistrations | undefined;
+    if (!toolsRegistry || typeof toolsRegistry.listRegistrations !== "function") {
+      ctx.log("llm-codemode: tools:registry (with listRegistrations) not available; nothing to register");
       return;
     }
 
-    // Render the kaizen.tools surface from currently-registered tools, EXCLUDING
-    // ourselves. (Including execute_typescript in its own description would be
-    // recursive and useless.)
-    const otherTools = toolsRegistry.list().filter((t) => t.name !== TOOL_NAME);
-    const dts = await renderDts(otherTools);
-    const description = `${PREAMBLE}\n${dts}`;
+    // Cached surface. We re-render on llm:before-call to pick up late
+    // registrations (MCP servers loading async, dynamic agents). surfaceHash()
+    // short-circuits when nothing changed.
+    let cachedHash = "";
+    let cachedDescription = `${PREAMBLE}\n(loading…)`;
+
+    async function buildDescription(): Promise<string> {
+      // Exclude ourselves from the rendered surface — execute_typescript
+      // documenting itself would be recursive and useless.
+      const regs = toolsRegistry!.listRegistrations().filter((r) => r.schema.name !== TOOL_NAME);
+      const hash = surfaceHash(regs);
+      if (hash === cachedHash) return cachedDescription;
+      cachedHash = hash;
+      cachedDescription = `${PREAMBLE}\n${await renderSurface(regs)}`;
+      return cachedDescription;
+    }
+
+    const initialDescription = await buildDescription();
 
     const schema: ToolSchema = {
       name: TOOL_NAME,
-      description,
+      description: initialDescription,
       parameters: PARAMETERS,
     };
 
@@ -1687,11 +2205,27 @@ const plugin: KaizenPlugin = {
     };
 
     toolsRegistry.register(schema, handler);
+
+    // Refresh the description on every LLM call. The driver supports request
+    // mutation in this hook (see plugins/llm-driver/CLAUDE.md "llm:before-call
+    // is mutable + cancellable"). We mutate the tools[] entry in place rather
+    // than re-registering, which would create tools:registered/unregistered
+    // churn and a feedback loop.
+    ctx.on("llm:before-call", async (payload: any) => {
+      const req = payload?.request;
+      if (!req || !Array.isArray(req.tools)) return;
+      const idx = req.tools.findIndex((t: any) => t?.name === TOOL_NAME);
+      if (idx < 0) return;
+      const desc = await buildDescription();
+      req.tools[idx] = { ...req.tools[idx], description: desc };
+    });
   },
 };
 
 export default plugin;
 ```
+
+**Mode A vs B note:** This plugin registers `execute_typescript` unconditionally. In mode B (the default, when other tool-providing plugins are loaded), the LLM sees those tools alongside `execute_typescript`. In mode A (codemode-only), the user either omits other tool-providing plugins from their personal harness, or passes `toolFilter: { names: ["execute_typescript"] }` to `runConversation` (existing infrastructure at `plugins/llm-driver/loop.ts:189`). The architecture supports both; this plugin doesn't enforce one.
 
 - [ ] **Step 4: Run the index test**
 
@@ -2004,7 +2538,7 @@ Edit `harnesses/openai-compatible.json` and replace the line:
 with:
 
 ```
-"official/llm-native-dispatch@0.2.0",
+"official/llm-native-dispatch@0.3.0",
 "official/llm-codemode@0.1.0",
 ```
 
@@ -2015,10 +2549,10 @@ Note: this is the same edit that ships in Phase E, just done early so smoke test
 Run:
 
 ```bash
-ls ~/.kaizen/marketplaces/official/plugins/llm-native-dispatch@0.2.0/dist/index.js >/dev/null 2>&1 || (
-  mkdir -p ~/.kaizen/marketplaces/official/plugins/llm-native-dispatch@0.2.0
-  cp -R plugins/llm-native-dispatch/. ~/.kaizen/marketplaces/official/plugins/llm-native-dispatch@0.2.0/
-  cd ~/.kaizen/marketplaces/official/plugins/llm-native-dispatch@0.2.0 \
+ls ~/.kaizen/marketplaces/official/plugins/llm-native-dispatch@0.3.0/dist/index.js >/dev/null 2>&1 || (
+  mkdir -p ~/.kaizen/marketplaces/official/plugins/llm-native-dispatch@0.3.0
+  cp -R plugins/llm-native-dispatch/. ~/.kaizen/marketplaces/official/plugins/llm-native-dispatch@0.3.0/
+  cd ~/.kaizen/marketplaces/official/plugins/llm-native-dispatch@0.3.0 \
     && bun build --target=bun --outfile=dist/index.js index.ts
 )
 ```
@@ -2033,7 +2567,10 @@ For each target model the user actually uses (LM Studio, Ollama, etc.), start a 
 
 - [ ] **Check 3c: Multi-step turns work.** Prompt: "Read the file /etc/hostname using execute_typescript, then on the next turn, summarize what you read." Verify two consecutive turns each containing `tool_calls` followed by a final assistant message.
 
-- [ ] **Check 3d: Cancellation leaves the conversation well-formed.** Start a long-running call (e.g. `await new Promise(r => setTimeout(r, 60000))`), hit Ctrl+C mid-execution, and on the next turn verify the LLM is sent a synthetic `tool` message for that `tool_call_id`. Inspect with whatever session log/replay mechanism is available (the `llm-session-manager` plugin's transcript files).
+- [ ] **Check 3d: Cancellation rolls back the turn cleanly.** Start a long-running call (e.g. `await new Promise(r => setTimeout(r, 60000))`), hit Ctrl+C mid-execution. Verify in the TUI that:
+  - The live tool-call row disappears from the live area (the `turn:end` handler clears it).
+  - The next user prompt is accepted normally.
+  - Inspecting the session transcript (`llm-session-manager`'s persisted file), the cancelled turn is NOT present — the driver's `turnHandle.rollback()` discarded every message appended during the turn, so the next LLM request does not see a dangling `tool_call_id`. This is the documented behavior at `plugins/llm-driver/loop.ts:290-303`. (The earlier draft of this plan claimed a synthetic `tool` message would be injected; that contradicted actual driver behavior. Rollback is correct because nothing was committed.)
 
 - [ ] **Step 4: Document outcomes**
 
@@ -2184,6 +2721,61 @@ Expected: the new paragraph is present.
 
 - [ ] **Step 4: No commit (memory lives outside the repo)**
 
+### Task E4a: Update marketplace, lockfile, and root README
+
+**Files:**
+- Modify: `.kaizen/marketplace.json`
+- Modify: `bun.lock`
+- Modify: `README.md`
+
+- [ ] **Step 1: Update marketplace.json**
+
+In `.kaizen/marketplace.json`, do all of:
+- Remove the entry for `llm-codemode-dispatch` (any version).
+- Add an entry for `llm-codemode@0.1.0` mirroring the structure of other plugin entries in the file (use a sibling entry as the template — match its keys exactly).
+- Bump the entries for `llm-events` to `0.4.0`, `llm-tui` to `0.2.0`, and `llm-native-dispatch` to `0.3.0` to match the versions deployed during this pivot.
+- If `llm-native-dispatch` does not yet have a marketplace entry (it was not in the openai-compatible harness before), add one mirroring sibling entries.
+
+Verify with:
+
+```bash
+grep -n "llm-codemode\|llm-native-dispatch\|llm-events\|llm-tui" .kaizen/marketplace.json
+```
+
+Expected: `llm-codemode-dispatch` is gone; `llm-codemode@0.1.0`, `llm-native-dispatch@0.3.0`, `llm-events@0.4.0`, `llm-tui@0.2.0` are present.
+
+- [ ] **Step 2: Refresh `bun.lock`**
+
+Run from the repo root:
+
+```bash
+bun install
+```
+
+Expected: `bun.lock` is regenerated with no `llm-codemode-dispatch` references and new entries for `llm-codemode`. If the lockfile contains residual `llm-codemode-dispatch` lines, manually remove them (search with `grep -n llm-codemode-dispatch bun.lock`) and re-run `bun install`.
+
+- [ ] **Step 3: Update root `README.md`**
+
+Run:
+
+```bash
+grep -n "llm-codemode-dispatch\|code-mode dispatch\|tool-dispatch strategy" README.md
+```
+
+For each match, decide:
+- If the README references `llm-codemode-dispatch` by name → replace with `llm-codemode`.
+- If the README describes the dispatch strategy as "code-mode" → replace with "native OpenAI tool-calling, with `execute_typescript` available as a single tool that runs LLM-emitted TypeScript in a sandbox."
+- If the README links to the old design spec → update to point at the new spec.
+
+If no matches: README is fine; no edit needed.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add .kaizen/marketplace.json bun.lock README.md
+git commit -m "chore: align marketplace, lockfile, and root README with codemode pivot"
+```
+
 ### Task E5: Archive the spec and plan
 
 **Files:**
@@ -2230,11 +2822,11 @@ cat harnesses/openai-compatible.json
 ```
 
 Confirm:
-- Contains `"official/llm-native-dispatch@0.2.0"`.
+- Contains `"official/llm-native-dispatch@0.3.0"` (bumped in Task A3).
 - Contains `"official/llm-codemode@0.1.0"`.
 - Does NOT contain `"official/llm-codemode-dispatch@..."`.
-- Contains `"official/llm-tui@0.2.0"` (or whatever current version was bumped to).
-- Contains `"official/llm-events@0.4.0"` (the bumped version).
+- Contains `"official/llm-tui@0.2.0"`.
+- Contains `"official/llm-events@0.4.0"`.
 
 If `llm-events` is referenced as `0.3.0` in the manifest, update to `0.4.0`:
 
