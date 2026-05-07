@@ -1,0 +1,21 @@
+{
+  "name": "llm-codemode",
+  "version": "0.1.0",
+  "description": "Registers execute_typescript as a single tool that runs LLM-emitted TypeScript in a Bun Worker sandbox with the kaizen.tools.* typed API.",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "keywords": [
+    "kaizen-plugin"
+  ],
+  "dependencies": {
+    "json-schema-to-typescript": "^15.0.3",
+    "llm-tools-registry": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/json-schema": "^7.0.15",
+    "typescript": "^5.4.0"
+  }
+}
