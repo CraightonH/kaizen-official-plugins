@@ -40,6 +40,13 @@ export interface SessionsStoreService {
   getMessages(id: string): Promise<ChatMessage[]>;
   beginTurn(id: string, turnId: string): TurnHandle;
   list(opts?: { parentSessionId?: string | null; includeChildren?: boolean; limit?: number }): Promise<SessionRecord[]>;
+  /**
+   * Rename a session by setting (or clearing) its alias. Persists the new
+   * value to the snapshot atomically and appends a rename op to the index.
+   * Pass `null` to clear the alias. Throws if `id` is unknown or if another
+   * session under the same parent already uses `alias`.
+   */
+  rename(id: string, alias: string | null): Promise<SessionRecord>;
   delete(id: string, opts?: { cascade?: boolean }): Promise<void>;
   readEvents(id: string, opts?: { fromOffset?: number; limit?: number }): AsyncIterable<EventLogEntry>;
   internalAppendEvent?(sessionId: string, ts: number, event: string, payload: any): Promise<void>;
@@ -249,6 +256,32 @@ export function makeStore(deps: StoreDeps): SessionsStoreService {
     return filtered.slice(0, opts?.limit ?? filtered.length).map(indexRecordToSessionRecord);
   }
 
+  async function rename(id: string, alias: string | null): Promise<SessionRecord> {
+    validateFullSessionId(id);
+    const entry = index.get(id);
+    if (!entry) throw new Error(`rename: session '${id}' not found`);
+
+    const trimmed = typeof alias === "string" ? alias.trim() : null;
+    const nextAlias: string | undefined = trimmed ? trimmed : undefined;
+
+    if (nextAlias) {
+      const collision = index.list().find((e) =>
+        e.id !== id && e.alias === nextAlias && e.parentSessionId === entry.parentSessionId
+      );
+      if (collision) throw new Error(`rename: alias '${nextAlias}' already in use under same parent`);
+    }
+
+    const sess = loadIntoCache(id);
+    const next: Snapshot = { ...sess.snapshot, alias: nextAlias };
+    const paths = sessionPaths(root, id);
+    await writeSnapshotAtomic(paths.snapshot, paths.snapshotTmp, next);
+    sess.snapshot = next;
+    sess.record = recordFromSnapshot(next);
+    await index.appendRename({ id, alias: nextAlias });
+    await deps.emit("session:renamed", { id, alias: nextAlias ?? null });
+    return sess.record;
+  }
+
   async function deleteSession(id: string, opts?: { cascade?: boolean }): Promise<void> {
     validateFullSessionId(id);
     if (!index.get(id)) throw new Error(`delete: session '${id}' not found`);
@@ -287,6 +320,7 @@ export function makeStore(deps: StoreDeps): SessionsStoreService {
     getMessages,
     beginTurn,
     list,
+    rename,
     delete: deleteSession,
     readEvents,
     internalAppendEvent,

@@ -1,1 +1,0 @@
-1. add slash command /session:rename to rename active session, including on disk. Default session name logic unchanged.

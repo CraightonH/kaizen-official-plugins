@@ -67,6 +67,43 @@ describe("registerBuiltins", () => {
     expect(printed.join("\n")).toContain("s1");
   });
 
+  it("/session:rename calls sessions.rename for the active session", async () => {
+    const reg = createRegistry();
+    const renamed: { id: string; alias: string | null }[] = [];
+    const sessions = {
+      async rename(id: string, alias: string | null) {
+        renamed.push({ id, alias });
+        return { id, harness: "h", alias: alias ?? undefined, metadata: {}, createdAt: 1, pluginFingerprint: [] };
+      },
+    };
+    registerBuiltins(reg, { sessions: sessions as any, getActiveSessionId: () => "s-active" });
+    expect(reg.get("session:rename")).toBeDefined();
+    const { ctx, printed } = makeCtx();
+    ctx.args = "  pretty-name  ";
+    await reg.get("session:rename")!.handler(ctx as any);
+    expect(renamed).toEqual([{ id: "s-active", alias: "pretty-name" }]);
+    expect(printed.join("\n")).toContain("Renamed session s-active → pretty-name");
+  });
+
+  it("/session:rename rejects when no name is given or no session is active", async () => {
+    const reg = createRegistry();
+    const sessions = {
+      async rename(id: string, alias: string | null) {
+        return { id, harness: "h", alias: alias ?? undefined, metadata: {}, createdAt: 1, pluginFingerprint: [] };
+      },
+    };
+    let active: string | null = null;
+    registerBuiltins(reg, { sessions: sessions as any, getActiveSessionId: () => active });
+    const { ctx } = makeCtx();
+    ctx.args = "";
+    await expect(reg.get("session:rename")!.handler(ctx as any)).rejects.toThrow(/missing new session name/);
+    ctx.args = "x";
+    await expect(reg.get("session:rename")!.handler(ctx as any)).rejects.toThrow(/no active session/);
+    active = "s1";
+    ctx.args = "x";
+    await reg.get("session:rename")!.handler(ctx as any); // should not throw now
+  });
+
   it("/clear archives by creating a new active session", async () => {
     const reg = createRegistry();
     const sessions = {

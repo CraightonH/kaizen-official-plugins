@@ -53,6 +53,30 @@ describe("store", () => {
     expect(await store.getMessages(session.id)).toEqual([{ role: "assistant", content: "ok" }]);
   });
 
+  test("rename updates alias on snapshot, index, and emits session:renamed", async () => {
+    const { store, emitted } = setup();
+    const a = await store.create({ alias: "old-a" });
+    const b = await store.create({ alias: "b" });
+    const renamed = await store.rename(a.id, "new-a");
+    expect(renamed.alias).toBe("new-a");
+    // Persisted: the index reflects the new alias.
+    expect((await store.list()).find((s) => s.id === a.id)?.alias).toBe("new-a");
+    // Snapshot reload from disk reflects it too.
+    expect((await store.load(a.id)).alias).toBe("new-a");
+    // Collision under same parent rejects.
+    await expect(store.rename(a.id, "b")).rejects.toThrow(/already in use/i);
+    // Clear by passing null.
+    const cleared = await store.rename(a.id, null);
+    expect(cleared.alias).toBeUndefined();
+    expect((await store.list()).find((s) => s.id === a.id)?.alias).toBeUndefined();
+    expect(emitted.some((e) => e.event === "session:renamed")).toBe(true);
+  });
+
+  test("rename throws when the session does not exist", async () => {
+    const { store } = setup();
+    await expect(store.rename("00000000-0000-4000-8000-000000000999", "x")).rejects.toThrow(/not found/i);
+  });
+
   test("event log append/read and public id validation", async () => {
     const { store } = setup();
     const session = await store.create({});

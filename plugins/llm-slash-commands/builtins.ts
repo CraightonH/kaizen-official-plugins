@@ -159,6 +159,23 @@ export function registerBuiltins(registry: SlashRegistryService, deps: BuiltinDe
   );
 
   registry.register(
+    {
+      name: "session:rename",
+      description: "Rename the active session (alias only; id is unchanged)",
+      source: "builtin",
+      usage: "<new-name>",
+    },
+    async (ctx) => {
+      const newName = ctx.args.trim();
+      if (!newName) throw new Error("missing new session name");
+      const active = deps.getActiveSessionId?.() ?? null;
+      if (!active) throw new Error("no active session to rename");
+      const record = await sessions.rename(active, newName);
+      await ctx.print(`Renamed session ${record.id} → ${record.alias}`);
+    },
+  );
+
+  registry.register(
     { name: "session:delete", description: "Delete a session", source: "builtin", usage: "<id> [--cascade]" },
     async (ctx) => {
       const parts = ctx.args.split(/\s+/).filter(Boolean);

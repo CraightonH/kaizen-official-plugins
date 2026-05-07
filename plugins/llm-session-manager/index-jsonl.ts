@@ -17,6 +17,7 @@ export interface Index {
   get(id: string): IndexEntry | undefined;
   appendCreate(e: IndexEntry): Promise<void>;
   appendUpdate(u: { id: string; lastTurnAt: number }): Promise<void>;
+  appendRename(r: { id: string; alias: string | undefined }): Promise<void>;
   appendDelete(d: { id: string; cascade: boolean }): Promise<void>;
 }
 
@@ -53,6 +54,16 @@ export function openIndex(file: string, opts?: { harnessDir?: string }): Index {
       const current = map.get(update.id);
       if (current) map.set(update.id, { ...current, lastTurnAt: update.lastTurnAt });
     },
+    async appendRename(rename) {
+      appendFileSync(file, JSON.stringify({ op: "rename", ...rename }) + "\n");
+      const current = map.get(rename.id);
+      if (current) {
+        const next: IndexEntry = { ...current };
+        if (rename.alias) next.alias = rename.alias;
+        else delete next.alias;
+        map.set(rename.id, next);
+      }
+    },
     async appendDelete(del) {
       appendFileSync(file, JSON.stringify({ op: "delete", ...del }) + "\n");
       map.delete(del.id);
@@ -72,6 +83,14 @@ function applyOp(map: Map<string, IndexEntry>, op: any): void {
   } else if (op?.op === "update") {
     const current = map.get(op.id);
     if (current) map.set(op.id, { ...current, lastTurnAt: op.lastTurnAt });
+  } else if (op?.op === "rename") {
+    const current = map.get(op.id);
+    if (current) {
+      const next: IndexEntry = { ...current };
+      if (op.alias) next.alias = op.alias;
+      else delete next.alias;
+      map.set(op.id, next);
+    }
   } else if (op?.op === "delete") {
     map.delete(op.id);
     if (op.cascade) {
