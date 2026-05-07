@@ -20,10 +20,10 @@ export interface AppProps {
   triggers: Set<string>;
   theme: TuiTheme;
   onSubmit: (text: string) => void;
-  onCtrlC?: () => void;
+  onCancel?: () => void;
 }
 
-export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, triggers, theme, onSubmit, onCtrlC }) => {
+export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, triggers, theme, onSubmit, onCancel }) => {
   const snap = useSyncExternalStore(
     (cb) => store.subscribe(cb),
     () => store.snapshot(),
@@ -95,7 +95,7 @@ export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, trigge
             triggers={triggers}
             theme={theme}
             onSubmit={onSubmit}
-            onCtrlC={onCtrlC}
+            onCancel={onCancel}
           />
           <StatusBar items={snap.status} color={theme.statusBarColor} />
         </>

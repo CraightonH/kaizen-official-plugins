@@ -12,7 +12,7 @@ export interface InputBoxProps {
   triggers: Set<string>;
   theme: TuiTheme;
   onSubmit: (text: string) => void;
-  onCtrlC?: () => void;
+  onCancel?: () => void;
 }
 
 // Naive linear scan: returns true if `pos` falls inside an unbalanced
@@ -104,7 +104,7 @@ function snapCursor(s: string, pos: number, direction: -1 | 1): number {
   return direction < 0 ? ph.start : ph.end;
 }
 
-export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, theme, onSubmit, onCtrlC }) => {
+export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, theme, onSubmit, onCancel }) => {
   const snap = useSyncExternalStore(
     (cb) => store.subscribe(cb),
     () => store.snapshot(),
@@ -188,7 +188,6 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
   });
 
   useInput((input, key) => {
-    if (key.ctrl && input === "c") { onCtrlC?.(); return; }
 
     // Readline-style cursor navigation. macOS Terminal.app and iTerm2 with
     // "Option as Meta" / "Send Ctrl+A/E for ⌘+←/→" send these sequences:
@@ -210,6 +209,7 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
 
     if (key.escape) {
       if (popup) { store.closePopup(); return; }
+      onCancel?.();
       return;
     }
 

@@ -149,11 +149,9 @@ const plugin: KaizenPlugin = {
       return;
     }
 
-    const onCtrlC = () => {
+    const onCancel = () => {
       if (store.snapshot().busy.active) {
         ctx.emit("turn:cancel").catch(() => {});
-      } else {
-        process.exit(0);
       }
     };
 
@@ -175,9 +173,8 @@ const plugin: KaizenPlugin = {
         triggers={triggers}
         theme={theme}
         onSubmit={onSubmit}
-        onCtrlC={onCtrlC}
+        onCancel={onCancel}
       />,
-      { exitOnCtrlC: false },
     );
 
     const channel: TuiChannelService = {
