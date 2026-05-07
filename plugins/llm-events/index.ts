@@ -34,6 +34,7 @@ export const VOCAB: Vocab = Object.freeze({
   TOOL_EXECUTE: "tool:execute",
   TOOL_RESULT: "tool:result",
   TOOL_ERROR: "tool:error",
+  TOOL_PROGRESS: "tool:progress",
   CODEMODE_CODE_EMITTED: "codemode:code-emitted",
   CODEMODE_BEFORE_EXECUTE: "codemode:before-execute",
   CODEMODE_RESULT: "codemode:result",
