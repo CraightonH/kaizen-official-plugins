@@ -15,6 +15,6 @@
     "official/llm-driver@0.2.0",
     "official/llm-status-items@0.1.1",
     "official/llm-hooks-shell@0.1.0",
-    "official/llm-tui@0.1.0"
+    "official/llm-tui@0.2.0"
   ]
 }
