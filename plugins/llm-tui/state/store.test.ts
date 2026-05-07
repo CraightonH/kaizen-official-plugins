@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { TuiStore, type CompletionItem } from "./store.ts";
+import { TuiStore, type CompletionItem, type ToolCallEntry } from "./store.ts";
 
 describe("TuiStore", () => {
   it("appendOutput adds an output line and notifies subscribers", () => {
@@ -188,6 +188,91 @@ describe("TuiStore", () => {
       s.enterHistoryMode();
       s.exitHistoryMode();
       expect(s.snapshot().viewMode).toBe("chat");
+    });
+  });
+
+  describe("live tool calls", () => {
+    it("appendLiveToolCall adds to liveToolCalls, not transcript", () => {
+      const store = new TuiStore();
+      store.appendLiveToolCall("call-1", "read_file", { path: "/etc/hosts" });
+      const snap = store.snapshot();
+      expect(snap.transcript).toHaveLength(0);
+      expect(snap.liveToolCalls.size).toBe(1);
+      const e = snap.liveToolCalls.get("call-1")!;
+      expect(e.name).toBe("read_file");
+      expect(e.status).toBe("running");
+      expect(e.args).toEqual({ path: "/etc/hosts" });
+    });
+
+    it("updateLiveToolCall accumulates stdout deltas in liveToolCalls", () => {
+      const store = new TuiStore();
+      store.appendLiveToolCall("c1", "execute_typescript", { code: "x" });
+      store.updateLiveToolCall("c1", { stdoutDelta: "a" });
+      store.updateLiveToolCall("c1", { stdoutDelta: "b" });
+      const e = store.snapshot().liveToolCalls.get("c1")!;
+      expect(e.stdout).toBe("ab");
+    });
+
+    it("updateLiveToolCall on unknown id is a no-op", () => {
+      const store = new TuiStore();
+      expect(() => store.updateLiveToolCall("missing", { stdoutDelta: "x" })).not.toThrow();
+      expect(store.snapshot().liveToolCalls.size).toBe(0);
+    });
+
+    it("finalizeLiveToolCall moves entry from liveToolCalls into transcript", () => {
+      const store = new TuiStore();
+      store.appendLiveToolCall("c1", "read_file", { path: "/x" });
+      store.updateLiveToolCall("c1", { result: "data" });
+      store.finalizeLiveToolCall("c1", "done");
+      const snap = store.snapshot();
+      expect(snap.liveToolCalls.size).toBe(0);
+      expect(snap.transcript).toHaveLength(1);
+      const e = snap.transcript[0] as ToolCallEntry;
+      expect(e.kind).toBe("tool_call");
+      expect(e.status).toBe("done");
+      expect(e.result).toBe("data");
+    });
+
+    it("finalizeLiveToolCall on unknown id is a no-op", () => {
+      const store = new TuiStore();
+      expect(() => store.finalizeLiveToolCall("missing", "done")).not.toThrow();
+      expect(store.snapshot().transcript).toHaveLength(0);
+    });
+
+    it("hasLiveToolCall reflects liveToolCalls membership", () => {
+      const store = new TuiStore();
+      expect(store.hasLiveToolCall("c1")).toBe(false);
+      store.appendLiveToolCall("c1", "x", {});
+      expect(store.hasLiveToolCall("c1")).toBe(true);
+      store.finalizeLiveToolCall("c1", "done");
+      expect(store.hasLiveToolCall("c1")).toBe(false);
+    });
+
+    it("appendToolCallToTranscript appends a finalized entry directly (no live phase)", () => {
+      const store = new TuiStore();
+      store.appendToolCallToTranscript("c1", "read_file", { path: "/x" }, "error", undefined, "unknown tool");
+      const snap = store.snapshot();
+      expect(snap.liveToolCalls.size).toBe(0);
+      expect(snap.transcript).toHaveLength(1);
+      const e = snap.transcript[0] as ToolCallEntry;
+      expect(e.status).toBe("error");
+      expect(e.errorMessage).toBe("unknown tool");
+    });
+
+    it("clearLiveToolCalls drops in-flight entries (used on turn:end rollback)", () => {
+      const store = new TuiStore();
+      store.appendLiveToolCall("c1", "read_file", {});
+      store.clearLiveToolCalls();
+      expect(store.snapshot().liveToolCalls.size).toBe(0);
+    });
+
+    it("snapshot identity changes on every mutation", () => {
+      const store = new TuiStore();
+      const s1 = store.snapshot();
+      store.appendLiveToolCall("c1", "x", {});
+      const s2 = store.snapshot();
+      expect(s2).not.toBe(s1);
+      expect(s2.liveToolCalls).not.toBe(s1.liveToolCalls);
     });
   });
 
