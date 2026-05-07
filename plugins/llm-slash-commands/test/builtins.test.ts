@@ -85,23 +85,32 @@ describe("registerBuiltins", () => {
     expect(printed.join("\n")).toContain("Renamed session s-active → pretty-name");
   });
 
-  it("/session:rename rejects when no name is given or no session is active", async () => {
+  it("/session:rename prints usage when no name given, error when no active session, and surfaces store errors", async () => {
     const reg = createRegistry();
     const sessions = {
       async rename(id: string, alias: string | null) {
+        if (alias === "taken") throw new Error("alias 'taken' already in use under same parent");
         return { id, harness: "h", alias: alias ?? undefined, metadata: {}, createdAt: 1, pluginFingerprint: [] };
       },
     };
     let active: string | null = null;
     registerBuiltins(reg, { sessions: sessions as any, getActiveSessionId: () => active });
-    const { ctx } = makeCtx();
-    ctx.args = "";
-    await expect(reg.get("session:rename")!.handler(ctx as any)).rejects.toThrow(/missing new session name/);
-    ctx.args = "x";
-    await expect(reg.get("session:rename")!.handler(ctx as any)).rejects.toThrow(/no active session/);
+
+    const c1 = makeCtx();
+    c1.ctx.args = "";
+    await reg.get("session:rename")!.handler(c1.ctx as any);
+    expect(c1.printed.join("\n")).toMatch(/Usage:/);
+
+    const c2 = makeCtx();
+    c2.ctx.args = "x";
+    await reg.get("session:rename")!.handler(c2.ctx as any);
+    expect(c2.printed.join("\n")).toMatch(/No active session/);
+
     active = "s1";
-    ctx.args = "x";
-    await reg.get("session:rename")!.handler(ctx as any); // should not throw now
+    const c3 = makeCtx();
+    c3.ctx.args = "taken";
+    await reg.get("session:rename")!.handler(c3.ctx as any);
+    expect(c3.printed.join("\n")).toMatch(/Rename failed: alias 'taken' already in use/);
   });
 
   it("/clear archives by creating a new active session", async () => {

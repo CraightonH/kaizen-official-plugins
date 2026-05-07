@@ -167,11 +167,23 @@ export function registerBuiltins(registry: SlashRegistryService, deps: BuiltinDe
     },
     async (ctx) => {
       const newName = ctx.args.trim();
-      if (!newName) throw new Error("missing new session name");
+      if (!newName) {
+        await ctx.print("Usage: /session:rename <new-name>");
+        return;
+      }
       const active = deps.getActiveSessionId?.() ?? null;
-      if (!active) throw new Error("no active session to rename");
-      const record = await sessions.rename(active, newName);
-      await ctx.print(`Renamed session ${record.id} → ${record.alias}`);
+      if (!active) {
+        await ctx.print("No active session to rename.");
+        return;
+      }
+      try {
+        const record = await sessions.rename(active, newName);
+        await ctx.print(`Renamed session ${record.id} → ${record.alias}`);
+      } catch (e: any) {
+        // Surface rename errors (e.g. alias collision) to the transcript;
+        // the dispatcher's harness:error fallback has no subscriber.
+        await ctx.print(`Rename failed: ${e?.message ?? String(e)}`);
+      }
     },
   );
 
