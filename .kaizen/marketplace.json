@@ -118,16 +118,6 @@
     },
     {
       "kind": "plugin",
-      "name": "llm-codemode-dispatch",
-      "description": "Code-mode tool dispatch: LLM writes TypeScript calling kaizen.tools.* in a Bun Worker sandbox. Default dispatch strategy for local LLMs.",
-      "categories": ["llm", "tool-dispatch"],
-      "versions": [
-        { "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-codemode-dispatch" } },
-        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-codemode-dispatch" } }
-      ]
-    },
-    {
-      "kind": "plugin",
       "name": "llm-codemode",
       "description": "Registers execute_typescript as a single tool that runs LLM-emitted TypeScript in a Bun Worker sandbox with the kaizen.tools.* typed API.",
       "categories": ["llm", "tools", "sandbox"],
