@@ -5,6 +5,9 @@ import { join } from "node:path";
 import { harnessKey } from "./harness-key";
 import { makeStore, type SessionsStoreService } from "./store";
 import { makeTraceSubscriber } from "./trace-subscriber";
+import { makeCommands } from "./commands.ts";
+import { registerSlashCommands, type SlashRegistryLike } from "./slash.ts";
+import { registerToolCommands, type ToolsRegistryLike } from "./tools.ts";
 
 interface SessionManagerConfig {
   sessionsBase?: string;
@@ -29,13 +32,15 @@ const TRACE_EVENTS = [
   "codemode:error",
 ];
 
+const LIFECYCLE_EVENTS = ["harness:start", "session:active-changed"];
+
 const plugin: KaizenPlugin = {
   name: "llm-session-manager",
   apiVersion: "3.0.0",
   permissions: {
     tier: "scoped",
     fs: { read: ["~/.kaizen/sessions/**"], write: ["~/.kaizen/sessions/**"] },
-    events: { subscribe: TRACE_EVENTS },
+    events: { subscribe: [...TRACE_EVENTS, ...LIFECYCLE_EVENTS] },
   },
   services: {
     consumes: ["llm-events:vocabulary"],
@@ -62,6 +67,11 @@ const plugin: KaizenPlugin = {
     });
     ctx.provideService<SessionsStoreService>("sessions:store", store);
 
+    let activeSessionId: string | null = null;
+    ctx.on("session:active-changed", (payload: any) => {
+      if (typeof payload?.to === "string") activeSessionId = payload.to;
+    });
+
     const subscriber = makeTraceSubscriber({
       store,
       now: () => Date.now(),
@@ -72,6 +82,20 @@ const plugin: KaizenPlugin = {
         await subscriber.handle(event, payload);
       });
     }
+
+    // Register slash + tool adapters on harness:start so consumed registries
+    // are guaranteed to be provided. Both are soft dependencies.
+    ctx.on("harness:start", () => {
+      const cmds = makeCommands({ store, emit: ctx.emit.bind(ctx), getActiveSessionId: () => activeSessionId });
+      try {
+        const slash = ctx.useService<SlashRegistryLike>("slash:registry");
+        if (slash) registerSlashCommands(slash, cmds);
+      } catch { /* slash:registry absent — skip */ }
+      try {
+        const toolsReg = ctx.useService<ToolsRegistryLike>("tools:registry");
+        if (toolsReg) registerToolCommands(toolsReg, cmds);
+      } catch { /* tools:registry absent — skip */ }
+    });
   },
 };
 
