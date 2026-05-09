@@ -1,3 +1,7 @@
 1. Cleanup tool call messages in TUI. Don't need full JSON object, just show the args - more human readable. *example* from claude code:
 `Bash(cd ~/.kaizen/marketplaces/official/plugins/llm-session-manager@0.1.0 && bun -e 'import { makeStore } from "./store.ts";…)`
 Don't treat that as gospel truth and implement exactly this, just use it as an example of the kind of content that could be included in tool messages.
+2. Add /tools:list slash command. Recommend any others that might be useful. /tools:reload???? This is so the human can see what tools are loaded.
+3. Expose slash commands as tools to the LLM (ie. so it can run /clear). Maybe this is unnecessary - /session:new creates a fresh session which is essentially equivalent?
+4. In conjunction with 3, define a way that the LLM could `/clear` (or just /session:new) while also passing a new prompt to begin the next session. Essentially, I want the LLM to be able to autonomously decide it would be better to seed a new session than continue to bloat context.
+5. Add a /context slash command that provides comprehensive information about what is in current context. Should include a breakdown of tokens/% of whole context things like tool definitions, system prompt (not the whole thing), tool responses, user prompt represent. I want this to be a useful slash command for an LLM to make decisions on whether it should proactively clear context. 
