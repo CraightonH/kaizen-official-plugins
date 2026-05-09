@@ -58,6 +58,7 @@ describe("llm-events", () => {
       "session:deleted",
       "session:active-changed",
       "session:renamed",
+      "session:handoff",
       "input:submit",
       "input:handled",
       "conversation:user-message",
@@ -269,6 +270,10 @@ describe("llm-events", () => {
 
   it("VOCAB includes mcp:registration-conflict", () => {
     expect(VOCAB.MCP_REGISTRATION_CONFLICT).toBe("mcp:registration-conflict");
+  });
+
+  it("VOCAB.SESSION_HANDOFF is exposed", () => {
+    expect(VOCAB.SESSION_HANDOFF).toBe("session:handoff");
   });
 
   it("provides llm-events:vocabulary and defines every event name", async () => {

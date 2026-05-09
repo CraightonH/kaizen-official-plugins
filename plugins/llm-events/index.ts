@@ -14,6 +14,7 @@ export const VOCAB: Vocab = Object.freeze({
   SESSION_DELETED: "session:deleted",
   SESSION_ACTIVE_CHANGED: "session:active-changed",
   SESSION_RENAMED: "session:renamed",
+  SESSION_HANDOFF: "session:handoff",
   INPUT_SUBMIT: "input:submit",
   INPUT_HANDLED: "input:handled",
   CONVERSATION_USER_MESSAGE: "conversation:user-message",
