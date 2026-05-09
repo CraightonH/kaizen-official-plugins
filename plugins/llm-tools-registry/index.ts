@@ -1,6 +1,7 @@
 import type { KaizenPlugin } from "kaizen/types";
 import { makeRegistry } from "./registry.ts";
 import type { ToolsRegistryService } from "./registry.ts";
+import { registerSlashCommands, type SlashRegistryLike } from "./slash.ts";
 
 const plugin: KaizenPlugin = {
   name: "llm-tools-registry",
@@ -15,6 +16,13 @@ const plugin: KaizenPlugin = {
       description: "Central tool registry (single tool-execution chokepoint).",
     });
     ctx.provideService<ToolsRegistryService>("tools:registry", registry);
+
+    try {
+      const slash = ctx.useService<SlashRegistryLike>("slash:registry");
+      if (slash) registerSlashCommands(slash, registry);
+    } catch {
+      // slash:registry not present in this harness — skip silently.
+    }
   },
 };
 
