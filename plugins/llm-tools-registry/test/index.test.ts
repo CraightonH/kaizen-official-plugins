@@ -23,7 +23,7 @@ describe("llm-tools-registry plugin", () => {
   it("metadata", () => {
     expect(plugin.name).toBe("llm-tools-registry");
     expect(plugin.apiVersion).toBe("3.0.0");
-    expect(plugin.permissions).toEqual({ tier: "trusted" });
+    expect(plugin.permissions).toEqual({ tier: "unscoped" });
     expect(plugin.services?.provides).toContain("tools:registry");
     expect(plugin.services?.consumes).toContain("llm-events:vocabulary");
   });

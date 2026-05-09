@@ -6,7 +6,7 @@ import { registerSlashCommands, type SlashRegistryLike } from "./slash.ts";
 const plugin: KaizenPlugin = {
   name: "llm-tools-registry",
   apiVersion: "3.0.0",
-  permissions: { tier: "trusted" },
+  permissions: { tier: "unscoped" },
   services: { provides: ["tools:registry"], consumes: ["llm-events:vocabulary"] },
 
   async setup(ctx) {
