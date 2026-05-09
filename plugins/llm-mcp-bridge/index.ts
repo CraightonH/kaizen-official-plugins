@@ -5,6 +5,7 @@ import { loadConfig, realDeps, type ResolvedServerConfig } from "./config.ts";
 import { createClient } from "./client.ts";
 import { makeBridgeService } from "./service.ts";
 import { registerSlashCommands, type SlashRegistryLike } from "./slash.ts";
+import { registerToolPeers } from "./tools-peers.ts";
 
 const VERSION = "0.1.0";
 
@@ -55,6 +56,13 @@ const plugin: KaizenPlugin = {
     } else {
       log("llm-mcp-bridge: slash:registry not present; /mcp:* commands not registered");
     }
+
+    // Tool peers — same surface, shaped for the LLM.
+    registerToolPeers(
+      { register: (s, h) => registry.register(s as any, h as any) },
+      svc,
+      async () => (await loadConfig(realDeps(log))).servers,
+    );
 
     // Status-bar integration (best-effort). Hide the item entirely when no
     // servers are configured — emitting an empty value still renders the
