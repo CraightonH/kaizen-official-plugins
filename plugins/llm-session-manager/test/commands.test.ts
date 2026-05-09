@@ -35,7 +35,7 @@ describe("clearSession", () => {
 
     const result = await cmds.clearSession();
 
-    expect(result).toEqual({ from: "sess-1", to: "sess-2", alias: "happy-otter" });
+    expect(result).toEqual({ from: "sess-1", to: "sess-2", alias: "happy-otter", seeded: false });
     expect(bus.calls).toEqual([
       { event: "session:active-changed", payload: { from: "sess-1", to: "sess-2", alias: "happy-otter" } },
       { event: "conversation:cleared", payload: { from: "sess-1", to: "sess-2" } },
@@ -51,6 +51,115 @@ describe("clearSession", () => {
     const result = await cmds.clearSession();
     expect(result.from).toBe(null);
     expect(result.alias).toBe(null);
+  });
+});
+
+function fakeStoreCapturingMessages() {
+  const messages: any[] = [];
+  const store = fakeStore({
+    create: mock(async () => ({ id: "new-id", harness: "h", metadata: {}, createdAt: 0, pluginFingerprint: [] } as SessionRecord)),
+    beginTurn: mock((_id: string, turnId: string) => ({
+      turnId,
+      append: (m: any) => { messages.push(m); },
+      commit: async () => {},
+      rollback: async () => {},
+    })),
+  });
+  return { store, messages };
+}
+
+describe("clearSession validation", () => {
+  it("no prompt, no autostart: backward-compat (no handoff event)", async () => {
+    const store = fakeStore({
+      create: mock(async () => ({ id: "sess-2", harness: "h", metadata: {}, createdAt: 0, pluginFingerprint: [] } as SessionRecord)),
+    });
+    const bus = captureEmit();
+    const cmds = makeCommands({ store, emit: bus.emit, getActiveSessionId: () => "sess-1" });
+    await cmds.clearSession();
+    const events = bus.calls.map((c) => c.event);
+    expect(events).toContain("session:active-changed");
+    expect(events).not.toContain("session:handoff");
+  });
+
+  it("prompt + autostart=true: emits handoff with autostart=true", async () => {
+    const store = fakeStore({
+      create: mock(async () => ({ id: "sess-2", harness: "h", metadata: {}, createdAt: 0, pluginFingerprint: [] } as SessionRecord)),
+    });
+    const bus = captureEmit();
+    const cmds = makeCommands({ store, emit: bus.emit, getActiveSessionId: () => "sess-1" });
+    await cmds.clearSession({ prompt: "continue work", autostart: true });
+    const handoff = bus.calls.find((c) => c.event === "session:handoff");
+    expect(handoff).toBeDefined();
+    expect(handoff!.payload).toEqual({ from: "sess-1", to: "sess-2", prompt: "continue work", autostart: true });
+  });
+
+  it("prompt only: defaults autostart to true", async () => {
+    const store = fakeStore({
+      create: mock(async () => ({ id: "sess-2", harness: "h", metadata: {}, createdAt: 0, pluginFingerprint: [] } as SessionRecord)),
+    });
+    const bus = captureEmit();
+    const cmds = makeCommands({ store, emit: bus.emit, getActiveSessionId: () => "sess-1" });
+    await cmds.clearSession({ prompt: "go" });
+    const handoff = bus.calls.find((c) => c.event === "session:handoff");
+    expect(handoff).toBeDefined();
+    expect(handoff!.payload.autostart).toBe(true);
+  });
+
+  it("prompt + autostart=false: emits handoff with autostart=false", async () => {
+    const store = fakeStore({
+      create: mock(async () => ({ id: "sess-2", harness: "h", metadata: {}, createdAt: 0, pluginFingerprint: [] } as SessionRecord)),
+    });
+    const bus = captureEmit();
+    const cmds = makeCommands({ store, emit: bus.emit, getActiveSessionId: () => "sess-1" });
+    await cmds.clearSession({ prompt: "go", autostart: false });
+    const handoff = bus.calls.find((c) => c.event === "session:handoff");
+    expect(handoff).toBeDefined();
+    expect(handoff!.payload.autostart).toBe(false);
+  });
+
+  it("autostart=true with no prompt: rejects", async () => {
+    const cmds = makeCommands({ store: fakeStore(), emit: async () => [], getActiveSessionId: () => "sess-1" });
+    await expect(cmds.clearSession({ autostart: true } as any)).rejects.toThrow(/prompt/i);
+  });
+
+  it("autostart=false with no prompt: rejects", async () => {
+    const cmds = makeCommands({ store: fakeStore(), emit: async () => [], getActiveSessionId: () => "sess-1" });
+    await expect(cmds.clearSession({ autostart: false } as any)).rejects.toThrow(/prompt/i);
+  });
+
+  it("empty/whitespace prompt: rejects", async () => {
+    const cmds = makeCommands({ store: fakeStore(), emit: async () => [], getActiveSessionId: () => "sess-1" });
+    await expect(cmds.clearSession({ prompt: "   " })).rejects.toThrow(/non-empty/i);
+  });
+
+  it("active session is a child session: rejects handoff", async () => {
+    const cmds = makeCommands({ store: fakeStore(), emit: async () => [], getActiveSessionId: () => "parent/child" });
+    await expect(cmds.clearSession({ prompt: "x" })).rejects.toThrow(/top-level/i);
+  });
+
+  it("seeded user turn lands in new snapshot with meta.handoff.from", async () => {
+    const { store, messages } = fakeStoreCapturingMessages();
+    const bus = captureEmit();
+    const cmds = makeCommands({ store, emit: bus.emit, getActiveSessionId: () => "old-id" });
+    await cmds.clearSession({ prompt: "resume here" });
+    expect(messages.length).toBe(1);
+    expect(messages[0].role).toBe("user");
+    expect(messages[0].content).toBe("resume here");
+    expect(messages[0].meta.handoff.from).toBe("old-id");
+  });
+
+  it("event ordering: active-changed fires before handoff", async () => {
+    const store = fakeStore({
+      create: mock(async () => ({ id: "sess-2", harness: "h", metadata: {}, createdAt: 0, pluginFingerprint: [] } as SessionRecord)),
+    });
+    const bus = captureEmit();
+    const cmds = makeCommands({ store, emit: bus.emit, getActiveSessionId: () => "sess-1" });
+    await cmds.clearSession({ prompt: "go" });
+    const events = bus.calls.map((c) => c.event);
+    const idxActive = events.indexOf("session:active-changed");
+    const idxHandoff = events.indexOf("session:handoff");
+    expect(idxActive).toBeGreaterThanOrEqual(0);
+    expect(idxHandoff).toBeGreaterThan(idxActive);
   });
 });
 

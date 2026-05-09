@@ -10,10 +10,16 @@ export interface ClearResult {
   from: string | null;
   to: string;
   alias: string | null;
+  seeded: boolean;
+}
+
+export interface ClearOptions {
+  prompt?: string;
+  autostart?: boolean;
 }
 
 export interface CommandsApi {
-  clearSession(): Promise<ClearResult>;
+  clearSession(opts?: ClearOptions): Promise<ClearResult>;
   listSessions(opts: { includeChildren?: boolean }): Promise<SessionRecord[]>;
   resumeSession(opts: { id_or_alias: string }): Promise<{ id: string; alias: string | null }>;
   renameActiveSession(opts: { name: string }): Promise<{ id: string; alias: string }>;
@@ -21,13 +27,52 @@ export interface CommandsApi {
 }
 
 export function makeCommands(deps: CommandsDeps): CommandsApi {
-  async function clearSession(): Promise<ClearResult> {
+  async function clearSession(opts: ClearOptions = {}): Promise<ClearResult> {
+    const hasPrompt = typeof opts.prompt === "string" && opts.prompt.trim().length > 0;
+    const explicitPromptArg = "prompt" in opts;
+    const explicitAutostart = "autostart" in opts;
+
+    if (explicitAutostart && !hasPrompt) {
+      throw new Error("session:new: autostart requires a non-empty prompt");
+    }
+    if (explicitPromptArg && !hasPrompt) {
+      throw new Error("session:new: prompt must be non-empty");
+    }
+
     const from = deps.getActiveSessionId();
+    if (hasPrompt && from && from.includes("/")) {
+      throw new Error("session:new: handoff is supported only for top-level sessions");
+    }
+
     const next = await deps.store.create({});
     const alias = next.alias ?? null;
+
+    let seeded = false;
+    if (hasPrompt) {
+      const turn = deps.store.beginTurn(next.id, `seed-${next.id}`);
+      turn.append({
+        role: "user",
+        content: opts.prompt!,
+        meta: { handoff: { from } },
+      });
+      await turn.commit();
+      seeded = true;
+    }
+
     await deps.emit("session:active-changed", { from, to: next.id, alias });
     await deps.emit("conversation:cleared", { from, to: next.id });
-    return { from, to: next.id, alias };
+
+    if (hasPrompt) {
+      const autostart = opts.autostart !== false;
+      await deps.emit("session:handoff", {
+        from,
+        to: next.id,
+        prompt: opts.prompt!,
+        autostart,
+      });
+    }
+
+    return { from, to: next.id, alias, seeded };
   }
 
   async function listSessions(opts: { includeChildren?: boolean }): Promise<SessionRecord[]> {
