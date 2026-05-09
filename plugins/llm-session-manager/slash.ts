@@ -26,16 +26,36 @@ export function registerSlashCommands(slash: SlashRegistryLike, cmds: CommandsAp
   const offs: Array<() => void> = [];
 
   const newSessionHandler = async (ctx: SlashCommandContextLike) => {
-    const r = await cmds.clearSession();
-    await ctx.print(`Active session: ${r.to}`);
+    const raw = ctx.args.trim();
+    const opts: { prompt?: string; autostart?: boolean } = {};
+    if (raw) {
+      let text = raw;
+      if (text.startsWith("--draft")) {
+        opts.autostart = false;
+        text = text.slice("--draft".length).trim();
+      } else {
+        opts.autostart = true;
+      }
+      if (!text) {
+        await ctx.print("Usage: /session:new [--draft] <prompt-text>");
+        return;
+      }
+      opts.prompt = text;
+    }
+    const r = await cmds.clearSession(opts);
+    if (r.seeded) {
+      await ctx.print(`Active session: ${r.to} (seeded${opts.autostart === false ? "; draft" : ""})`);
+    } else {
+      await ctx.print(`Active session: ${r.to}`);
+    }
   };
 
   offs.push(slash.register(
-    { name: "clear", description: "Archive current session and start a fresh one", source: "builtin" },
+    { name: "clear", description: "Archive current session and start a fresh one", source: "builtin", usage: "[--draft] [prompt]" },
     newSessionHandler,
   ));
   offs.push(slash.register(
-    { name: "session:new", description: "Create and switch to a new top-level session", source: "plugin" },
+    { name: "session:new", description: "Create and switch to a new top-level session, optionally seeded with a starter prompt", source: "plugin", usage: "[--draft] [prompt]" },
     newSessionHandler,
   ));
 

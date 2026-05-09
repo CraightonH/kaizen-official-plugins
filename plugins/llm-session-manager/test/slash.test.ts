@@ -60,6 +60,36 @@ describe("session slash commands", () => {
     expect((cmds.clearSession as any).mock.calls.length).toBe(2);
   });
 
+  it("/session:new with no args: bare archive+switch (backward-compat)", async () => {
+    let captured: any = "no-call";
+    const cmds: any = { clearSession: async (o: any) => { captured = o; return { from: null, to: "x", alias: null, seeded: false }; } };
+    const handlers: Record<string, any> = {};
+    const slash = { register: (m: any, h: any) => { handlers[m.name] = h; return () => {}; } };
+    registerSlashCommands(slash as any, cmds);
+    await handlers["session:new"]({ args: "", print: async () => {} });
+    expect(captured).toEqual({});
+  });
+
+  it("/session:new <text>: prompt + autostart=true", async () => {
+    let captured: any = null;
+    const cmds: any = { clearSession: async (o: any) => { captured = o; return { from: null, to: "x", alias: null, seeded: true }; } };
+    const handlers: Record<string, any> = {};
+    const slash = { register: (m: any, h: any) => { handlers[m.name] = h; return () => {}; } };
+    registerSlashCommands(slash as any, cmds);
+    await handlers["session:new"]({ args: "continue the refactor", print: async () => {} });
+    expect(captured).toEqual({ prompt: "continue the refactor", autostart: true });
+  });
+
+  it("/session:new --draft <text>: prompt + autostart=false", async () => {
+    let captured: any = null;
+    const cmds: any = { clearSession: async (o: any) => { captured = o; return { from: null, to: "x", alias: null, seeded: true }; } };
+    const handlers: Record<string, any> = {};
+    const slash = { register: (m: any, h: any) => { handlers[m.name] = h; return () => {}; } };
+    registerSlashCommands(slash as any, cmds);
+    await handlers["session:new"]({ args: "--draft continue the refactor", print: async () => {} });
+    expect(captured).toEqual({ prompt: "continue the refactor", autostart: false });
+  });
+
   it("/session:list passes --all → includeChildren: true", async () => {
     const list = mock(async () => [
       { id: "s1", alias: "owl", harness: "h", metadata: {}, createdAt: 0, pluginFingerprint: [] },
