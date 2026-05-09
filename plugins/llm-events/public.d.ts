@@ -54,6 +54,13 @@ export interface ChatMessage {
   toolCalls?: ToolCall[];
   toolCallId?: string;
   name?: string;
+  /**
+   * Optional, plugin-defined metadata about the message. Persisted with the
+   * message in session snapshots. Reserved keys: `handoff` (set by
+   * llm-session-manager when a session was seeded via `session:new` with a
+   * prompt; payload is `{ from: <SessionId> }`).
+   */
+  meta?: Record<string, unknown>;
 }
 
 export interface ToolCall {

@@ -100,6 +100,15 @@ describe("llm-events", () => {
     expect(actual.size).toBe(expected.size);
   });
 
+  it("ChatMessage supports optional meta", () => {
+    const m: import("./public").ChatMessage = {
+      role: "user",
+      content: "hi",
+      meta: { handoff: { from: "abc" } },
+    };
+    expect(m.meta?.handoff).toBeDefined();
+  });
+
   it("re-exports tools:registry interface types", async () => {
     type _Probe = import("./public").ToolsRegistryService extends {
       register: (...a: any[]) => any;
