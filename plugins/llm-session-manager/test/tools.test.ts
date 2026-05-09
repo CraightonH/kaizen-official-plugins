@@ -82,6 +82,33 @@ describe("session tool peers", () => {
     expect((del as any).mock.calls[0][0]).toEqual({ id: "x", cascade: true });
   });
 
+  it("session:new tool schema accepts prompt + autostart", () => {
+    const { svc, tools } = fakeRegistry();
+    registerToolCommands(svc, fakeCommands());
+    const schema = tools.find((t) => t.schema.name === "session:new")!.schema;
+    expect(schema.parameters.properties.prompt).toBeDefined();
+    expect(schema.parameters.properties.autostart).toBeDefined();
+    expect(schema.parameters.additionalProperties).toBe(false);
+  });
+
+  it("session:new tool forwards args to clearSession", async () => {
+    const clear = mock(async (_opts: any) => ({ from: null, to: "x", alias: null, seeded: true }));
+    const { svc, tools } = fakeRegistry();
+    registerToolCommands(svc, fakeCommands({ clearSession: clear as any }));
+    const t = tools.find((tt) => tt.schema.name === "session:new")!;
+    await t.handler({ prompt: "go", autostart: false }, callCtx());
+    expect((clear as any).mock.calls[0][0]).toEqual({ prompt: "go", autostart: false });
+  });
+
+  it("session:new tool omits keys when args are missing/wrong-typed", async () => {
+    const clear = mock(async (_opts: any) => ({ from: null, to: "x", alias: null }));
+    const { svc, tools } = fakeRegistry();
+    registerToolCommands(svc, fakeCommands({ clearSession: clear as any }));
+    const t = tools.find((tt) => tt.schema.name === "session:new")!;
+    await t.handler({}, callCtx());
+    expect((clear as any).mock.calls[0][0]).toEqual({});
+  });
+
   it("session:rename surfaces underlying errors (no swallow)", async () => {
     const rename = mock(async () => { throw new Error("alias taken"); });
     const { svc, tools } = fakeRegistry();

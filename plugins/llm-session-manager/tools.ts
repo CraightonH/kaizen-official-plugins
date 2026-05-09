@@ -8,18 +8,29 @@ export interface ToolsRegistryLike {
   register(schema: ToolSchema, handler: ToolHandlerLike): () => void;
 }
 
-const EMPTY_OBJECT = { type: "object", properties: {}, additionalProperties: false } as const;
-
 export function registerToolCommands(tools: ToolsRegistryLike, cmds: CommandsApi): Array<() => void> {
   const offs: Array<() => void> = [];
 
   offs.push(tools.register(
     {
       name: "session:new",
-      description: "Archive the current session and start a fresh one. Returns ids of previous (from) and new (to) sessions.",
-      parameters: EMPTY_OBJECT as any,
+      description:
+        "Archive the current session and start a fresh one. Optionally seed the new session with a starter prompt — useful when context has grown bloated and you want to continue work in a clean session. With autostart=true (default), the new session immediately runs inference on the seeded prompt; with autostart=false, the prompt lands in the user input as a draft for the human to review. Returns ids of previous (from) and new (to) sessions and a seeded flag.",
+      parameters: {
+        type: "object",
+        properties: {
+          prompt:    { type: "string",  description: "Starter prompt for the new session. The new LLM sees this as its first user turn." },
+          autostart: { type: "boolean", description: "If true (default), inference begins immediately in the new session. If false, the prompt is queued as a draft for the human to review." },
+        },
+        additionalProperties: false,
+      } as any,
     },
-    async () => cmds.clearSession(),
+    async (args: any) => {
+      const opts: { prompt?: string; autostart?: boolean } = {};
+      if (typeof args?.prompt === "string") opts.prompt = args.prompt;
+      if (typeof args?.autostart === "boolean") opts.autostart = args.autostart;
+      return cmds.clearSession(opts);
+    },
   ));
 
   offs.push(tools.register(
