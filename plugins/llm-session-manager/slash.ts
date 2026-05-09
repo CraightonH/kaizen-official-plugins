@@ -4,7 +4,7 @@ import type { SessionRecord } from "./store.ts";
 export interface SlashCommandManifestLike {
   name: string;
   description: string;
-  source: "plugin";
+  source: "builtin" | "plugin";
   usage?: string;
 }
 export interface SlashCommandContextLike {
@@ -31,7 +31,7 @@ export function registerSlashCommands(slash: SlashRegistryLike, cmds: CommandsAp
   };
 
   offs.push(slash.register(
-    { name: "clear", description: "Archive current session and start a fresh one", source: "plugin" },
+    { name: "clear", description: "Archive current session and start a fresh one", source: "builtin" },
     newSessionHandler,
   ));
   offs.push(slash.register(
