@@ -16,11 +16,12 @@ function makeCtx() {
 }
 
 describe("registerBuiltins", () => {
-  it("registers /help and /exit on the registry", () => {
+  it("registers /help, /exit, and /history on the registry", () => {
     const reg = createRegistry();
     registerBuiltins(reg);
     expect(reg.get("help")).toBeDefined();
     expect(reg.get("exit")).toBeDefined();
+    expect(reg.get("history")).toBeDefined();
     expect(reg.get("help")!.manifest.source).toBe("builtin");
   });
 
@@ -32,120 +33,12 @@ describe("registerBuiltins", () => {
     expect(emitted).toEqual([{ event: "harness:exit-requested", payload: {} }]);
   });
 
-  it("registers session commands when sessions store is supplied", async () => {
+  it("/history emits tui:enter-history", async () => {
     const reg = createRegistry();
-    const sessions = {
-      next: 0,
-      records: [] as any[],
-      async create() {
-        const record = { id: `s${++this.next}`, harness: "h", metadata: {}, createdAt: this.next, pluginFingerprint: [] };
-        this.records.push(record);
-        return record;
-      },
-      async list() { return this.records; },
-      async exists(id: string) { return this.records.some((r) => r.id === id); },
-      async load(id: string) { return this.records.find((r) => r.id === id); },
-      async delete(id: string) { this.records = this.records.filter((r) => r.id !== id && !r.id.startsWith(id + "/")); },
-    };
-    let active: string | null = null;
-    registerBuiltins(reg, { sessions: sessions as any, getActiveSessionId: () => active });
-    expect(reg.get("session:new")).toBeDefined();
-    expect(reg.get("session:list")).toBeDefined();
-    expect(reg.get("session:resume")).toBeDefined();
-    expect(reg.get("session:delete")).toBeDefined();
-    expect(reg.get("clear")).toBeDefined();
-
-    const { ctx, emitted, printed } = makeCtx();
-    ctx.emit = mock(async (event: string, payload: any) => {
-      emitted.push({ event, payload });
-      if (event === "session:active-changed") active = payload.to;
-    });
-    await reg.get("session:new")!.handler(ctx as any);
-    expect(active).toBe("s1");
-    expect(emitted).toContainEqual({ event: "session:active-changed", payload: { from: null, to: "s1", alias: null } });
-    await reg.get("session:list")!.handler(ctx as any);
-    expect(printed.join("\n")).toContain("s1");
-  });
-
-  it("/session:rename calls sessions.rename for the active session", async () => {
-    const reg = createRegistry();
-    const renamed: { id: string; alias: string | null }[] = [];
-    const sessions = {
-      async rename(id: string, alias: string | null) {
-        renamed.push({ id, alias });
-        return { id, harness: "h", alias: alias ?? undefined, metadata: {}, createdAt: 1, pluginFingerprint: [] };
-      },
-    };
-    registerBuiltins(reg, { sessions: sessions as any, getActiveSessionId: () => "s-active" });
-    expect(reg.get("session:rename")).toBeDefined();
-    const { ctx, printed } = makeCtx();
-    ctx.args = "  pretty-name  ";
-    await reg.get("session:rename")!.handler(ctx as any);
-    expect(renamed).toEqual([{ id: "s-active", alias: "pretty-name" }]);
-    expect(printed.join("\n")).toContain("Renamed session s-active → pretty-name");
-  });
-
-  it("/session:rename prints usage when no name given, error when no active session, and surfaces store errors", async () => {
-    const reg = createRegistry();
-    const sessions = {
-      async rename(id: string, alias: string | null) {
-        if (alias === "taken") throw new Error("alias 'taken' already in use under same parent");
-        return { id, harness: "h", alias: alias ?? undefined, metadata: {}, createdAt: 1, pluginFingerprint: [] };
-      },
-    };
-    let active: string | null = null;
-    registerBuiltins(reg, { sessions: sessions as any, getActiveSessionId: () => active });
-
-    const c1 = makeCtx();
-    c1.ctx.args = "";
-    await reg.get("session:rename")!.handler(c1.ctx as any);
-    expect(c1.printed.join("\n")).toMatch(/Usage:/);
-
-    const c2 = makeCtx();
-    c2.ctx.args = "x";
-    await reg.get("session:rename")!.handler(c2.ctx as any);
-    expect(c2.printed.join("\n")).toMatch(/No active session/);
-
-    active = "s1";
-    const c3 = makeCtx();
-    c3.ctx.args = "taken";
-    await reg.get("session:rename")!.handler(c3.ctx as any);
-    expect(c3.printed.join("\n")).toMatch(/Rename failed: alias 'taken' already in use/);
-  });
-
-  it("/clear archives by creating a new active session", async () => {
-    const reg = createRegistry();
-    const sessions = {
-      async create() { return { id: "s-new", harness: "h", metadata: {}, createdAt: 1, pluginFingerprint: [] }; },
-    };
-    registerBuiltins(reg, { sessions: sessions as any, getActiveSessionId: () => "s-old" });
+    registerBuiltins(reg);
     const { ctx, emitted } = makeCtx();
-    await reg.get("clear")!.handler(ctx as any);
-    expect(emitted).toContainEqual({ event: "session:active-changed", payload: { from: "s-old", to: "s-new", alias: null } });
-    expect(emitted).toContainEqual({ event: "conversation:cleared", payload: { from: "s-old", to: "s-new" } });
-  });
-
-  it("/session:delete active session creates replacement only after preflight", async () => {
-    const reg = createRegistry();
-    const deleted: any[] = [];
-    const sessions = {
-      records: [
-        { id: "s1", harness: "h", metadata: {}, createdAt: 1, pluginFingerprint: [] },
-        { id: "s1/child", harness: "h", parentSessionId: "s1", metadata: {}, createdAt: 2, pluginFingerprint: [] },
-      ],
-      async list() { return this.records; },
-      async create() { return { id: "replacement", harness: "h", metadata: {}, createdAt: 3, pluginFingerprint: [] }; },
-      async delete(id: string, opts: any) { deleted.push({ id, opts }); },
-    };
-    registerBuiltins(reg, { sessions: sessions as any, getActiveSessionId: () => "s1" });
-    const { ctx, emitted } = makeCtx();
-    ctx.args = "s1";
-    await expect(reg.get("session:delete")!.handler(ctx as any)).rejects.toThrow(/children/);
-    expect(deleted).toEqual([]);
-    ctx.args = "s1 --cascade";
-    await reg.get("session:delete")!.handler(ctx as any);
-    expect(deleted).toEqual([{ id: "s1", opts: { cascade: true } }]);
-    expect(emitted).toContainEqual({ event: "session:active-changed", payload: { from: "s1", to: "replacement", alias: null } });
+    await reg.get("history")!.handler(ctx as any);
+    expect(emitted).toEqual([{ event: "tui:enter-history", payload: {} }]);
   });
 
   it("/help with no args groups all registered commands", async () => {

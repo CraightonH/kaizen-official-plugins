@@ -3,7 +3,6 @@ import type {
   SlashCommandManifest,
   SlashRegistryService,
 } from "./registry.ts";
-import type { SessionsStoreService, SessionRecord } from "llm-session-manager/public";
 
 interface Group {
   label: string;
@@ -13,12 +12,11 @@ interface Group {
 const DRIVER_BARE_NAMES = new Set(["clear", "model"]);
 
 const GROUPS: Group[] = [
-  // Built-ins shipped by this plugin (bare names not in the driver set).
   { label: "Built-in", match: (m) => m.source === "builtin" && !m.name.includes(":") && !DRIVER_BARE_NAMES.has(m.name) },
   { label: "Driver",   match: (m) => m.source === "builtin" && DRIVER_BARE_NAMES.has(m.name) },
   { label: "Skills",   match: (m) => m.name === "skills" || m.name.startsWith("skills:") || m.name.startsWith("skills-") },
   { label: "Agents",   match: (m) => m.name === "agents" || m.name.startsWith("agents:") },
-  { label: "Sessions", match: (m) => m.name.startsWith("session:") },
+  { label: "Sessions", match: (m) => m.name.startsWith("session:") || m.name === "clear" },
   { label: "Memory",   match: (m) => m.name.startsWith("memory:") },
   { label: "MCP",      match: (m) => m.name.startsWith("mcp:") },
   { label: "User",     match: (m) => m.source === "file" },
@@ -59,42 +57,14 @@ function helpAll(registry: SlashRegistryService): string {
   return lines.join("\n").replace(/\n+$/, "");
 }
 
-export interface BuiltinDeps {
-  sessions?: SessionsStoreService;
-  getActiveSessionId?: () => string | null;
-  log?: (msg: string) => void;
-}
-
-function sessionLine(record: SessionRecord): string {
-  const label = record.alias ? ` (${record.alias})` : "";
-  const agent = record.agentName ? ` agent=${record.agentName}` : "";
-  const marker = record.parentSessionId ? "  " : "";
-  return `${marker}${record.id}${label}${agent}`;
-}
-
-async function resolveSession(sessions: SessionsStoreService, token: string): Promise<SessionRecord> {
-  if (!token) throw new Error("missing session id");
-  if (await sessions.exists(token)) return sessions.load(token);
-  const all = await sessions.list({ includeChildren: true });
-  const match = all.find((record) => record.alias === token);
-  if (!match) throw new Error(`session not found: ${token}`);
-  return match;
-}
-
-export function registerBuiltins(registry: SlashRegistryService, deps: BuiltinDeps = {}): void {
+export function registerBuiltins(registry: SlashRegistryService): void {
   registry.register(
     { name: "help", description: "List available slash commands", source: "builtin", usage: "[command]" },
     async (ctx: SlashCommandContext) => {
       const arg = ctx.args.trim();
-      if (!arg) {
-        await ctx.print(helpAll(registry));
-        return;
-      }
+      if (!arg) { await ctx.print(helpAll(registry)); return; }
       const entry = registry.get(arg);
-      if (!entry) {
-        await ctx.print(`Unknown command: /${arg}.`);
-        return;
-      }
+      if (!entry) { await ctx.print(`Unknown command: /${arg}.`); return; }
       await ctx.print(formatEntry(entry.manifest));
     },
   );
@@ -110,117 +80,6 @@ export function registerBuiltins(registry: SlashRegistryService, deps: BuiltinDe
     { name: "history", description: "Open the session audit view (j/k focus, Enter expand, q quit)", source: "builtin" },
     async (ctx: SlashCommandContext) => {
       await ctx.emit("tui:enter-history", {});
-    },
-  );
-
-  if (!deps.sessions) return;
-  const sessions = deps.sessions;
-
-  registry.register(
-    { name: "clear", description: "Archive current session and start a fresh one", source: "builtin" },
-    async (ctx) => {
-      const from = deps.getActiveSessionId?.() ?? null;
-      const next = await sessions.create({});
-      await ctx.emit("session:active-changed", { from, to: next.id, alias: next.alias ?? null });
-      await ctx.emit("conversation:cleared", { from, to: next.id });
-      await ctx.print(`Active session: ${next.id}`);
-    },
-  );
-
-  registry.register(
-    { name: "session:new", description: "Create and switch to a new top-level session", source: "builtin" },
-    async (ctx) => {
-      const from = deps.getActiveSessionId?.() ?? null;
-      const next = await sessions.create({});
-      await ctx.emit("session:active-changed", { from, to: next.id, alias: next.alias ?? null });
-      await ctx.print(`Active session: ${next.id}`);
-    },
-  );
-
-  registry.register(
-    { name: "session:list", description: "List sessions", source: "builtin", usage: "[--all]" },
-    async (ctx) => {
-      const includeChildren = ctx.args.split(/\s+/).filter(Boolean).includes("--all");
-      const rows = await sessions.list({ includeChildren });
-      await ctx.print(rows.length ? rows.map(sessionLine).join("\n") : "No sessions.");
-    },
-  );
-
-  registry.register(
-    { name: "session:resume", description: "Resume a session by id or alias", source: "builtin", usage: "<id|alias>" },
-    async (ctx) => {
-      const token = ctx.args.trim();
-      const record = await resolveSession(sessions, token);
-      const from = deps.getActiveSessionId?.() ?? null;
-      await ctx.emit("session:active-changed", { from, to: record.id, alias: record.alias ?? null });
-      await ctx.emit("session:resumed", { id: record.id });
-      await ctx.print(`Active session: ${record.id}`);
-    },
-  );
-
-  registry.register(
-    {
-      name: "session:rename",
-      description: "Rename the active session (alias only; id is unchanged)",
-      source: "builtin",
-      usage: "<new-name>",
-    },
-    async (ctx) => {
-      const newName = ctx.args.trim();
-      if (!newName) {
-        await ctx.print("Usage: /session:rename <new-name>");
-        return;
-      }
-      const active = deps.getActiveSessionId?.() ?? null;
-      if (!active) {
-        await ctx.print("No active session to rename.");
-        return;
-      }
-      try {
-        const record = await sessions.rename(active, newName);
-        await ctx.print(`Renamed session ${record.id} → ${record.alias}`);
-      } catch (e: any) {
-        // Surface rename errors (e.g. alias collision) to the transcript;
-        // the dispatcher's harness:error fallback has no subscriber.
-        await ctx.print(`Rename failed: ${e?.message ?? String(e)}`);
-      }
-    },
-  );
-
-  registry.register(
-    { name: "session:delete", description: "Delete a session", source: "builtin", usage: "<id> [--cascade]" },
-    async (ctx) => {
-      const parts = ctx.args.split(/\s+/).filter(Boolean);
-      const cascade = parts.includes("--cascade");
-      const id = parts.find((part) => part !== "--cascade");
-      if (!id) throw new Error("missing session id");
-      const active = deps.getActiveSessionId?.() ?? null;
-
-      if (id !== active) {
-        await sessions.delete(id, { cascade });
-        await ctx.print(`Deleted session: ${id}`);
-        return;
-      }
-
-      const all = await sessions.list({ includeChildren: true });
-      const hasChildren = all.some((record) => record.id.startsWith(id + "/"));
-      if (hasChildren && !cascade) {
-        throw new Error(`delete: session '${id}' has children; pass --cascade`);
-      }
-
-      const replacement = await sessions.create({});
-      try {
-        await sessions.delete(id, { cascade });
-      } catch (err) {
-        try {
-          await sessions.delete(replacement.id, { cascade: true });
-        } catch (cleanupErr) {
-          deps.log?.(`llm-slash-commands: failed to delete unused replacement session ${replacement.id}: ${String((cleanupErr as any)?.message ?? cleanupErr)}`);
-        }
-        throw err;
-      }
-      await ctx.emit("session:active-changed", { from: id, to: replacement.id, alias: replacement.alias ?? null });
-      await ctx.print(`Active session: ${replacement.id}`);
     },
   );
 }

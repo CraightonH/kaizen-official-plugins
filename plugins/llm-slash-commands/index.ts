@@ -14,24 +14,17 @@ const plugin: KaizenPlugin = {
   name: "llm-slash-commands",
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
-  services: { consumes: ["sessions:store"], provides: ["slash:registry"] },
+  services: { provides: ["slash:registry"] },
 
   async setup(ctx) {
     const registry: SlashRegistryService = createRegistry();
-    ctx.consumeService?.("sessions:store");
-    let sessions: any;
-    try { sessions = ctx.useService("sessions:store"); } catch { sessions = undefined; }
     let activeSessionId: string | null = null;
     ctx.on?.("session:active-changed", (payload: any) => {
       if (typeof payload?.to === "string") activeSessionId = payload.to;
     });
 
     // Built-ins.
-    registerBuiltins(registry, {
-      sessions,
-      getActiveSessionId: () => activeSessionId,
-      log: (msg) => ctx.log(msg),
-    });
+    registerBuiltins(registry);
 
     // File commands.
     const home = process.env.HOME ?? "/";
