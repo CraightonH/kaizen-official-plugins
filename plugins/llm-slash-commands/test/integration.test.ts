@@ -126,6 +126,7 @@ describe("llm-slash-commands integration", () => {
     const tui = { register: (s: any) => { tuiSources.push(s); return () => {}; } };
     const { ctx } = makeCtx({ tuiCompletion: tui });
     await plugin.setup(ctx);
+    await ctx.emit("harness:start", {});
 
     expect(tuiSources.length).toBe(1);
     expect(tuiSources[0]!.trigger).toBe("/");

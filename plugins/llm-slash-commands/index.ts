@@ -59,16 +59,15 @@ const plugin: KaizenPlugin = {
     });
     ctx.on?.("input:submit", onSubmit, { priority: 100 });
 
-    // Optional llm-tui:completion.
-    let completion: TuiCompletionService | undefined;
-    try {
-      completion = ctx.useService<TuiCompletionService>("llm-tui:completion");
-    } catch {
-      completion = undefined;
-    }
-    if (completion) {
-      completion.register(buildCompletionSource(registry));
-    }
+    // Optional llm-tui:completion. Defer to harness:start so the lookup runs
+    // after llm-tui has provided the service (load order is no longer pinned
+    // by a hard consumes declaration).
+    ctx.on?.("harness:start", () => {
+      try {
+        const completion = ctx.useService<TuiCompletionService>("llm-tui:completion");
+        if (completion) completion.register(buildCompletionSource(registry));
+      } catch { /* llm-tui:completion absent — skip */ }
+    });
   },
 };
 
