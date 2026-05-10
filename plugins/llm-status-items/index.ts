@@ -3,6 +3,9 @@ import type { LLMCompleteService, ModelInfo } from "llm-events/public";
 import { applyEvent, initialState, type StatusState } from "./state.ts";
 import { formatDollars, loadRateTable, realCostDeps, tokensToCents, type CostDeps, type RateTable } from "./cost.ts";
 import { formatContextItem } from "./context.ts";
+import { buildSnapshot } from "./snapshot.ts";
+import { registerStatusSlash, type SlashRegistryLike } from "./slash.ts";
+import { registerStatusTool, type ToolsRegistryLike } from "./tool.ts";
 
 const SUBSCRIBED = [
   "harness:start",
@@ -22,7 +25,7 @@ const plugin: KaizenPlugin = {
   name: "llm-status-items",
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
-  services: { consumes: ["llm-events:vocabulary", "llm:complete"] },
+  services: { consumes: ["llm-events:vocabulary", "llm:complete", "slash:registry", "tools:registry"] },
 
   async setup(ctx) {
     ctx.consumeService("llm-events:vocabulary");
@@ -236,6 +239,25 @@ const plugin: KaizenPlugin = {
         await emitCost(name, payload);
       });
     }
+
+    // Snapshot getter for /status:show + status:show tool. Reads `state`,
+    // `costCents`, and `costActive` from this closure so every call returns
+    // current values without any caching.
+    const getSnapshot = () => buildSnapshot(state, costActive ? costCents : null);
+
+    // Soft registration on harness:start — slash and tools registries are
+    // optional peers. Both adapters are thin wrappers around the same
+    // getSnapshot closure; either can be absent without affecting the other.
+    ctx.on("harness:start", () => {
+      try {
+        const slash = ctx.useService<SlashRegistryLike>("slash:registry");
+        if (slash) registerStatusSlash(slash, getSnapshot);
+      } catch { /* slash:registry absent — skip */ }
+      try {
+        const toolsReg = ctx.useService<ToolsRegistryLike>("tools:registry");
+        if (toolsReg) registerStatusTool(toolsReg, getSnapshot);
+      } catch { /* tools:registry absent — skip */ }
+    });
   },
 };
 

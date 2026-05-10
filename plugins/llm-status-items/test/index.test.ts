@@ -5,7 +5,21 @@ interface Emit { event: string; payload: any }
 
 function makeCtx(opts: { rateTable?: Record<string, any> } = {}) {
   const subscribed: string[] = [];
-  const handlers: Record<string, (p: any) => void | Promise<void>> = {};
+  // Support multiple handlers per event name (plugins may register more than
+  // one ctx.on() for the same event — e.g. harness:start for both the reducer
+  // and adapter registration).
+  const handlerLists: Record<string, Array<(p: any) => void | Promise<void>>> = {};
+  const handlers = new Proxy({} as Record<string, (p: any) => Promise<void>>, {
+    get(_t, name: string) {
+      const fns = handlerLists[name];
+      if (!fns || fns.length === 0) return undefined;
+      return async (p: any) => { for (const fn of fns) await fn(p); };
+    },
+    set(_t, name: string, fn: (p: any) => void | Promise<void>) {
+      handlerLists[name] = [fn];
+      return true;
+    },
+  });
   const emits: Emit[] = [];
   return {
     subscribed,
@@ -14,7 +28,11 @@ function makeCtx(opts: { rateTable?: Record<string, any> } = {}) {
     log: mock(() => {}),
     config: {},
     defineEvent: mock(() => {}),
-    on: mock((name: string, fn: (p: any) => void) => { subscribed.push(name); handlers[name] = fn; }),
+    on: mock((name: string, fn: (p: any) => void) => {
+      subscribed.push(name);
+      if (!handlerLists[name]) handlerLists[name] = [];
+      handlerLists[name].push(fn);
+    }),
     emit: mock(async (event: string, payload: any) => { emits.push({ event, payload }); return []; }),
     defineService: mock(() => {}),
     provideService: mock(() => {}),
@@ -33,7 +51,9 @@ describe("llm-status-items setup", () => {
   it("subscribes to exactly the spec'd events", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    expect(ctx.subscribed.sort()).toEqual([
+    // Dedupe before sort: the registration wiring adds a second harness:start
+    // handler (for adapter registration) but the event set is the same.
+    expect([...new Set(ctx.subscribed)].sort()).toEqual([
       "conversation:cleared",
       "harness:start",
       "llm:before-call",
@@ -167,5 +187,87 @@ describe("llm-status-items setup", () => {
     await ctx.handlers["llm:before-call"]!({ request: { model: "memory-injected-model", messages: [] } });
     const modelEmit = ctx.emits.find((e: Emit) => e.event === "status:item-update" && e.payload?.key === "model");
     expect(modelEmit?.payload.value).toBe("memory-injected-model");
+  });
+});
+
+describe("status:show slash + tool registration", () => {
+  it("registers /status:show on slash:registry and 'status:show' on tools:registry on harness:start", async () => {
+    const ctx = makeCtx();
+    const slashRegistered: Array<{ name: string }> = [];
+    const toolsRegistered: Array<{ name: string }> = [];
+    ctx.useService = mock((id: string) => {
+      if (id === "slash:registry") {
+        return {
+          register: (manifest: any) => {
+            slashRegistered.push({ name: manifest.name });
+            return () => {};
+          },
+        };
+      }
+      if (id === "tools:registry") {
+        return {
+          register: (schema: any) => {
+            toolsRegistered.push({ name: schema.name });
+            return () => {};
+          },
+        };
+      }
+      return undefined;
+    });
+    await plugin.setup(ctx);
+    await ctx.handlers["harness:start"]!({});
+    expect(slashRegistered.map((e) => e.name)).toContain("status:show");
+    expect(toolsRegistered.map((e) => e.name)).toContain("status:show");
+  });
+
+  it("slash and tool adapters reflect the same snapshot derived from StatusState", async () => {
+    const ctx = makeCtx();
+    let slashHandler: ((ctx: { args: string; print: (t: string) => Promise<void> }) => Promise<void>) | null = null;
+    let toolHandler: ((args: any, ctx: any) => Promise<unknown>) | null = null;
+    ctx.useService = mock((id: string) => {
+      if (id === "slash:registry") {
+        return {
+          register: (manifest: any, h: any) => {
+            if (manifest.name === "status:show") slashHandler = h;
+            return () => {};
+          },
+        };
+      }
+      if (id === "tools:registry") {
+        return {
+          register: (schema: any, h: any) => {
+            if (schema.name === "status:show") toolHandler = h;
+            return () => {};
+          },
+        };
+      }
+      return undefined;
+    });
+    await plugin.setup(ctx);
+    await ctx.handlers["harness:start"]!({});
+    // Drive some state through the reducer.
+    await ctx.handlers["llm:before-call"]!({ request: { model: "gpt-4o-mini" } });
+    await ctx.handlers["llm:done"]!({
+      response: { usage: { promptTokens: 100, completionTokens: 50 } },
+    });
+
+    const printed: string[] = [];
+    await slashHandler!({ args: "", print: async (t) => { printed.push(t); } });
+    const toolResult = (await toolHandler!({}, { signal: new AbortController().signal, callId: "c", log: () => {} })) as any;
+
+    expect(printed[0]).toContain("model:           gpt-4o-mini");
+    expect(printed[0]).toContain("in=100");
+    expect(printed[0]).toContain("out=50");
+    expect(toolResult.model).toBe("gpt-4o-mini");
+    expect(toolResult.sessionTotals).toEqual({ promptTokens: 100, completionTokens: 50 });
+    expect(toolResult.contextWindow.lastPromptTokens).toBe(100);
+  });
+
+  it("works without slash:registry or tools:registry (both soft)", async () => {
+    const ctx = makeCtx();
+    ctx.useService = mock(() => undefined);
+    await plugin.setup(ctx);
+    // Should not throw.
+    await ctx.handlers["harness:start"]!({});
   });
 });
