@@ -117,9 +117,15 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
   const [histIdx, setHistIdx] = useState<number | null>(null);
   const queryToken = useRef(0);
   // Tracks the timestamp of the last Ctrl+C press so a second press within
-  // CTRL_C_EXIT_WINDOW_MS triggers a real exit instead of re-arming.
-  const ctrlCArmedAt = useRef<number | null>(null);
+  // CTRL_C_EXIT_WINDOW_MS triggers a real exit instead of re-arming. The
+  // armed state also drives a transient hint rendered below the input box;
+  // it's React state (not a transcript notice) so it disappears cleanly
+  // when the window expires instead of becoming a permanent scrollback
+  // line that lies after the timeout.
+  const [ctrlCArmed, setCtrlCArmed] = useState(false);
   const ctrlCTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Cleanup any pending arm timer on unmount.
+  useEffect(() => () => { if (ctrlCTimer.current) clearTimeout(ctrlCTimer.current); }, []);
 
   const popup = snap.popup;
   const value = snap.input.value;
@@ -202,23 +208,20 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
     // a second press within CTRL_C_EXIT_WINDOW_MS unmounts and exits.
     // Ink's exitOnCtrlC is disabled at render() so this handler owns it.
     if (key.ctrl && input === "c") {
-      const now = Date.now();
-      const armed = ctrlCArmedAt.current !== null && (now - ctrlCArmedAt.current) <= CTRL_C_EXIT_WINDOW_MS;
-      if (armed) {
+      if (ctrlCArmed) {
         if (ctrlCTimer.current) { clearTimeout(ctrlCTimer.current); ctrlCTimer.current = null; }
-        ctrlCArmedAt.current = null;
+        setCtrlCArmed(false);
         onExit?.();
         return;
       }
-      ctrlCArmedAt.current = now;
       if (ctrlCTimer.current) clearTimeout(ctrlCTimer.current);
-      ctrlCTimer.current = setTimeout(() => { ctrlCArmedAt.current = null; ctrlCTimer.current = null; }, CTRL_C_EXIT_WINDOW_MS);
+      ctrlCTimer.current = setTimeout(() => { setCtrlCArmed(false); ctrlCTimer.current = null; }, CTRL_C_EXIT_WINDOW_MS);
+      setCtrlCArmed(true);
       // Cancel an in-flight turn and clear any pending input buffer so the
       // user starts from a clean state on the next prompt.
       if (snap.busy.active) onCancel?.();
       if (value.length > 0) store.setInput("", 0);
       if (popup) store.closePopup();
-      store.appendNotice("Press Ctrl-C again to exit");
       return;
     }
 
@@ -504,6 +507,9 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
         );
       })}
       <Text color={theme.promptColor}>{bottomLine}</Text>
+      {ctrlCArmed && (
+        <Text color={theme.noticeColor} dimColor>Press Ctrl-C again to exit</Text>
+      )}
       {popup && <CompletionPopup popup={popup} noticeColor={theme.noticeColor} />}
     </Box>
   );

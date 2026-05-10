@@ -497,7 +497,7 @@ describe("InputBox", () => {
     it("first press shows hint and clears buffer; does NOT call onExit", async () => {
       const ctx = setup();
       let exited = false;
-      const { stdin } = render(
+      const { stdin, lastFrame } = render(
         <InputBox store={ctx.store} registry={ctx.reg} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} onExit={() => { exited = true; }} />,
       );
       await tick();
@@ -507,8 +507,21 @@ describe("InputBox", () => {
       await tick();
       expect(exited).toBe(false);
       expect(ctx.store.snapshot().input.value).toBe("");
-      const transcript = ctx.store.snapshot().transcript;
-      expect(transcript[transcript.length - 1]?.text).toContain("Press Ctrl-C again to exit");
+      expect(lastFrame()).toContain("Press Ctrl-C again to exit");
+    });
+
+    it("hint clears after the exit window expires", async () => {
+      const ctx = setup();
+      const { stdin, lastFrame } = render(
+        <InputBox store={ctx.store} registry={ctx.reg} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} onExit={() => {}} />,
+      );
+      await tick();
+      stdin.write("\x03");
+      await tick();
+      expect(lastFrame()).toContain("Press Ctrl-C again to exit");
+      // Window is 2000ms; wait it out and confirm the hint is gone.
+      await tick(2100);
+      expect(lastFrame()).not.toContain("Press Ctrl-C again to exit");
     });
 
     it("second Ctrl+C within window calls onExit", async () => {
