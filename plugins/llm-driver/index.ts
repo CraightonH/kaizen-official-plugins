@@ -111,6 +111,30 @@ const plugin: KaizenPlugin = {
     ctx.on("session:active-changed", (payload: any) => {
       if (typeof payload?.to === "string") state.activeSessionId = payload.to;
     });
+    // session:handoff (from llm-session-manager) carries autostart=true when
+    // the handed-off session already has a seeded user turn at its tail. We
+    // dispatch a turn against payload.to (not state.activeSessionId — pass it
+    // explicitly to avoid relying on subscriber ordering with active-changed).
+    // Single-flight guard: if a turn is already in progress we skip; the
+    // owned-turn path in runConversation creates its own turn lifecycle.
+    ctx.on("session:handoff", async (payload: any) => {
+      if (!payload || payload.autostart !== true) return;
+      if (typeof payload.to !== "string") return;
+      if (state.currentTurn) return;
+      if (!buildDeps) return;
+      try {
+        await runConversation(
+          {
+            systemPrompt: state.systemPrompt,
+            sessionId: payload.to,
+            trigger: "agent",
+          },
+          buildDeps(),
+        );
+      } catch (err) {
+        ctx.log(`session:handoff autostart failed: ${(err as any)?.message ?? String(err)}`);
+      }
+    });
     // Bridge system messages (slash command output, plugin notices) to the
     // UI so /help and friends are actually visible. Uses moduleUi resolved
     // in start() because kaizen forbids ctx.on registration past setup().

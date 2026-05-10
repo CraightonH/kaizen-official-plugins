@@ -83,4 +83,99 @@ describe("llm-driver integration (synthetic llm:complete)", () => {
     expect(seq.indexOf("turn:end")).toBeGreaterThan(seq.indexOf("conversation:assistant-message"));
     expect(seq.at(-1)).toBe("harness:end");
   });
+
+  it("driver runs a turn on session:handoff with autostart=true", async () => {
+    const handlers: Record<string, Function[]> = {};
+    const events: { name: string; payload: any }[] = [];
+    let completeCalls = 0;
+    const llm = {
+      async *complete() {
+        completeCalls++;
+        yield { type: "token", delta: "hi" } as const;
+        yield { type: "done", response: { content: "hi", finishReason: "stop" } } as const;
+      },
+      async listModels() { return []; },
+    };
+    const sessions = makeSessions();
+    const ctx: any = {
+      log: () => {},
+      config: {},
+      defineService: () => {},
+      provideService: () => {},
+      consumeService: () => {},
+      defineEvent: () => {},
+      useService: (n: string) => {
+        if (n === "llm:complete") return llm;
+        if (n === "sessions:store") return sessions;
+        throw new Error(`useService: no provider for '${n}'`);
+      },
+      on: (n: string, fn: Function) => { (handlers[n] ??= []).push(fn); return () => {}; },
+      emit: async (n: string, p?: any) => { events.push({ name: n, payload: p }); for (const fn of handlers[n] ?? []) await fn(p); },
+    };
+    await plugin.setup!(ctx);
+
+    // Simulate session-manager: create new session with seeded user turn at tail.
+    const newSession = await sessions.create();
+    const handle = sessions.beginTurn(newSession.id, "seed-turn");
+    handle.append({ role: "user", content: "seeded prompt" });
+    await handle.commit();
+
+    // Mirror real flow: active-changed fires before handoff.
+    await ctx.emit("session:active-changed", { from: null, to: newSession.id, alias: null });
+    await ctx.emit("session:handoff", { from: null, to: newSession.id, autostart: true });
+
+    // Allow any outstanding microtasks/awaits in the subscriber to settle.
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(completeCalls).toBe(1);
+    const msgs = await sessions.getMessages(newSession.id);
+    expect(msgs.at(-1)?.role).toBe("assistant");
+    const turnEnds = events.filter(e => e.name === "turn:end");
+    expect(turnEnds.length).toBe(1);
+    expect(turnEnds[0]!.payload.reason).toBe("complete");
+  });
+
+  it("driver no-ops on session:handoff with autostart=false", async () => {
+    const handlers: Record<string, Function[]> = {};
+    const events: { name: string; payload: any }[] = [];
+    let completeCalls = 0;
+    const llm = {
+      async *complete() {
+        completeCalls++;
+        yield { type: "done", response: { content: "x", finishReason: "stop" } } as const;
+      },
+      async listModels() { return []; },
+    };
+    const sessions = makeSessions();
+    const ctx: any = {
+      log: () => {},
+      config: {},
+      defineService: () => {},
+      provideService: () => {},
+      consumeService: () => {},
+      defineEvent: () => {},
+      useService: (n: string) => {
+        if (n === "llm:complete") return llm;
+        if (n === "sessions:store") return sessions;
+        throw new Error(`useService: no provider for '${n}'`);
+      },
+      on: (n: string, fn: Function) => { (handlers[n] ??= []).push(fn); return () => {}; },
+      emit: async (n: string, p?: any) => { events.push({ name: n, payload: p }); for (const fn of handlers[n] ?? []) await fn(p); },
+    };
+    await plugin.setup!(ctx);
+
+    const newSession = await sessions.create();
+    const handle = sessions.beginTurn(newSession.id, "seed-turn");
+    handle.append({ role: "user", content: "seeded prompt" });
+    await handle.commit();
+
+    await ctx.emit("session:active-changed", { from: null, to: newSession.id, alias: null });
+    await ctx.emit("session:handoff", { from: null, to: newSession.id, autostart: false });
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(completeCalls).toBe(0);
+    const turnStarts = events.filter(e => e.name === "turn:start");
+    expect(turnStarts.length).toBe(0);
+  });
 });
