@@ -65,10 +65,47 @@ test("uses custom collapsedSummary from a registered renderer", () => {
   expect(lastFrame() ?? "").toContain("path=/etc/hosts");
 });
 
-test("falls back to JSON.stringify of args when no renderer registered", () => {
+test("default summary surfaces the primary arg value (path) without JSON braces", () => {
   const reg = makeToolRendererRegistry();
   const { lastFrame } = render(
     <ToolCallBlock entry={entry()} registry={reg} theme={theme as any} />
   );
-  expect(lastFrame() ?? "").toContain('{"path":"/etc/hosts"}');
+  const out = lastFrame() ?? "";
+  expect(out).toContain("read_file(/etc/hosts)");
+  expect(out).not.toContain('{"path":');
+});
+
+test("default summary picks `command` over other keys for Bash-style tools", () => {
+  const reg = makeToolRendererRegistry();
+  const { lastFrame } = render(
+    <ToolCallBlock entry={entry({ name: "Bash", args: { command: "ls -la /tmp", description: "list tmp" } })} registry={reg} theme={theme as any} />
+  );
+  expect(lastFrame() ?? "").toContain("Bash(ls -la /tmp)");
+});
+
+test("default summary truncates very long values with an ellipsis", () => {
+  const reg = makeToolRendererRegistry();
+  const long = "a".repeat(200);
+  const { lastFrame } = render(
+    <ToolCallBlock entry={entry({ args: { command: long } })} registry={reg} theme={theme as any} />
+  );
+  expect(lastFrame() ?? "").toContain("…");
+});
+
+test("default summary collapses whitespace in multi-line commands", () => {
+  const reg = makeToolRendererRegistry();
+  const { lastFrame } = render(
+    <ToolCallBlock entry={entry({ name: "Bash", args: { command: "cd foo &&\n  bar\n  baz" } })} registry={reg} theme={theme as any} />
+  );
+  expect(lastFrame() ?? "").toContain("Bash(cd foo && bar baz)");
+});
+
+test("default summary falls back to key=value pairs when no primary key matches", () => {
+  const reg = makeToolRendererRegistry();
+  const { lastFrame } = render(
+    <ToolCallBlock entry={entry({ name: "weird", args: { foo: "1", bar: 2 } })} registry={reg} theme={theme as any} />
+  );
+  const out = lastFrame() ?? "";
+  expect(out).toContain("foo=1");
+  expect(out).toContain("bar=2");
 });
