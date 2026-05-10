@@ -67,3 +67,72 @@ describe("edit tool — str_replace", () => {
       .rejects.toThrow(/old_str must be non-empty/);
   });
 });
+
+describe("edit tool — insert", () => {
+  it("prepends when insert_line is 0", async () => {
+    const p = join(dir, "a.txt"); writeFileSync(p, "alpha\nbeta\n");
+    await handler({ command: "insert", path: p, insert_line: 0, insert_text: "ZERO\n" }, ctx);
+    expect(readFileSync(p, "utf8")).toBe("ZERO\nalpha\nbeta\n");
+  });
+
+  it("appends when insert_line equals file's line count", async () => {
+    const p = join(dir, "a.txt"); writeFileSync(p, "alpha\nbeta\n");
+    await handler({ command: "insert", path: p, insert_line: 2, insert_text: "GAMMA\n" }, ctx);
+    expect(readFileSync(p, "utf8")).toBe("alpha\nbeta\nGAMMA\n");
+  });
+
+  it("inserts after line N in the middle", async () => {
+    const p = join(dir, "a.txt"); writeFileSync(p, "alpha\nbeta\ngamma\n");
+    await handler({ command: "insert", path: p, insert_line: 1, insert_text: "MID\n" }, ctx);
+    expect(readFileSync(p, "utf8")).toBe("alpha\nMID\nbeta\ngamma\n");
+  });
+
+  it("preserves trailing-newline absence when appending verbatim", async () => {
+    const p = join(dir, "a.txt"); writeFileSync(p, "alpha\nbeta"); // no trailing \n; line count = 2
+    await handler({ command: "insert", path: p, insert_line: 2, insert_text: "GAMMA" }, ctx);
+    expect(readFileSync(p, "utf8")).toBe("alpha\nbetaGAMMA");
+  });
+
+  it("rejects insert_line past EOF", async () => {
+    const p = join(dir, "a.txt"); writeFileSync(p, "alpha\nbeta\n"); // 2 lines
+    await expect(handler({ command: "insert", path: p, insert_line: 3, insert_text: "X" }, ctx))
+      .rejects.toThrow(/exceeds file length 2 lines/);
+  });
+
+  it("rejects negative insert_line", async () => {
+    const p = join(dir, "a.txt"); writeFileSync(p, "x\n");
+    await expect(handler({ command: "insert", path: p, insert_line: -1, insert_text: "X" }, ctx))
+      .rejects.toThrow(/non-negative integer/);
+  });
+
+  it("rejects empty insert_text", async () => {
+    const p = join(dir, "a.txt"); writeFileSync(p, "x\n");
+    await expect(handler({ command: "insert", path: p, insert_line: 0, insert_text: "" }, ctx))
+      .rejects.toThrow(/insert_text must be non-empty/);
+  });
+
+  it("missing file throws ENOENT", async () => {
+    await expect(handler({ command: "insert", path: join(dir, "missing"), insert_line: 0, insert_text: "x" }, ctx))
+      .rejects.toThrow(/ENOENT/);
+  });
+
+  it("inserts into an empty file when insert_line is 0", async () => {
+    const p = join(dir, "a.txt"); writeFileSync(p, ""); // 0 lines
+    await handler({ command: "insert", path: p, insert_line: 0, insert_text: "first\n" }, ctx);
+    expect(readFileSync(p, "utf8")).toBe("first\n");
+  });
+});
+
+describe("edit tool — dispatcher", () => {
+  it("rejects unknown command", async () => {
+    const p = join(dir, "a.txt"); writeFileSync(p, "x");
+    await expect(handler({ command: "delete_lines", path: p } as any, ctx))
+      .rejects.toThrow(/unknown command/);
+  });
+
+  it("rejects missing command", async () => {
+    const p = join(dir, "a.txt"); writeFileSync(p, "x");
+    await expect(handler({ path: p } as any, ctx))
+      .rejects.toThrow(/unknown command/);
+  });
+});
