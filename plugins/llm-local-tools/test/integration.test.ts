@@ -43,17 +43,18 @@ function makeCtx(registry: any) {
 }
 
 describe("llm-local-tools integration", () => {
-  it("registers seven tools with correct tags", async () => {
+  it("registers eight tools with correct tags", async () => {
     const reg = makeFakeRegistry();
     await plugin.setup!(makeCtx(reg));
     expect(reg.list().map(s => s.name).sort()).toEqual(
-      ["bash", "create", "edit", "glob", "grep", "read", "write"]
+      ["bash", "create", "edit", "glob", "grep", "read", "web_fetch", "write"]
     );
     expect(reg.list({ tags: ["fs"] }).map(s => s.name).sort()).toEqual(
       ["create", "edit", "glob", "grep", "read", "write"]
     );
     expect(reg.list({ tags: ["shell"] }).map(s => s.name)).toEqual(["bash"]);
-    expect(reg.list({ tags: ["local"] })).toHaveLength(7);
+    expect(reg.list({ tags: ["web"] }).map(s => s.name)).toEqual(["web_fetch"]);
+    expect(reg.list({ tags: ["local"] })).toHaveLength(8);
   });
 
   it("end-to-end: create then read then grep through registry.invoke", async () => {
@@ -76,7 +77,7 @@ describe("llm-local-tools integration", () => {
   it("teardown removes every tool", async () => {
     const reg = makeFakeRegistry();
     const result = await plugin.setup!(makeCtx(reg)) as { teardown: () => Promise<void> };
-    expect(reg.list()).toHaveLength(7);
+    expect(reg.list()).toHaveLength(8);
     await result.teardown();
     expect(reg.list()).toHaveLength(0);
   });

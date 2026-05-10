@@ -9,7 +9,7 @@ interface ToolsRegistryService {
   invoke(name: string, args: unknown, ctx: any): Promise<unknown>;
 }
 
-export const TOOL_NAMES = ["read", "write", "create", "edit", "glob", "grep", "bash"] as const;
+export const TOOL_NAMES = ["read", "write", "create", "edit", "glob", "grep", "bash", "web_fetch"] as const;
 
 const plugin: KaizenPlugin = {
   name: "llm-local-tools",

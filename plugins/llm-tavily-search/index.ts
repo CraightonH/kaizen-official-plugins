@@ -1,0 +1,41 @@
+// plugins/llm-tavily-search/index.ts
+import type { KaizenPlugin } from "kaizen/types";
+import type { ToolSchema } from "llm-events/public";
+import { loadConfig, realDeps } from "./config.ts";
+import { schema, makeHandler } from "./tool.ts";
+
+interface ToolsRegistryService {
+  register(schema: ToolSchema, handler: (args: any, ctx: any) => Promise<unknown>): () => void;
+  list(filter?: { tags?: string[]; names?: string[] }): ToolSchema[];
+  invoke(name: string, args: unknown, ctx: any): Promise<unknown>;
+}
+
+export const TOOL_NAMES = ["web_search"] as const;
+
+const plugin: KaizenPlugin = {
+  name: "llm-tavily-search",
+  apiVersion: "3.0.0",
+  permissions: { tier: "trusted" },
+  services: { consumes: ["tools:registry"] },
+
+  async setup(ctx) {
+    const registry = ctx.useService<ToolsRegistryService>("tools:registry");
+    if (!registry) throw new Error("llm-tavily-search: tools:registry service not available");
+
+    const config = await loadConfig(realDeps((m) => ctx.log(m)));
+    if (!config.apiKey) {
+      ctx.log("llm-tavily-search: no API key found; web_search will error on call. Set TAVILY_API_KEY or ~/.kaizen/plugins/llm-tavily-search/config.json");
+    }
+
+    const handler = makeHandler({ config, fetch, log: (m) => ctx.log(m) });
+    const unregister = registry.register(schema, handler);
+
+    return {
+      async teardown() {
+        try { unregister(); } catch { /* idempotent */ }
+      },
+    };
+  },
+};
+
+export default plugin;

@@ -1,3 +1,4 @@
+// plugins/llm-tavily-search/test/scaffold.test.ts
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "../index.ts";
 
@@ -29,23 +30,21 @@ function makeCtx(registry: any) {
   } as any;
 }
 
-describe("llm-local-tools plugin", () => {
+describe("llm-tavily-search plugin", () => {
   it("metadata", () => {
-    expect(plugin.name).toBe("llm-local-tools");
+    expect(plugin.name).toBe("llm-tavily-search");
     expect(plugin.apiVersion).toBe("3.0.0");
     expect(plugin.services?.consumes).toContain("tools:registry");
   });
 
-  it("registers all eight tools at setup", async () => {
+  it("registers web_search at setup", async () => {
     const registry = makeRegistry();
     const ctx = makeCtx(registry);
     await plugin.setup!(ctx);
-    expect(registry.registered.sort()).toEqual(
-      ["bash", "create", "edit", "glob", "grep", "read", "web_fetch", "write"]
-    );
+    expect(registry.registered).toEqual(["web_search"]);
   });
 
-  it("teardown unregisters everything", async () => {
+  it("teardown unregisters", async () => {
     const registry = makeRegistry();
     const ctx = makeCtx(registry);
     const result = await plugin.setup!(ctx) as { teardown: () => Promise<void> };
@@ -54,10 +53,7 @@ describe("llm-local-tools plugin", () => {
   });
 
   it("throws if tools:registry is unavailable", async () => {
-    const ctx = {
-      log: () => {},
-      useService: () => undefined,
-    } as any;
+    const ctx = { log: () => {}, useService: () => undefined } as any;
     await expect(plugin.setup!(ctx)).rejects.toThrow(/tools:registry/);
   });
 });

@@ -5,6 +5,7 @@
     "official/openai-llm@0.1.0",
     "official/llm-tools-registry@0.2.0",
     "official/llm-local-tools@0.1.0",
+    "official/llm-tavily-search@0.1.0",
     "official/llm-mcp-bridge@0.1.1",
     "official/llm-skills@0.1.1",
     "official/llm-memory@0.1.1",

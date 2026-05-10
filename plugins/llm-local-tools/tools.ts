@@ -6,6 +6,7 @@ import * as editMod from "./tools/edit.ts";
 import * as globMod from "./tools/glob.ts";
 import * as grepMod from "./tools/grep.ts";
 import * as bashMod from "./tools/bash.ts";
+import * as webFetchMod from "./tools/web_fetch.ts";
 import type { ToolSchema } from "llm-events/public";
 
 export interface ToolEntry {
@@ -21,4 +22,5 @@ export const ALL_TOOLS: ToolEntry[] = [
   { schema: globMod.schema, handler: globMod.handler },
   { schema: grepMod.schema, handler: grepMod.handler },
   { schema: bashMod.schema, handler: bashMod.handler },
+  { schema: webFetchMod.schema, handler: webFetchMod.handler },
 ];

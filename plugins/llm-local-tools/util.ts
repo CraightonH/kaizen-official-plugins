@@ -9,6 +9,8 @@ export const READ_CAP_LINES = 2000;
 export const BASH_OUTPUT_CAP = 256 * 1024;
 export const GREP_DEFAULT_MAX = 200;
 export const GLOB_CAP = 1000;
+export const WEB_FETCH_CAP_BYTES = 512 * 1024;
+export const WEB_FETCH_DEFAULT_TIMEOUT_MS = 30000;
 
 export function resolvePath(p: string, baseCwd?: string): string {
   if (isAbsolute(p)) return p;
