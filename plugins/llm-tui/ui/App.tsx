@@ -51,6 +51,11 @@ export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, trigge
     if (e.kind === "user") {
       return (
         <Text>
+          {e.handoffFrom && (
+            <Text color={theme.noticeColor} dimColor>
+              {`[handoff from ${e.handoffFrom}] `}
+            </Text>
+          )}
           <Text color={theme.promptColor} bold>{"❯ "}</Text>
           <Text color={theme.outputColor} backgroundColor="#2a2a2a">{e.text}</Text>
         </Text>

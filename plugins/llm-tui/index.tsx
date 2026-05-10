@@ -110,6 +110,21 @@ const plugin: KaizenPlugin = {
       store.enterHistoryMode();
     });
 
+    // session:handoff → either prefill the input buffer for human review
+    // (autostart=false) or append the seeded prompt as a user transcript line
+    // with a handoff badge (autostart=true). The driver short-circuits the
+    // autostart=false case, so the TUI is the only path that surfaces the
+    // seeded prompt in either branch.
+    ctx.on("session:handoff", async (payload: any) => {
+      if (!payload || typeof payload.prompt !== "string") return;
+      if (payload.autostart === false) {
+        store.setInput(payload.prompt, payload.prompt.length);
+      } else {
+        const from = typeof payload.from === "string" ? payload.from : undefined;
+        store.appendUser(payload.prompt, from ? { handoffFrom: from } : undefined);
+      }
+    });
+
     // Tool lifecycle events → live tool calls + finalized transcript entries.
     ctx.on("tool:execute", async (payload: any) => {
       if (!payload || typeof payload.callId !== "string" || typeof payload.name !== "string") return;
@@ -200,6 +215,7 @@ const plugin: KaizenPlugin = {
       appendReasoning: (delta: string) => store.appendReasoning(delta),
       finalizeReasoning: () => store.finalizeReasoning(),
       clearLiveThinking: () => store.clearLiveThinking(),
+      setInputDraft: (text: string) => store.setInput(text, text.length),
     };
     ctx.provideService<TuiChannelService>("llm-tui:channel", channel);
 

@@ -83,6 +83,31 @@ describe("llm-tui plugin", () => {
     // No assertion on rendered output (non-TTY); just that it completed.
   });
 
+  it("subscribes to session:handoff and tolerates malformed payloads", async () => {
+    const ctx = makeCtx();
+    await plugin.setup(ctx);
+    expect(ctx.subs["session:handoff"]?.length).toBe(1);
+    const handler = ctx.subs["session:handoff"]![0]!;
+    // Malformed payloads must not throw.
+    await handler(undefined);
+    await handler({});
+    await handler({ prompt: 42 });
+    // Well-formed autostart=true / autostart=false also must not throw
+    // (store mutation is internal to the plugin; lifecycle correctness is
+    // covered by the store unit tests + UI tests).
+    await handler({ prompt: "hi", autostart: true, from: "abc" });
+    await handler({ prompt: "hi", autostart: false });
+  });
+
+  it("channel exposes setInputDraft", async () => {
+    const ctx = makeCtx();
+    await plugin.setup(ctx);
+    const ch = ctx.provided["llm-tui:channel"] as any;
+    expect(typeof ch.setInputDraft).toBe("function");
+    // Non-TTY mode provides the fallback channel; setInputDraft is a no-op there.
+    expect(() => ch.setInputDraft("draft")).not.toThrow();
+  });
+
   it("accepts harness-provided default theme via plugin config", async () => {
     const ctx = makeCtx({ config: { theme: { promptLabel: "kaizen" } } });
     await plugin.setup(ctx);

@@ -13,6 +13,24 @@ describe("TuiStore", () => {
     expect(count).toBe(1);
   });
 
+  it("appendUser records a user line without handoffFrom by default", () => {
+    const s = new TuiStore();
+    s.appendUser("hi");
+    const last = s.snapshot().transcript.at(-1)! as any;
+    expect(last.kind).toBe("user");
+    expect(last.text).toBe("hi");
+    expect(last.handoffFrom).toBeUndefined();
+  });
+
+  it("appendUser with handoffFrom records the marker on the entry", () => {
+    const s = new TuiStore();
+    s.appendUser("hi", { handoffFrom: "abc" });
+    const last = s.snapshot().transcript.at(-1)! as any;
+    expect(last.kind).toBe("user");
+    expect(last.text).toBe("hi");
+    expect(last.handoffFrom).toBe("abc");
+  });
+
   it("appendNotice records a notice line", () => {
     const s = new TuiStore();
     s.appendNotice("setup ok");

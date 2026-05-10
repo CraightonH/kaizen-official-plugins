@@ -26,6 +26,11 @@ export interface TuiChannelService {
   finalizeReasoning(): void;
   /** Discard accumulated reasoning without writing a transcript entry. */
   clearLiveThinking(): void;
+  /**
+   * Replace the input buffer contents (used for draft prefill on session:handoff
+   * with autostart=false). Cursor lands at the end of the inserted text.
+   */
+  setInputDraft(text: string): void;
 }
 
 export interface CompletionItem {

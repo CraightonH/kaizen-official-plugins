@@ -63,6 +63,28 @@ describe("App", () => {
     expect(lastFrame()).toContain("branch main");
   });
 
+  it("renders [handoff from <id>] badge on user lines with handoffFrom", async () => {
+    const ctx = setup();
+    ctx.store.appendUser("seeded prompt", { handoffFrom: "abc" });
+    const { lastFrame } = render(
+      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+    );
+    await tick();
+    expect(lastFrame()).toContain("[handoff from abc]");
+    expect(lastFrame()).toContain("seeded prompt");
+  });
+
+  it("does not render the handoff badge on plain user lines", async () => {
+    const ctx = setup();
+    ctx.store.appendUser("plain prompt");
+    const { lastFrame } = render(
+      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+    );
+    await tick();
+    expect(lastFrame()).toContain("plain prompt");
+    expect(lastFrame()).not.toContain("[handoff from");
+  });
+
   it("renders popup above input when popup is open near terminal bottom", async () => {
     // v0 contract: the popup is rendered AFTER the InputBox in the JSX tree
     // (which Ink lays out below). We capture the layout here as documented.

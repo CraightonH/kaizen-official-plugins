@@ -31,6 +31,7 @@ export function createFallbackChannel(): TuiChannelService {
     appendReasoning() { /* no-op: thinking deltas are dropped in non-TTY mode */ },
     finalizeReasoning() { /* no-op */ },
     clearLiveThinking() { /* no-op */ },
+    setInputDraft() { /* no-op: no input buffer in non-TTY mode */ },
     readInput() {
       ensureReader();
       if (queued.length > 0) {

@@ -5,6 +5,8 @@ export interface PlainTranscriptLine {
   id: number;
   kind: "output" | "notice" | "user" | "thoughts";
   text: string;
+  /** Set on `kind: "user"` lines that were seeded by a session:handoff. */
+  handoffFrom?: string;
 }
 
 export interface ToolCallEntry {
@@ -112,8 +114,14 @@ export class TuiStore {
     this._emit();
   }
 
-  appendUser(text: string): void {
-    this._transcript = [...this._transcript, { id: ++this._seq, kind: "user", text }];
+  appendUser(text: string, opts?: { handoffFrom?: string }): void {
+    const entry: PlainTranscriptLine = {
+      id: ++this._seq,
+      kind: "user",
+      text,
+      ...(opts?.handoffFrom ? { handoffFrom: opts.handoffFrom } : {}),
+    };
+    this._transcript = [...this._transcript, entry];
     this._emit();
   }
 
