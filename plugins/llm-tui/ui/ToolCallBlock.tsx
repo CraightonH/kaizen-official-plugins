@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Text } from "ink";
+import { Box, Text } from "ink";
 import type { ToolCallEntry } from "../state/store.ts";
 import type { ToolRendererRegistry } from "../tool-renderers/registry.ts";
 import type { TuiTheme } from "../theme/loader.ts";
@@ -98,7 +98,12 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ entry, registry, t
     entry.status === "done" && entry.result ? ` — ${truncate(entry.result, 40)}` :
     "";
 
-  return (
+  const expanded =
+    renderer && renderer.expandedView && entry.status !== "running"
+      ? renderer.expandedView(entry.args, entry.result, entry.status, entry.stdout)
+      : null;
+
+  const header = (
     <Text>
       <Text color={theme.promptColor}>{"▸ "}</Text>
       <Text color={theme.promptColor} bold>{entry.name}</Text>
@@ -106,5 +111,17 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ entry, registry, t
       <Text color={glyphColor}>{`  ${glyph}`}</Text>
       <Text color={theme.outputColor} dimColor>{trail}</Text>
     </Text>
+  );
+
+  if (!expanded) return header;
+
+  return (
+    <Box flexDirection="column">
+      {header}
+      <Box flexDirection="row">
+        <Text color={theme.outputColor} dimColor>{"  ⎿  "}</Text>
+        <Box flexDirection="column">{expanded}</Box>
+      </Box>
+    </Box>
   );
 };

@@ -11,6 +11,7 @@ import { TuiStore } from "./state/store.ts";
 import { makeCompletionRegistry } from "./completion/registry.ts";
 import { makeToolRendererRegistry } from "./tool-renderers/registry.ts";
 import type { TuiToolRendererService } from "./tool-renderers/registry.ts";
+import { defaultRenderers } from "./tool-renderers/defaults.tsx";
 import { loadTheme, realThemeDeps, type TuiTheme } from "./theme/loader.ts";
 import { App } from "./ui/App.tsx";
 import { createFallbackChannel } from "./fallback.ts";
@@ -53,6 +54,11 @@ const plugin: KaizenPlugin = {
     ctx.provideService<TuiCompletionService>("llm-tui:completion", registry.service);
     const toolRenderers = makeToolRendererRegistry();
     ctx.provideService<TuiToolRendererService>("llm-tui:tool-renderer", toolRenderers.service);
+    // Built-in opt-in renderers for common local tools (edit, write, create,
+    // bash). Each provides a verbose result view rendered inline below the
+    // one-line summary. External tools can override by registering their own
+    // renderer with the same toolName.
+    for (const r of defaultRenderers(theme)) toolRenderers.service.register(r);
 
     // Triggers are derived from registered sources. We track the set live by
     // wrapping register() so the InputBox always sees the current trigger map

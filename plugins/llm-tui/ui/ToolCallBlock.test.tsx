@@ -1,4 +1,5 @@
 import React from "react";
+import { Text } from "ink";
 import { test, expect } from "bun:test";
 import { render } from "ink-testing-library";
 import { ToolCallBlock } from "./ToolCallBlock.tsx";
@@ -108,4 +109,46 @@ test("default summary falls back to key=value pairs when no primary key matches"
   const out = lastFrame() ?? "";
   expect(out).toContain("foo=1");
   expect(out).toContain("bar=2");
+});
+
+test("renders expandedView inline below the one-liner on terminal status", () => {
+  const reg = makeToolRendererRegistry();
+  reg.service.register({
+    toolName: "edit",
+    collapsedSummary: () => "f.txt",
+    expandedView: (_a, _r, status) => (status === "done" ? <Text>verbose-body</Text> : null),
+  });
+  const { lastFrame } = render(
+    <ToolCallBlock entry={entry({ name: "edit", status: "done", result: "ok" })} registry={reg} theme={theme as any} />
+  );
+  const out = lastFrame() ?? "";
+  expect(out).toContain("verbose-body");
+  expect(out).toContain("⎿");
+});
+
+test("does NOT render expandedView while still running", () => {
+  const reg = makeToolRendererRegistry();
+  reg.service.register({
+    toolName: "edit",
+    collapsedSummary: () => "f.txt",
+    expandedView: () => <Text>verbose-body</Text>,
+  });
+  const { lastFrame } = render(
+    <ToolCallBlock entry={entry({ name: "edit", status: "running" })} registry={reg} theme={theme as any} />
+  );
+  expect(lastFrame() ?? "").not.toContain("verbose-body");
+});
+
+test("renderer with no expandedView renders just the one-liner (back-compat)", () => {
+  const reg = makeToolRendererRegistry();
+  reg.service.register({
+    toolName: "edit",
+    collapsedSummary: () => "f.txt",
+  });
+  const { lastFrame } = render(
+    <ToolCallBlock entry={entry({ name: "edit", status: "done", result: "ok" })} registry={reg} theme={theme as any} />
+  );
+  const out = lastFrame() ?? "";
+  expect(out).toContain("edit(f.txt)");
+  expect(out).not.toContain("⎿");
 });
