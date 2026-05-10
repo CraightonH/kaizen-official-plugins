@@ -69,27 +69,47 @@ export function defaultRenderers(theme: TuiTheme): TuiToolRenderer[] {
       expandedView: (args, _result, status) => {
         if (status === "error") return null;
         const a = (args ?? {}) as Record<string, unknown>;
-        if (a.command !== "str_replace") return null;
-        const oldStr = typeof a.old_str === "string" ? a.old_str : "";
-        const newStr = typeof a.new_str === "string" ? a.new_str : "";
-        const oldLines = oldStr === "" ? [] : oldStr.split("\n");
-        const newLines = newStr === "" ? [] : newStr.split("\n");
-        const headline = `Replaced ${oldLines.length} → ${newLines.length} line${newLines.length === 1 ? "" : "s"}`;
-        const oldPrev = previewLines(oldStr, PREVIEW_LINES);
-        const newPrev = previewLines(newStr, PREVIEW_LINES);
-        return (
-          <>
-            <Text color={theme.outputColor}>{headline}</Text>
-            {renderLines(oldPrev.lines, theme, oldPrev.hidden, () => ({
-              glyph: "- ",
-              color: theme.noticeColor,
-            }))}
-            {renderLines(newPrev.lines, theme, newPrev.hidden, () => ({
-              glyph: "+ ",
-              color: theme.promptColor,
-            }))}
-          </>
-        );
+
+        if (a.command === "str_replace") {
+          const oldStr = typeof a.old_str === "string" ? a.old_str : "";
+          const newStr = typeof a.new_str === "string" ? a.new_str : "";
+          const oldLines = oldStr === "" ? [] : oldStr.split("\n");
+          const newLines = newStr === "" ? [] : newStr.split("\n");
+          const headline = `Replaced ${oldLines.length} → ${newLines.length} line${newLines.length === 1 ? "" : "s"}`;
+          const oldPrev = previewLines(oldStr, PREVIEW_LINES);
+          const newPrev = previewLines(newStr, PREVIEW_LINES);
+          return (
+            <>
+              <Text color={theme.outputColor}>{headline}</Text>
+              {renderLines(oldPrev.lines, theme, oldPrev.hidden, () => ({
+                glyph: "- ",
+                color: theme.noticeColor,
+              }))}
+              {renderLines(newPrev.lines, theme, newPrev.hidden, () => ({
+                glyph: "+ ",
+                color: theme.promptColor,
+              }))}
+            </>
+          );
+        }
+
+        if (a.command === "insert") {
+          const text = typeof a.insert_text === "string" ? a.insert_text : "";
+          const line = typeof a.insert_line === "number" ? a.insert_line : 0;
+          const total = text === "" ? 0 : text.split("\n").length - (text.endsWith("\n") ? 1 : 0);
+          const prev = previewLines(text, PREVIEW_LINES);
+          return (
+            <>
+              <Text color={theme.outputColor}>{`Inserted ${total} line${total === 1 ? "" : "s"} at line ${line}`}</Text>
+              {renderLines(prev.lines, theme, prev.hidden, () => ({
+                glyph: "+ ",
+                color: theme.promptColor,
+              }))}
+            </>
+          );
+        }
+
+        return null;
       },
     },
 

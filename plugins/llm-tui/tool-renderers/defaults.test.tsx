@@ -105,6 +105,26 @@ test("bash renderer truncates with hidden-line summary past PREVIEW_LINES", () =
   expect(out).toContain("+15 more");
 });
 
+test("edit renderer with insert command shows inserted-line headline and content preview", () => {
+  const reg = withDefaults();
+  const { lastFrame } = render(
+    <ToolCallBlock
+      registry={reg}
+      theme={theme as any}
+      entry={entry({
+        name: "edit",
+        args: { command: "insert", path: "/tmp/foo.ts", insert_line: 5, insert_text: "new line A\nnew line B\n" },
+        result: "edited /tmp/foo.ts: inserted 2 line(s) at line 5",
+      })}
+    />
+  );
+  const out = lastFrame() ?? "";
+  expect(out).toContain("Inserted 2 line");
+  expect(out).toContain("at line 5");
+  expect(out).toContain("new line A");
+  expect(out).toContain("new line B");
+});
+
 test("error status suppresses verbose body for write/edit (avoids misleading content)", () => {
   const reg = withDefaults();
   const { lastFrame } = render(
