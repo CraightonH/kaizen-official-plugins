@@ -181,6 +181,14 @@ const plugin: KaizenPlugin = {
       }
     };
 
+    // Two-step Ctrl+C exit. We disable Ink's built-in exitOnCtrlC handler
+    // (below) so the first press can surface a hint instead of tearing down
+    // the UI silently; InputBox arms this and calls back on the second press.
+    const onExit = () => {
+      try { (plugin as any).__ink?.unmount(); } catch { /* ignore */ }
+      process.exit(0);
+    };
+
     // Hand the line to the driver via the readInput channel and let the
     // driver own the input:submit emit. Emitting it here too creates a
     // race: two parallel dispatches mean the slash-commands handler's
@@ -200,7 +208,9 @@ const plugin: KaizenPlugin = {
         theme={theme}
         onSubmit={onSubmit}
         onCancel={onCancel}
+        onExit={onExit}
       />,
+      { exitOnCtrlC: false },
     );
 
     const channel: TuiChannelService = {

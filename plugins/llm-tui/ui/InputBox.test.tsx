@@ -493,6 +493,39 @@ describe("InputBox", () => {
     });
   });
 
+  describe("Ctrl+C two-step exit", () => {
+    it("first press shows hint and clears buffer; does NOT call onExit", async () => {
+      const ctx = setup();
+      let exited = false;
+      const { stdin } = render(
+        <InputBox store={ctx.store} registry={ctx.reg} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} onExit={() => { exited = true; }} />,
+      );
+      await tick();
+      stdin.write("draft");
+      await tick();
+      stdin.write("\x03"); // Ctrl+C
+      await tick();
+      expect(exited).toBe(false);
+      expect(ctx.store.snapshot().input.value).toBe("");
+      const transcript = ctx.store.snapshot().transcript;
+      expect(transcript[transcript.length - 1]?.text).toContain("Press Ctrl-C again to exit");
+    });
+
+    it("second Ctrl+C within window calls onExit", async () => {
+      const ctx = setup();
+      let exitCount = 0;
+      const { stdin } = render(
+        <InputBox store={ctx.store} registry={ctx.reg} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} onExit={() => { exitCount++; }} />,
+      );
+      await tick();
+      stdin.write("\x03");
+      await tick();
+      stdin.write("\x03");
+      await tick();
+      expect(exitCount).toBe(1);
+    });
+  });
+
   it("Up arrow recalls history when popup is closed", async () => {
     const ctx = setup();
     ctx.store.submit("first");

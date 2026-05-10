@@ -13,7 +13,12 @@ export interface InputBoxProps {
   theme: TuiTheme;
   onSubmit: (text: string) => void;
   onCancel?: () => void;
+  onExit?: () => void;
 }
+
+// Window during which a second Ctrl+C exits. After this, the next press
+// re-arms instead of exiting — matches Claude Code's behavior.
+const CTRL_C_EXIT_WINDOW_MS = 2000;
 
 // Naive linear scan: returns true if `pos` falls inside an unbalanced
 // quote / backtick region starting from column 0.
@@ -104,13 +109,17 @@ function snapCursor(s: string, pos: number, direction: -1 | 1): number {
   return direction < 0 ? ph.start : ph.end;
 }
 
-export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, theme, onSubmit, onCancel }) => {
+export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, theme, onSubmit, onCancel, onExit }) => {
   const snap = useSyncExternalStore(
     (cb) => store.subscribe(cb),
     () => store.snapshot(),
   );
   const [histIdx, setHistIdx] = useState<number | null>(null);
   const queryToken = useRef(0);
+  // Tracks the timestamp of the last Ctrl+C press so a second press within
+  // CTRL_C_EXIT_WINDOW_MS triggers a real exit instead of re-arming.
+  const ctrlCArmedAt = useRef<number | null>(null);
+  const ctrlCTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const popup = snap.popup;
   const value = snap.input.value;
@@ -188,6 +197,30 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
   });
 
   useInput((input, key) => {
+    // Ctrl+C: two-step exit, modeled on Claude Code. First press shows a
+    // hint (and cancels any in-flight turn / clears a non-empty buffer);
+    // a second press within CTRL_C_EXIT_WINDOW_MS unmounts and exits.
+    // Ink's exitOnCtrlC is disabled at render() so this handler owns it.
+    if (key.ctrl && input === "c") {
+      const now = Date.now();
+      const armed = ctrlCArmedAt.current !== null && (now - ctrlCArmedAt.current) <= CTRL_C_EXIT_WINDOW_MS;
+      if (armed) {
+        if (ctrlCTimer.current) { clearTimeout(ctrlCTimer.current); ctrlCTimer.current = null; }
+        ctrlCArmedAt.current = null;
+        onExit?.();
+        return;
+      }
+      ctrlCArmedAt.current = now;
+      if (ctrlCTimer.current) clearTimeout(ctrlCTimer.current);
+      ctrlCTimer.current = setTimeout(() => { ctrlCArmedAt.current = null; ctrlCTimer.current = null; }, CTRL_C_EXIT_WINDOW_MS);
+      // Cancel an in-flight turn and clear any pending input buffer so the
+      // user starts from a clean state on the next prompt.
+      if (snap.busy.active) onCancel?.();
+      if (value.length > 0) store.setInput("", 0);
+      if (popup) store.closePopup();
+      store.appendNotice("Press Ctrl-C again to exit");
+      return;
+    }
 
     // Readline-style cursor navigation. macOS Terminal.app and iTerm2 with
     // "Option as Meta" / "Send Ctrl+A/E for ⌘+←/→" send these sequences:
