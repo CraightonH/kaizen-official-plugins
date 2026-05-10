@@ -26,7 +26,11 @@ tools/bash.ts     Spawns via the shell (process group) so SIGTERM/SIGKILL kill c
                   Middle-truncation past 256 KB. Wires registry's AbortSignal to SIGTERM.
                   Rejects run_in_background: true.
 tools/web_fetch.ts HTTP(S) GET/HEAD via globalThis.fetch (overridable via ctx.fetch).
-                  Refuses non-http(s). 30s default timeout, 512 KB body cap. Honors ctx.signal.
+                  Refuses non-http(s). 30s default timeout, 512 KB in-context body cap.
+                  Binary content-types (image/*, audio/*, video/*, application/pdf, octet-stream,
+                  archives, office docs, etc.) require `save_to` — otherwise refused so garbage
+                  bytes never enter context. `save_to` also works for text (saves + omits body).
+                  Downloads capped at WEB_FETCH_DOWNLOAD_CAP_BYTES (50 MB). Honors ctx.signal.
 test/             bun:test suites — one per tool, plus util.test.ts, scaffold.test.ts, integration.test.ts.
 test/fixtures/    Static inputs used by read/grep/glob tests.
 ```
@@ -42,7 +46,7 @@ Boundaries:
 - **Path resolution is per-call.** Every handler resolves paths via `resolvePath(p, args.cwd)` at invoke time against `process.cwd()`. There is no plugin-owned working directory. Don't add one.
 - **Errors throw native `Error`.** No special error envelope. The registry catches and emits `tool:error`; the active dispatch strategy turns that into a `tool` message. Error messages must include the resolved absolute path when relevant — the LLM uses it to recover.
 - **Truncation markers are stable.** The exact `... [truncated: ...]` shape is part of the contract with the LLM (it has been trained on this idiom). Don't reword.
-- **Caps live in `util.ts`.** `MAX_READ_BYTES` (50 MB hard refusal), `READ_CAP_BYTES` (256 KB), `READ_CAP_LINES` (2000), `BASH_OUTPUT_CAP` (256 KB), `GREP_DEFAULT_MAX` (200), `GLOB_CAP` (1000), `WEB_FETCH_CAP_BYTES` (512 KB), `WEB_FETCH_DEFAULT_TIMEOUT_MS` (30 s). Tools import them; do not re-declare per-tool defaults.
+- **Caps live in `util.ts`.** `MAX_READ_BYTES` (50 MB hard refusal), `READ_CAP_BYTES` (256 KB), `READ_CAP_LINES` (2000), `BASH_OUTPUT_CAP` (256 KB), `GREP_DEFAULT_MAX` (200), `GLOB_CAP` (1000), `WEB_FETCH_CAP_BYTES` (512 KB in-context), `WEB_FETCH_DOWNLOAD_CAP_BYTES` (50 MB on disk), `WEB_FETCH_DEFAULT_TIMEOUT_MS` (30 s). Binary content-type classification lives in `isBinaryContentType()` — also in `util.ts`. Tools import them; do not re-declare per-tool defaults.
 - **`edit` uniqueness is load-bearing.** Multi-match without `replace_all` MUST throw with the match count. This is the single most important behavioral guarantee — it is what makes `edit` safe for unattended use.
 - **`bash` middle-truncates.** Compiler/test output carries signal at both ends. Don't switch to head- or tail-only truncation.
 - **`bash` cancellation.** The registry's `ToolExecutionContext.signal` must SIGTERM the spawned process group. `turn:cancel` relies on this.

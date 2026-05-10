@@ -10,7 +10,39 @@ export const BASH_OUTPUT_CAP = 256 * 1024;
 export const GREP_DEFAULT_MAX = 200;
 export const GLOB_CAP = 1000;
 export const WEB_FETCH_CAP_BYTES = 512 * 1024;
+export const WEB_FETCH_DOWNLOAD_CAP_BYTES = 50 * 1024 * 1024;
 export const WEB_FETCH_DEFAULT_TIMEOUT_MS = 30000;
+
+const BINARY_CT_PREFIXES = ["image/", "audio/", "video/", "font/"];
+const BINARY_CT_EXACT = new Set([
+  "application/octet-stream",
+  "application/pdf",
+  "application/zip",
+  "application/x-tar",
+  "application/gzip",
+  "application/x-gzip",
+  "application/x-bzip2",
+  "application/x-xz",
+  "application/x-7z-compressed",
+  "application/x-rar-compressed",
+  "application/x-msdownload",
+  "application/x-executable",
+  "application/x-sharedlib",
+  "application/x-mach-binary",
+  "application/wasm",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+]);
+
+export function isBinaryContentType(contentType: string): boolean {
+  if (!contentType) return false;
+  const ct = contentType.split(";")[0].trim().toLowerCase();
+  if (BINARY_CT_EXACT.has(ct)) return true;
+  for (const pre of BINARY_CT_PREFIXES) if (ct.startsWith(pre)) return true;
+  return false;
+}
 
 export function resolvePath(p: string, baseCwd?: string): string {
   if (isAbsolute(p)) return p;
