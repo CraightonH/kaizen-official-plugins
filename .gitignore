@@ -3,3 +3,4 @@ node_modules/
 .kaizen/audit/
 .claude/worktrees/
 .claire/
+plugins/*/dist/
