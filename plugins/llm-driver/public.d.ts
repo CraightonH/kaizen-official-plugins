@@ -26,7 +26,12 @@ export type RunConversationInput = {
       userMessage?: never;
     }
   | {
-      userMessage: ChatMessage;
+      /**
+       * The user message to append before inference. When omitted (and the call
+       * owns the turn), runConversation infers against the current snapshot tail —
+       * which must already end with a user turn (e.g. one seeded by session:handoff).
+       */
+      userMessage?: ChatMessage;
       externalTurnId?: never;
       turnHandle?: never;
     }

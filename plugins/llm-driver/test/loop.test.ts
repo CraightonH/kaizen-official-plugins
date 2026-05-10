@@ -286,6 +286,44 @@ describe("runConversation", () => {
     expect(reqEv.payload.request.systemPrompt).toBe("mutated-sp");
   });
 
+  it("owned turn without userMessage infers against pending snapshot tail", async () => {
+    const { emit, events } = makeEmit();
+    const sessions = makeSessions();
+    // Pre-seed a user message into the session (simulating session:handoff seeding).
+    const seedHandle = sessions.beginTurn("session-1", "turn-seed");
+    seedHandle.append({ role: "user", content: "seeded" });
+    await seedHandle.commit();
+
+    const llm = makeLlm([[{ type: "done", response: { content: "reply", finishReason: "stop" } }]]);
+    const deps = makeDeps({ emit, sessions, llmComplete: llm });
+
+    const out = await runConversation({
+      systemPrompt: "sys",
+      sessionId: "session-1",
+    }, deps);
+
+    expect(out.finalMessage).toEqual({ role: "assistant", content: "reply" });
+    // Must NOT emit conversation:user-message (no new user provided).
+    expect(events.map((e) => e.name)).not.toContain("conversation:user-message");
+    // Owns the turn → emits turn:start/turn:end.
+    expect(events.map((e) => e.name)).toContain("turn:start");
+    expect(events.map((e) => e.name)).toContain("turn:end");
+    // Snapshot has exactly one user message (no duplication) plus assistant.
+    const msgs = await sessions.getMessages("session-1");
+    expect(msgs.filter((m) => m.role === "user")).toHaveLength(1);
+    expect(msgs.map((m) => m.role)).toEqual(["user", "assistant"]);
+    expect(msgs[0]).toEqual({ role: "user", content: "seeded" });
+  });
+
+  it("owned turn without userMessage and empty snapshot throws", async () => {
+    const sessions = makeSessions();
+    const deps = makeDeps({ sessions });
+    await expect(runConversation({
+      systemPrompt: "sys",
+      sessionId: "session-1",
+    }, deps)).rejects.toThrow(/no userMessage and no pending user turn/);
+  });
+
   it("request.cancelled=true short-circuits without appending an assistant", async () => {
     const { events } = makeEmit();
     const sessions = makeSessions();

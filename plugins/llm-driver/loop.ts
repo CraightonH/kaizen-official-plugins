@@ -45,7 +45,12 @@ export type RunConversationInput = RunConversationBase & (
       userMessage?: never;
     }
   | {
-      userMessage: ChatMessage;
+      /**
+       * The user message to append before inference. When omitted (and the call
+       * owns the turn), runConversation infers against the current snapshot tail —
+       * which must already end with a user turn (e.g. one seeded by session:handoff).
+       */
+      userMessage?: ChatMessage;
       externalTurnId?: never;
       turnHandle?: never;
     }
@@ -173,8 +178,17 @@ export async function runConversation(
   const usages: Array<LLMResponse["usage"]> = [];
 
   if (ownsTurn) {
-    turnHandle.append(input.userMessage);
-    await deps.emit("conversation:user-message", { message: input.userMessage });
+    if (input.userMessage !== undefined) {
+      turnHandle.append(input.userMessage);
+      await deps.emit("conversation:user-message", { message: input.userMessage });
+    } else {
+      // No user message provided: snapshot tail must already be a user turn
+      // (e.g. seeded by llm-session-manager during a session:handoff). Validate.
+      const tail = await deps.sessions.getMessages(input.sessionId);
+      if (tail.length === 0 || tail[tail.length - 1]?.role !== "user") {
+        throw new Error("runConversation: no userMessage and no pending user turn at snapshot tail");
+      }
+    }
     await deps.emit("turn:start", {
       turnId,
       sessionId: input.sessionId,
