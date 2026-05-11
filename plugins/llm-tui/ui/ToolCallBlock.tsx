@@ -30,18 +30,21 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ entry, registry, t
   else if (entry.status === "done") { glyph = "✓"; glyphColor = theme.outputColor; }
   else { glyph = "✗"; glyphColor = theme.noticeColor; }
 
-  const resultPreview = entry.status === "done"
+  const expanded =
+    renderer && renderer.expandedView && entry.status !== "running"
+      ? renderer.expandedView(entry.args, entry.result, entry.status, entry.stdout)
+      : null;
+
+  // Suppress the success trail when an expansion is present — the ⎿ block
+  // already shows the same content, more legibly. Errors keep the trail
+  // (errorMessage) since the expansion is usually null for error cases.
+  const resultPreview = entry.status === "done" && !expanded
     ? (entry.stdout && entry.stdout.length > 0 ? defaultResultPreview(entry.stdout) : defaultResultPreview(entry.result))
     : "";
   const trail =
     entry.status === "error" && entry.errorMessage ? ` — ${entry.errorMessage}` :
     resultPreview ? ` — ${resultPreview}` :
     "";
-
-  const expanded =
-    renderer && renderer.expandedView && entry.status !== "running"
-      ? renderer.expandedView(entry.args, entry.result, entry.status, entry.stdout)
-      : null;
 
   const header = (
     <Text>

@@ -200,3 +200,40 @@ test("default trail truncates very long output with an ellipsis", () => {
   );
   expect(lastFrame() ?? "").toContain("…");
 });
+
+test("success trail is suppressed when an expandedView is rendered (no duplicate info)", () => {
+  const reg = makeToolRendererRegistry();
+  reg.service.register({
+    toolName: "edit",
+    collapsedSummary: () => "f.txt",
+    expandedView: (_a, _r, status) => (status === "done" ? <Text>EXPANDED-BODY</Text> : null),
+  });
+  const { lastFrame } = render(
+    <ToolCallBlock
+      entry={entry({ name: "edit", status: "done", result: "RESULT-IN-TRAIL" })}
+      registry={reg}
+      theme={theme as any}
+    />
+  );
+  const out = lastFrame() ?? "";
+  expect(out).toContain("EXPANDED-BODY");
+  expect(out).not.toContain("RESULT-IN-TRAIL");
+  expect(out).not.toContain(" — ");
+});
+
+test("error trail still renders even when an expandedView is present", () => {
+  const reg = makeToolRendererRegistry();
+  reg.service.register({
+    toolName: "edit",
+    collapsedSummary: () => "f.txt",
+    expandedView: () => <Text>EXPANDED-BODY</Text>,
+  });
+  const { lastFrame } = render(
+    <ToolCallBlock
+      entry={entry({ name: "edit", status: "error", errorMessage: "boom" })}
+      registry={reg}
+      theme={theme as any}
+    />
+  );
+  expect(lastFrame() ?? "").toContain("boom");
+});
