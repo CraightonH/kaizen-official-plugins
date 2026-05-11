@@ -144,3 +144,88 @@ test("error status suppresses verbose body for write/edit (avoids misleading con
   expect(out).toContain("old_str must be non-empty");
   expect(out).not.toContain("Replaced");
 });
+
+test("bash renderer extracts `output` text from a JSON result", () => {
+  const reg = withDefaults();
+  const result = JSON.stringify({
+    exit_code: 0,
+    output: "On branch main\nnothing to commit, working tree clean",
+    duration_ms: 8,
+  });
+  const { lastFrame } = render(
+    <ToolCallBlock
+      registry={reg}
+      theme={theme as any}
+      entry={entry({
+        name: "bash",
+        args: { command: "git status" },
+        status: "done",
+        stdout: "",
+        result,
+      })}
+    />
+  );
+  const out = lastFrame() ?? "";
+  expect(out).toContain("On branch main");
+  expect(out).toContain("nothing to commit");
+  expect(out).not.toContain('"exit_code"');
+  expect(out).not.toContain('"output"');
+});
+
+test("bash renderer falls back to raw result when it is not parseable JSON", () => {
+  const reg = withDefaults();
+  const { lastFrame } = render(
+    <ToolCallBlock
+      registry={reg}
+      theme={theme as any}
+      entry={entry({
+        name: "bash",
+        args: { command: "echo hi" },
+        status: "done",
+        stdout: "",
+        result: "not json at all",
+      })}
+    />
+  );
+  expect(lastFrame() ?? "").toContain("not json at all");
+});
+
+test("bash renderer prefers streamed stdout over parsed output", () => {
+  const reg = withDefaults();
+  const result = JSON.stringify({ exit_code: 0, output: "FROM-RESULT" });
+  const { lastFrame } = render(
+    <ToolCallBlock
+      registry={reg}
+      theme={theme as any}
+      entry={entry({
+        name: "bash",
+        args: { command: "x" },
+        status: "done",
+        stdout: "FROM-STDOUT",
+        result,
+      })}
+    />
+  );
+  const out = lastFrame() ?? "";
+  expect(out).toContain("FROM-STDOUT");
+  expect(out).not.toContain("FROM-RESULT");
+});
+
+test("bash renderer renders (no output) when output is empty", () => {
+  const reg = withDefaults();
+  const result = JSON.stringify({ exit_code: 0, output: "" });
+  const { lastFrame } = render(
+    <ToolCallBlock
+      registry={reg}
+      theme={theme as any}
+      entry={entry({
+        name: "bash",
+        args: { command: "true" },
+        status: "done",
+        stdout: "",
+        result,
+      })}
+    />
+  );
+  expect(lastFrame() ?? "").toContain("(no output)");
+});

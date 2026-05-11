@@ -30,7 +30,9 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ entry, registry, t
   else if (entry.status === "done") { glyph = "✓"; glyphColor = theme.outputColor; }
   else { glyph = "✗"; glyphColor = theme.noticeColor; }
 
-  const resultPreview = entry.status === "done" ? defaultResultPreview(entry.result) : "";
+  const resultPreview = entry.status === "done"
+    ? (entry.stdout && entry.stdout.length > 0 ? defaultResultPreview(entry.stdout) : defaultResultPreview(entry.result))
+    : "";
   const trail =
     entry.status === "error" && entry.errorMessage ? ` — ${entry.errorMessage}` :
     resultPreview ? ` — ${resultPreview}` :
