@@ -6,9 +6,13 @@ import { resolvePath } from "../util.ts";
 export const schema: ToolSchema = {
   name: "edit",
   description:
-    "Edit a text file. Two commands:\n" +
-    "- `str_replace`: find `old_str` in the file and replace with `new_str`. `old_str` MUST appear exactly once unless `replace_all: true`. Use this to modify, replace specific known lines (quote them exactly in `old_str`), or delete content (set `new_str` to \"\").\n" +
-    "- `insert`: insert `insert_text` AT line `insert_line` (1-based; the inserted text becomes the new line `insert_line`, existing lines shift down). For a file with N lines, `insert_line: 1` prepends, `insert_line: N+1` appends. Line numbers match the 1-based numbering shown by `read`.",
+    "Edit a text file. Two commands — pick by intent:\n" +
+    "- ADDING new content (prepend, append, insert between lines)? Use `insert`. Don't use `str_replace` to fake a prepend/append by stuffing the original line into `old_str` — `insert` is the right primitive.\n" +
+    "- MODIFYING or DELETING existing content? Use `str_replace`.\n" +
+    "\n" +
+    "Command details:\n" +
+    "- `str_replace`: find `old_str` (required, non-empty, whitespace-sensitive) in the file and replace with `new_str` (required; set to \"\" to delete the matched text). `old_str` MUST appear exactly once unless `replace_all: true`. To replace specific known lines, quote them exactly in `old_str`.\n" +
+    "- `insert`: insert `insert_text` (required) AT line `insert_line` (required, 1-based; the inserted text becomes the new line `insert_line`, existing lines shift down). For a file with N lines, `insert_line: 1` prepends, `insert_line: N+1` appends. Line numbers match the 1-based numbering shown by `read`.",
   parameters: {
     type: "object",
     properties: {
@@ -84,7 +88,13 @@ function countLines(content: string): number {
 }
 
 async function handleStrReplace(args: StrReplaceArgs): Promise<string> {
+  if (args.old_str === undefined) {
+    throw new Error('old_str is required when command="str_replace"; supply the exact text to find (must appear in the file, whitespace-sensitive). To add content without modifying existing lines, use command="insert" instead.');
+  }
   if (typeof args.old_str !== "string") throw new Error("old_str must be a string");
+  if (args.new_str === undefined) {
+    throw new Error('new_str is required when command="str_replace"; supply the replacement text (use "" to delete the matched text)');
+  }
   if (typeof args.new_str !== "string") throw new Error("new_str must be a string");
   if (args.old_str === "") {
     throw new Error('old_str must be non-empty; use command="insert" to add content, or `write` to overwrite the file');

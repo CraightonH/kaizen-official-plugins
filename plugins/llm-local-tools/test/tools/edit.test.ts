@@ -66,6 +66,20 @@ describe("edit tool — str_replace", () => {
     await expect(handler({ command: "str_replace", path: p, old_str: "", new_str: "Y" }, ctx))
       .rejects.toThrow(/old_str must be non-empty/);
   });
+
+  it("rejects missing old_str with a self-teaching error", async () => {
+    const p = join(dir, "a.txt"); writeFileSync(p, "alpha");
+    await expect(handler({ command: "str_replace", path: p, new_str: "Y" } as any, ctx))
+      .rejects.toThrow(/old_str is required when command="str_replace"/);
+    await expect(handler({ command: "str_replace", path: p, new_str: "Y" } as any, ctx))
+      .rejects.toThrow(/command="insert"/);
+  });
+
+  it("rejects missing new_str with a self-teaching error", async () => {
+    const p = join(dir, "a.txt"); writeFileSync(p, "alpha");
+    await expect(handler({ command: "str_replace", path: p, old_str: "alpha" } as any, ctx))
+      .rejects.toThrow(/new_str is required when command="str_replace"/);
+  });
 });
 
 describe("edit tool — insert (1-based AT semantics)", () => {
