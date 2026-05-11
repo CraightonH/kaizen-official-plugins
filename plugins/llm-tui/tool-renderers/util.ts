@@ -77,6 +77,26 @@ export const PRIMARY_RESULT_KEYS = [
   "message",
 ];
 
+// Parse a JSON-stringified tool result and return the first matching
+// primary-key string value, preserving its original content (newlines,
+// whitespace). Returns null when the input isn't a parseable object or
+// when no key matches — callers decide the fallback. The empty string
+// is a legitimate extraction and is returned as-is.
+export function extractPrimaryString(result: string, primaryKeys: string[]): string | null {
+  if (result.length === 0) return null;
+  const first = result[0];
+  if (first !== "{" && first !== "[") return null;
+  try {
+    const parsed = JSON.parse(result);
+    if (!parsed || typeof parsed !== "object") return null;
+    for (const k of primaryKeys) {
+      const v = (parsed as Record<string, unknown>)[k];
+      if (typeof v === "string") return v;
+    }
+  } catch { /* fall through */ }
+  return null;
+}
+
 // Render a tool result as a short, human-readable preview. Mirrors
 // defaultCollapsedSummary for args. If the result is a JSON string that
 // parses to an object, surface the primary string field; otherwise render
@@ -87,18 +107,10 @@ export function defaultResultPreview(result: unknown): string {
     return truncate(pickPrimary(result as Record<string, unknown>, PRIMARY_RESULT_KEYS), MAX_PREVIEW);
   }
   if (typeof result !== "string") return truncate(String(result), MAX_PREVIEW);
+  if (result.length === 0) return "";
 
-  const s = result;
+  const extracted = extractPrimaryString(result, PRIMARY_RESULT_KEYS);
+  const s = extracted ?? result;
   if (s.length === 0) return "";
-  const first = s[0];
-  if (first === "{" || first === "[") {
-    try {
-      const parsed = JSON.parse(s);
-      if (parsed && typeof parsed === "object") {
-        const picked = pickPrimary(parsed as Record<string, unknown>, PRIMARY_RESULT_KEYS);
-        if (picked.length > 0) return truncate(picked, MAX_PREVIEW);
-      }
-    } catch { /* fall through to raw */ }
-  }
   return truncate(compactWhitespace(s), MAX_PREVIEW);
 }

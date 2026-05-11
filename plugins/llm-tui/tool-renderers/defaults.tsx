@@ -2,7 +2,7 @@ import React from "react";
 import { Text } from "ink";
 import type { TuiToolRenderer } from "./registry.ts";
 import type { TuiTheme } from "../theme/loader.ts";
-import { PRIMARY_RESULT_KEYS } from "./util.ts";
+import { extractPrimaryString, PRIMARY_RESULT_KEYS } from "./util.ts";
 
 const PREVIEW_LINES = 10;
 const MAX_LINE_WIDTH = 200;
@@ -172,24 +172,15 @@ export function defaultRenderers(theme: TuiTheme): TuiToolRenderer[] {
         if (status === "error") {
           return result ? renderError(result, theme) : null;
         }
+        // Prefer streamed stdout. Otherwise try to extract the primary
+        // string field (e.g. `output`) from the JSON-stringified handler
+        // result so the expansion shows real text instead of a JSON blob.
+        // Empty extraction (output: "") is kept — falls through to (no output)
+        // below rather than being clobbered by the raw JSON.
         let text = stdout && stdout.length > 0 ? stdout : "";
         if (!text && result) {
-          // Try to extract the primary string field (e.g. `output`) from a
-          // JSON-stringified handler result. Fall back to the raw result on
-          // any parse failure or shape mismatch.
-          let extracted = false;
-          if (result.startsWith("{") || result.startsWith("[")) {
-            try {
-              const parsed = JSON.parse(result);
-              if (parsed && typeof parsed === "object") {
-                for (const k of PRIMARY_RESULT_KEYS) {
-                  const v = (parsed as Record<string, unknown>)[k];
-                  if (typeof v === "string") { text = v; extracted = true; break; }
-                }
-              }
-            } catch { /* fall through to raw */ }
-          }
-          if (!extracted) text = result;
+          const extracted = extractPrimaryString(result, PRIMARY_RESULT_KEYS);
+          text = extracted ?? result;
         }
         if (!text) return <Text color={theme.outputColor} dimColor>(no output)</Text>;
         const prev = previewLines(text, PREVIEW_LINES);
