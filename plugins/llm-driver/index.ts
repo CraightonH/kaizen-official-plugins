@@ -259,13 +259,14 @@ const plugin: KaizenPlugin = {
           await ctx.emit("conversation:assistant-message", { message: result.finalMessage });
           await ctx.emit("turn:end", { turnId, sessionId, reason: "complete", durationMs: Date.now() - turnStartedAt });
         } catch (err: any) {
-          await handle.rollback();
           const isAbort = err?.name === "AbortError" || controller.signal.aborted;
           if (isAbort) {
+            await handle.partialCommit();
             ui.writeNotice("↯ cancelled");
             await ctx.emit("turn:end", { turnId, sessionId, reason: "cancelled" });
           } else {
             // recoverable error: roll back, surface, continue
+            await handle.rollback();
             await ctx.emit("turn:error", { turnId, sessionId, message: err?.message ?? String(err), cause: err });
             await ctx.emit("turn:end", { turnId, sessionId, reason: "error" });
           }

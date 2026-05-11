@@ -303,10 +303,12 @@ export async function runConversation(
     }
   } catch (err: any) {
     if (ownsTurn) {
-      await turnHandle.rollback();
       const isAbort = err?.name === "AbortError" || signal.aborted;
       const reason = isAbort ? "cancelled" : "error";
-      if (reason === "error") {
+      if (isAbort) {
+        await turnHandle.partialCommit();
+      } else {
+        await turnHandle.rollback();
         await deps.emit("turn:error", {
           turnId,
           sessionId: input.sessionId,
