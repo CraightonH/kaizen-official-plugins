@@ -14,4 +14,4 @@ Top-level sessions use manager-minted UUID ids. Sub-sessions are nested under a 
 <parent-session-id>/reviewer-A
 ```
 
-All message writes happen through `TurnHandle`. A committed turn atomically rewrites `snapshot.json`; a rolled-back turn discards buffered messages while leaving trace events intact for auditability.
+All message writes happen through `TurnHandle`. A committed turn atomically rewrites `snapshot.json`. A rolled-back turn discards buffered messages while leaving trace events intact for auditability. A partially-committed turn (cancellation path) drops a trailing assistant message with unresolved tool_calls and persists the rest; `events.jsonl` is not trimmed in either case.

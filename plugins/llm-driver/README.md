@@ -7,7 +7,7 @@ Coordination plugin for the openai-compatible harness. Owns the assistant turn l
 - Runs the interactive REPL: read input → emit `input:submit` → start turn → call LLM → render output → end turn.
 - Tracks the active session id and writes messages through `sessions:store` turn handles. Cancellation/error rolls back buffered message writes.
 - Owns turn identity (one `AbortController` per turn) and emits the lifecycle events other plugins observe (`harness:start`, `harness:end`, `harness:error`, `session:active-changed`, `turn:start`, `turn:end`, `turn:error`, `conversation:user-message`, `conversation:assistant-message`, `llm:before-call`, `llm:request`, `llm:token`, `llm:reasoning`, `llm:tool-call`, `llm:done`, `llm:error`).
-- Cancellation: subscribes to `turn:cancel` and aborts the in-flight controller. On cancel, the current turn handle rolls back.
+- Cancellation: subscribes to `turn:cancel` and aborts the in-flight controller. On cancel, the current turn handle is *partially committed* — the user message and any completed tool roundtrips are persisted to the snapshot; a trailing assistant message with unresolved `toolCalls` is dropped. Non-abort errors still roll back fully.
 - Short-circuit hooks for non-LLM input:
   - `input:handled` — subscriber sets a flag; the driver skips the LLM round-trip for the just-submitted line.
   - `harness:exit-requested` — flips a flag; the next loop iteration breaks out and ends the harness.
