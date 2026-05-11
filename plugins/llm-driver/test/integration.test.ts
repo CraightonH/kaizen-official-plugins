@@ -22,7 +22,17 @@ function makeSessions() {
         append: (msg: ChatMessage) => buffer.push(msg),
         commit: async () => { messages.set(id, [...(messages.get(id) ?? []), ...buffer]); open.delete(id); },
         rollback: async () => { open.delete(id); },
-        partialCommit: async () => { open.delete(id); },
+        partialCommit: async () => {
+          const trimmed = [...buffer];
+          const last = trimmed[trimmed.length - 1];
+          if (last && last.role === "assistant" && Array.isArray(last.toolCalls) && last.toolCalls.length > 0) {
+            trimmed.pop();
+          }
+          if (trimmed.length > 0) {
+            messages.set(id, [...(messages.get(id) ?? []), ...trimmed]);
+          }
+          open.delete(id);
+        },
       };
     },
     async load(id: string) { return { id, harness: "h", metadata: {}, createdAt: 1, pluginFingerprint: [] }; },
@@ -178,5 +188,63 @@ describe("llm-driver integration (synthetic llm:complete)", () => {
     expect(completeCalls).toBe(0);
     const turnStarts = events.filter(e => e.name === "turn:start");
     expect(turnStarts.length).toBe(0);
+  });
+
+  it("cancel during in-flight LLM call preserves the user message in the snapshot", async () => {
+    const handlers: Record<string, Function[]> = {};
+    const events: { name: string; payload: any }[] = [];
+    const ui = {
+      i: 0,
+      readInput: async function () { return this.i++ === 0 ? "amend my request later" : ""; },
+      setBusy: () => {},
+      setBusyTiming: () => {},
+      writeOutput: () => {},
+      writeNotice: () => {},
+    };
+    // LLM that never resolves on its own — we cancel it.
+    const llm = {
+      complete: async function* (_req: any, opts?: { signal?: AbortSignal }) {
+        await new Promise<void>((resolve, reject) => {
+          if (opts?.signal?.aborted) return reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+          opts?.signal?.addEventListener("abort", () => {
+            reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+          });
+        });
+        yield { type: "done", response: { content: "", finishReason: "stop" } } as const;
+      },
+      async listModels() { return []; },
+    };
+    const sessions = makeSessions();
+    const ctx: any = {
+      log: () => {},
+      config: { defaultSystemPrompt: "sp" },
+      defineService: () => {},
+      provideService: () => {},
+      consumeService: () => {},
+      defineEvent: () => {},
+      useService: (n: string) => {
+        if (n === "llm-tui:channel") return ui;
+        if (n === "llm:complete") return llm;
+        if (n === "sessions:store") return sessions;
+        throw new Error(`useService: no provider for '${n}'`);
+      },
+      on: (n: string, fn: Function) => { (handlers[n] ??= []).push(fn); return () => {}; },
+      emit: async (n: string, p?: any) => { events.push({ name: n, payload: p }); for (const fn of handlers[n] ?? []) await fn(p); },
+    };
+
+    await plugin.setup!(ctx);
+    // Fire turn:cancel shortly after start to abort the pending LLM call.
+    setTimeout(() => { ctx.emit("turn:cancel", {}); }, 10);
+    await plugin.start!(ctx);
+
+    // Find the active session id from emitted events.
+    const created = events.find((e) => e.name === "session:active-changed");
+    const sessionId = created?.payload?.to;
+    expect(sessionId).toBeTruthy();
+    const snapshot = await sessions.getMessages(sessionId);
+    expect(snapshot).toEqual([{ role: "user", content: "amend my request later" }]);
+
+    const turnEnd = events.find((e) => e.name === "turn:end");
+    expect(turnEnd?.payload?.reason).toBe("cancelled");
   });
 });
