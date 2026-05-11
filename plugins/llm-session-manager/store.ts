@@ -213,6 +213,26 @@ export function makeStore(deps: StoreDeps): SessionsStoreService {
     const bufferedMessages: ChatMessage[] = [];
     let closed = false;
     let committed = false;
+
+    async function writeBufferedMessages(messagesToWrite: ChatMessage[]) {
+      const next: Snapshot = {
+        ...sess.snapshot,
+        messages: [...sess.snapshot.messages, ...messagesToWrite],
+        lastTurnAt: deps.now(),
+      };
+      const paths = sessionPaths(root, id);
+      await sess.events.flush();
+      await writeSnapshotAtomic(paths.snapshot, paths.snapshotTmp, next);
+      sess.snapshot = next;
+      sess.record = recordFromSnapshot(next);
+      sess.openTurn = undefined;
+      try {
+        await index.appendUpdate({ id, lastTurnAt: next.lastTurnAt! });
+      } catch (err) {
+        deps.log(`sessions: index update failed for ${id}: ${String((err as any)?.message ?? err)}`);
+      }
+    }
+
     const handle: TurnHandle = {
       turnId,
       append(message) {
@@ -221,24 +241,9 @@ export function makeStore(deps: StoreDeps): SessionsStoreService {
       },
       async commit() {
         if (closed) return;
-        const next: Snapshot = {
-          ...sess.snapshot,
-          messages: [...sess.snapshot.messages, ...bufferedMessages],
-          lastTurnAt: deps.now(),
-        };
-        const paths = sessionPaths(root, id);
-        await sess.events.flush();
-        await writeSnapshotAtomic(paths.snapshot, paths.snapshotTmp, next);
-        sess.snapshot = next;
-        sess.record = recordFromSnapshot(next);
-        sess.openTurn = undefined;
+        await writeBufferedMessages(bufferedMessages);
         closed = true;
         committed = true;
-        try {
-          await index.appendUpdate({ id, lastTurnAt: next.lastTurnAt! });
-        } catch (err) {
-          deps.log(`sessions: index update failed for ${id}: ${String((err as any)?.message ?? err)}`);
-        }
       },
       async rollback() {
         if (committed) return;
@@ -247,7 +252,20 @@ export function makeStore(deps: StoreDeps): SessionsStoreService {
         closed = true;
       },
       async partialCommit() {
-        throw new Error("partialCommit: not yet implemented");
+        if (closed) return;
+        const trimmed = [...bufferedMessages];
+        const last = trimmed[trimmed.length - 1];
+        if (last && last.role === "assistant" && Array.isArray(last.toolCalls) && last.toolCalls.length > 0) {
+          trimmed.pop();
+        }
+        if (trimmed.length === 0) {
+          sess.openTurn = undefined;
+          closed = true;
+          return;
+        }
+        await writeBufferedMessages(trimmed);
+        closed = true;
+        committed = true;
       },
     };
     sess.openTurn = { bufferedMessages };
