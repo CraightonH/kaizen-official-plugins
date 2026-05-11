@@ -2,10 +2,12 @@ import type {
   ToolSchema,
   ToolHandler,
   ToolExecutionContext,
+} from "llm-events/public";
+import type {
+  DriverService,
   RunConversationInput,
   RunConversationOutput,
-  DriverService,
-} from "llm-events/public";
+} from "llm-driver/public";
 import type { SessionsStoreService } from "llm-session-manager/public";
 import type { RegistryHandle } from "./registry.ts";
 import type { TurnTracker } from "./turn-tracker.ts";

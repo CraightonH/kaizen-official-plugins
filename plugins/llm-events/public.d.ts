@@ -210,48 +210,6 @@ export interface ToolDispatchStrategy {
   }): Promise<ChatMessage[]>;
 }
 
-// ---------- driver:run-conversation (owned by `llm-driver`) ----------
-
-import type { TurnHandle } from "llm-session-manager/public";
-
-export type RunConversationInput = {
-  systemPrompt: string;
-  sessionId: string;
-  /** Restricts the tool registry view for this nested run. */
-  toolFilter?: { tags?: string[]; names?: string[] };
-  /** Override default model for this run. */
-  model?: string;
-  /** For nested-turn telemetry (set by `llm-agents` when dispatching sub-agents). */
-  parentTurnId?: string;
-  signal?: AbortSignal;
-  trigger?: "user" | "agent";
-} & (
-  | {
-      externalTurnId: string;
-      turnHandle: TurnHandle;
-      userMessage?: never;
-    }
-  | {
-      /**
-       * The user message to append before inference. When omitted, the current
-       * snapshot tail must already be a user message, such as a session:handoff
-       * seeded prompt.
-       */
-      userMessage?: ChatMessage;
-      externalTurnId?: never;
-      turnHandle?: never;
-    }
-);
-
-export interface RunConversationOutput {
-  finalMessage: ChatMessage;
-  usage: { promptTokens: number; completionTokens: number };
-}
-
-export interface DriverService {
-  runConversation(input: RunConversationInput): Promise<RunConversationOutput>;
-}
-
 // ---------- skills:registry (owned by `llm-skills`) ----------
 
 export interface SkillManifest {

@@ -5,7 +5,8 @@ import type {
   LLMResponse,
   ToolSchema,
 } from "llm-events/public";
-import type { SessionsStoreService, TurnHandle } from "llm-session-manager/public";
+import type { SessionsStoreService } from "llm-session-manager/public";
+import type { RunConversationInput, RunConversationOutput } from "./public";
 import { aggregateUsage } from "./state.ts";
 
 export interface ToolsRegistryService {
@@ -26,39 +27,6 @@ export interface ToolDispatchStrategy {
     turnId: string;
     sessionId: string;
   }): Promise<ChatMessage[]>;
-}
-
-type RunConversationBase = {
-  systemPrompt: string;
-  sessionId: string;
-  toolFilter?: { tags?: string[]; names?: string[] };
-  model?: string;
-  parentTurnId?: string;
-  signal?: AbortSignal;
-  trigger?: "user" | "agent";
-};
-
-export type RunConversationInput = RunConversationBase & (
-  | {
-      externalTurnId: string;
-      turnHandle: TurnHandle;
-      userMessage?: never;
-    }
-  | {
-      /**
-       * The user message to append before inference. When omitted (and the call
-       * owns the turn), runConversation infers against the current snapshot tail —
-       * which must already end with a user turn (e.g. one seeded by session:handoff).
-       */
-      userMessage?: ChatMessage;
-      externalTurnId?: never;
-      turnHandle?: never;
-    }
-);
-
-export interface RunConversationOutput {
-  finalMessage: ChatMessage;
-  usage: { promptTokens: number; completionTokens: number };
 }
 
 export interface PromptSystemServiceLike {

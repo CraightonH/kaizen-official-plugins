@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 
 // The Spec 0 acceptance criteria require Tier 1+ plugins to be able to import
-// every one of these names from `llm-events/public.d.ts` without circular
+// the foundational names from `llm-events/public.d.ts` without circular
 // dependencies. This test imports them together; if any name is missing or
 // renamed, this file fails to type-check and `bun test` reports the error.
 import type {
@@ -15,7 +15,6 @@ import type {
   ToolsRegistryService,
   ToolExecutionContext,
   ToolDispatchStrategy,
-  DriverService,
   SkillsRegistryService,
   AgentsRegistryService,
   SlashRegistryService,
@@ -30,7 +29,7 @@ describe("llm-events: Spec 0 acceptance-criteria imports", () => {
     expect(CANCEL_TOOL).toBe(Symbol.for("kaizen.cancel"));
   });
 
-  it("every Spec 0 type name resolves at the declaration level", () => {
+  it("every foundational Spec 0 type name resolves at the declaration level", () => {
     type _V = Vocab;
     type _Cm = ChatMessage;
     type _Tc = ToolCall;
@@ -41,7 +40,6 @@ describe("llm-events: Spec 0 acceptance-criteria imports", () => {
     type _Trs = ToolsRegistryService;
     type _Tec = ToolExecutionContext;
     type _Tds = ToolDispatchStrategy;
-    type _Ds = DriverService;
     type _Skr = SkillsRegistryService;
     type _Agr = AgentsRegistryService;
     type _Slr = SlashRegistryService;

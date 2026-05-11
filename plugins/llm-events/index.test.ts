@@ -143,34 +143,6 @@ describe("llm-events", () => {
     expect(ok).toBe(true);
   });
 
-  it("re-exports driver:run-conversation interface types", () => {
-    type _Driver = import("./public").DriverService extends {
-      runConversation: (...a: any[]) => Promise<any>;
-    } ? true : false;
-    const ok: _Driver = true;
-    expect(ok).toBe(true);
-
-    type _In = import("./public").RunConversationInput extends {
-      systemPrompt: string;
-      sessionId: string;
-    } ? true : false;
-    const inOk: _In = true;
-    expect(inOk).toBe(true);
-
-    const seededTailInput: import("./public").RunConversationInput = {
-      systemPrompt: "",
-      sessionId: "session-1",
-    };
-    expect(seededTailInput.sessionId).toBe("session-1");
-
-    type _Out = import("./public").RunConversationOutput extends {
-      finalMessage: any;
-      usage: { promptTokens: number; completionTokens: number };
-    } ? true : false;
-    const outOk: _Out = true;
-    expect(outOk).toBe(true);
-  });
-
   it("re-exports skills:registry interface types", () => {
     type _Reg = import("./public").SkillsRegistryService extends {
       list: () => any;

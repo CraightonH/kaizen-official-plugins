@@ -10,16 +10,19 @@ index.ts        Plugin lifecycle. Declares VOCAB (frozen), CANCEL_TOOL,
                 `llm-events:vocabulary` service, provides VOCAB as its impl,
                 and calls ctx.defineEvent() once per VOCAB value.
                 The only file that touches `ctx`.
-public.d.ts     Canonical TypeScript contract for the entire harness:
+public.d.ts     Foundation TypeScript contract for the harness:
                 Vocab, EventName, ChatMessage, ToolCall, ToolSchema, ModelInfo,
                 LLMRequest, LLMResponse, LLMStreamEvent, LLMCompleteService,
                 ToolsRegistryService + ToolHandler + ToolExecutionContext,
-                ToolDispatchStrategy, DriverService + RunConversation{Input,Output},
+                ToolDispatchStrategy,
                 SkillsRegistryService + SkillManifest,
                 AgentsRegistryService + AgentManifest,
                 SlashRegistryService + SlashCommand{Manifest,Context,Handler},
                 TuiCompletionService + CompletionSource + CompletionItem.
                 No runtime code — type-only import surface for peers.
+                DriverService + RunConversation{Input,Output} are owned by
+                llm-driver/public because they depend on TurnHandle from
+                llm-session-manager.
 index.test.ts   Bun-test suite: VOCAB shape/freeze, sentinel identity,
                 lifecycle (defineEvent + provideService), and structural type
                 probes for every re-exported service interface.
@@ -55,6 +58,10 @@ Do **not** add `defineEvent` calls in any other plugin for names declared here. 
 ## Adding a new shared type
 
 Cross-plugin service contracts (`*Service` interfaces) and their payload types (`*Manifest`, `*Context`, etc.) belong in `public.d.ts`. Plugin-internal types should stay in the owning plugin's own `public.d.ts`.
+
+Do not add contracts here if their shape requires importing another harness
+plugin. `llm-events` must remain dependency-free; put that contract in the
+owning plugin's `public.d.ts` instead.
 
 When adding a service interface here:
 - Comment with the owning plugin name (see existing `// ---------- tools:registry (owned by llm-tools-registry) ----------` headers).

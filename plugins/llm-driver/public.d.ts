@@ -11,6 +11,7 @@ export type {
 import type { ChatMessage } from "llm-events/public";
 import type { TurnHandle } from "llm-session-manager/public";
 
+// Owned by llm-driver: service contract for `driver:run-conversation`.
 export type RunConversationInput = {
   systemPrompt: string;
   sessionId: string;

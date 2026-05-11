@@ -26,7 +26,8 @@ depth.ts        computeDepth(records, turnId) — counts agent-trigger ancestors
                 the user turn. 1024-iteration safety guard.
 tool-filter.ts  Glob matcher for manifest `tools` patterns and toolMatches() helper. Pure.
 dispatch.ts     makeDispatchTool({ registry, tracker, driver, maxDepth, hasSkills }) →
-                { schema, handler }. Reads ctx.turnId, builds RunConversationInput, recurses.
+                { schema, handler }. Reads ctx.turnId, builds RunConversationInput
+                from llm-driver/public, recurses.
 public.d.ts     Re-exports AgentManifest and AgentsRegistryService from llm-events/public.
                 The canonical service contract lives in the events VOCAB.
 ```

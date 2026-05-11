@@ -10,8 +10,10 @@ Tier 0 foundation plugin for the openai-compatible Kaizen harness.
   than hand-typing event-name strings.
 - **`ctx.defineEvent` registration** for every name in `VOCAB`, so the bus
   validates `emit`/`on` calls against the known set.
-- **Shared types** in `public.d.ts`. Every other `llm-*` plugin in the harness
-  imports cross-plugin contracts from here to avoid circular dependencies.
+- **Shared types** in `public.d.ts`. Other `llm-*` plugins import event,
+  conversation, LLM, tool, slash, status, skill, and agent contracts from here.
+  Owner-specific contracts that depend on higher-level plugins live with their
+  owning plugin, for example `driver:run-conversation` in `llm-driver/public`.
 
 ## Type re-exports (cross-plugin contracts)
 
@@ -23,19 +25,20 @@ Tier 0 foundation plugin for the openai-compatible Kaizen harness.
 - Cancellation sentinel — `CANCEL_TOOL = Symbol.for("kaizen.cancel")`.
 - Service interfaces (declared here, *implemented* by their owning plugin):
   `ToolsRegistryService`, `ToolHandler`, `ToolExecutionContext`,
-  `ToolDispatchStrategy`, `DriverService`, `RunConversationInput`,
-  `RunConversationOutput`, `SkillsRegistryService`, `SkillManifest`,
+  `ToolDispatchStrategy`, `SkillsRegistryService`, `SkillManifest`,
   `AgentsRegistryService`, `AgentManifest`, `SlashRegistryService`,
   `SlashCommandManifest`, `SlashCommandHandler`, `SlashCommandContext`,
   `TuiCompletionService`, `CompletionSource`, `CompletionItem`.
+- Driver service interfaces — `DriverService`, `RunConversationInput`, and
+  `RunConversationOutput` — are owned by `llm-driver/public`.
 
 ## Why interfaces live here, not in their owning plugin
 
-Spec 0 is the propagation source-of-truth for any cross-plugin contract.
-Hosting service-interface declarations in `llm-events` keeps the dependency
-graph acyclic: every `llm-*` plugin depends on `llm-events`, and `llm-events`
-depends on nothing. An owning plugin (e.g. `llm-driver` for `DriverService`)
-implements the interface and `provideService`s a value satisfying its shape.
+Spec 0 is the propagation source-of-truth for foundational cross-plugin
+contracts. Hosting shared declarations in `llm-events` keeps the dependency
+graph acyclic: every `llm-*` plugin can depend on `llm-events`, and
+`llm-events` depends on nothing. Contracts that need types from a higher-level
+plugin stay with their owner so this foundation plugin remains a leaf.
 
 ## Permissions
 
