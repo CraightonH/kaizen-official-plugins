@@ -152,3 +152,51 @@ test("renderer with no expandedView renders just the one-liner (back-compat)", (
   expect(out).toContain("edit(f.txt)");
   expect(out).not.toContain("⎿");
 });
+
+test("default trail extracts `output` from a bash-shaped JSON result", () => {
+  const reg = makeToolRendererRegistry();
+  const result = JSON.stringify({ exit_code: 0, output: "On branch main\nnothing to commit", duration_ms: 12 });
+  const { lastFrame } = render(
+    <ToolCallBlock entry={entry({ name: "bash", status: "done", result })} registry={reg} theme={theme as any} />
+  );
+  const out = lastFrame() ?? "";
+  expect(out).toContain("On branch main");
+  expect(out).not.toContain('"exit_code"');
+  expect(out).not.toContain('"output"');
+});
+
+test("default trail renders non-JSON result strings unchanged (compacted)", () => {
+  const reg = makeToolRendererRegistry();
+  const { lastFrame } = render(
+    <ToolCallBlock entry={entry({ name: "x", status: "done", result: "plain output here" })} registry={reg} theme={theme as any} />
+  );
+  expect(lastFrame() ?? "").toContain("plain output here");
+});
+
+test("default trail renders nothing when result is empty", () => {
+  const reg = makeToolRendererRegistry();
+  const { lastFrame } = render(
+    <ToolCallBlock entry={entry({ name: "x", status: "done", result: "" })} registry={reg} theme={theme as any} />
+  );
+  const out = lastFrame() ?? "";
+  expect(out).not.toContain(" — ");
+});
+
+test("default trail collapses whitespace in extracted output", () => {
+  const reg = makeToolRendererRegistry();
+  const result = JSON.stringify({ output: "line1\nline2\n  line3" });
+  const { lastFrame } = render(
+    <ToolCallBlock entry={entry({ name: "bash", status: "done", result })} registry={reg} theme={theme as any} />
+  );
+  expect(lastFrame() ?? "").toContain("line1 line2 line3");
+});
+
+test("default trail truncates very long output with an ellipsis", () => {
+  const reg = makeToolRendererRegistry();
+  const long = "a".repeat(200);
+  const result = JSON.stringify({ output: long });
+  const { lastFrame } = render(
+    <ToolCallBlock entry={entry({ name: "bash", status: "done", result })} registry={reg} theme={theme as any} />
+  );
+  expect(lastFrame() ?? "").toContain("…");
+});

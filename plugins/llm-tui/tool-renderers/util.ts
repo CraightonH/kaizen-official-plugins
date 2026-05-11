@@ -63,3 +63,42 @@ export function defaultCollapsedSummary(args: unknown): string {
   if (typeof args !== "object") return truncate(String(args), MAX_PREVIEW);
   return truncate(pickPrimary(args as Record<string, unknown>, PRIMARY_ARG_KEYS), MAX_PREVIEW);
 }
+
+// Heuristic: when a tool result is an object, these keys (in priority order)
+// usually hold the "interesting" payload. `output` is the bash result shape;
+// `stdout` covers generic shell adapters; `text`/`content` cover readers;
+// `result`/`message` are generic fallbacks.
+export const PRIMARY_RESULT_KEYS = [
+  "output",
+  "stdout",
+  "text",
+  "content",
+  "result",
+  "message",
+];
+
+// Render a tool result as a short, human-readable preview. Mirrors
+// defaultCollapsedSummary for args. If the result is a JSON string that
+// parses to an object, surface the primary string field; otherwise render
+// the string itself. Always single-line, truncated to MAX_PREVIEW.
+export function defaultResultPreview(result: unknown): string {
+  if (result == null) return "";
+  if (typeof result === "object") {
+    return truncate(pickPrimary(result as Record<string, unknown>, PRIMARY_RESULT_KEYS), MAX_PREVIEW);
+  }
+  if (typeof result !== "string") return truncate(String(result), MAX_PREVIEW);
+
+  const s = result;
+  if (s.length === 0) return "";
+  const first = s[0];
+  if (first === "{" || first === "[") {
+    try {
+      const parsed = JSON.parse(s);
+      if (parsed && typeof parsed === "object") {
+        const picked = pickPrimary(parsed as Record<string, unknown>, PRIMARY_RESULT_KEYS);
+        if (picked.length > 0) return truncate(picked, MAX_PREVIEW);
+      }
+    } catch { /* fall through to raw */ }
+  }
+  return truncate(compactWhitespace(s), MAX_PREVIEW);
+}

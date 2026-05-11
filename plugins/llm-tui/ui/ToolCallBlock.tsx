@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import type { ToolCallEntry } from "../state/store.ts";
 import type { ToolRendererRegistry } from "../tool-renderers/registry.ts";
 import type { TuiTheme } from "../theme/loader.ts";
-import { defaultCollapsedSummary, truncate } from "../tool-renderers/util.ts";
+import { defaultCollapsedSummary, defaultResultPreview } from "../tool-renderers/util.ts";
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
@@ -30,9 +30,10 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ entry, registry, t
   else if (entry.status === "done") { glyph = "✓"; glyphColor = theme.outputColor; }
   else { glyph = "✗"; glyphColor = theme.noticeColor; }
 
+  const resultPreview = entry.status === "done" ? defaultResultPreview(entry.result) : "";
   const trail =
     entry.status === "error" && entry.errorMessage ? ` — ${entry.errorMessage}` :
-    entry.status === "done" && entry.result ? ` — ${truncate(entry.result, 40)}` :
+    resultPreview ? ` — ${resultPreview}` :
     "";
 
   const expanded =
