@@ -25,7 +25,7 @@ Coordination plugin for the openai-compatible harness. Owns the assistant turn l
 **Service** — `driver:run-conversation`
 
 ```typescript
-interface RunConversationInput {
+type RunConversationInput = {
   systemPrompt: string;
   sessionId: string;
   toolFilter?: { tags?: string[]; names?: string[] };
@@ -33,21 +33,21 @@ interface RunConversationInput {
   parentTurnId?: string;
   signal?: AbortSignal;
   trigger?: "user" | "agent";
-  userMessage: ChatMessage;
-}
-
-// Existing-turn mode, used by the interactive loop:
-interface RunConversationExistingTurnInput {
-  systemPrompt: string;
-  sessionId: string;
-  externalTurnId: string;
-  turnHandle: TurnHandle;
-  toolFilter?: { tags?: string[]; names?: string[] };
-  model?: string;
-  parentTurnId?: string;
-  signal?: AbortSignal;
-  trigger?: "user" | "agent";
-}
+} & (
+  | {
+      // Existing-turn mode, used by the interactive loop.
+      externalTurnId: string;
+      turnHandle: TurnHandle;
+      userMessage?: never;
+    }
+  | {
+      // Owned-turn mode. When omitted, the current snapshot tail must already
+      // be a user message, such as a session:handoff seeded prompt.
+      userMessage?: ChatMessage;
+      externalTurnId?: never;
+      turnHandle?: never;
+    }
+);
 
 interface RunConversationOutput {
   finalMessage: ChatMessage;
@@ -62,16 +62,21 @@ interface DriverService {
 Semantics:
 - The driver does not select a model. If `input.model` is omitted, the LLM provider behind `llm:complete` substitutes its own default.
 - `sessionId` selects the persisted transcript. The driver reads fresh messages from `sessions:store` before each LLM call and appends assistant/tool messages through a turn handle.
-- In owned-turn mode (`userMessage`), `runConversation()` begins, commits, and rolls back its own turn and emits `turn:start`/`turn:end`.
+- In owned-turn mode (`userMessage` or a snapshot tail that already ends in a user message), `runConversation()` begins, commits, and rolls back its own turn and emits `turn:start`/`turn:end`.
 - In existing-turn mode (`externalTurnId` plus `turnHandle`), the caller owns turn lifecycle and commit/rollback; `runConversation()` only appends messages.
 - `signal` aborts the in-flight LLM stream. On abort, `turn:end` fires with `reason: "cancelled"`.
 
-### Consumes
+### Required Services
 
 - **Service** — `llm-events:vocabulary` (required). Event vocabulary plugin; the driver participates in the shared event names.
 - **Service** — `llm-tui:channel` (required). UI channel with `readInput()`, `setBusy()`, `writeOutput()`, `writeNotice()`, and optional `writeUser()`. Drives the interactive loop.
 - **Service** — `llm:complete` (required). The provider that yields `LLMStreamEvent`s (`token`, `reasoning`, `tool-call`, `done`, `error`).
 - **Service** — `sessions:store` (required). Persistent session store used for active transcripts and turn handles.
+
+### Optional Services
+
+These are discovered at runtime with safe `useService()` lookups rather than declared as hard `services.consumes` edges, so a smaller harness can omit them.
+
 - **Service** — `tools:registry` (optional). When present, listed tools are advertised to the strategy via `prepareRequest({ availableTools })`.
 - **Service** — `tool-dispatch:strategy` (optional). When present together with `tools:registry`, drives the multi-step tool loop. `prepareRequest()` may return `tools` and a `systemPromptAppend`; `handleResponse()` returns messages to append before the next LLM call (empty array → end of turn).
 - **Service** — `prompt:system` (optional). When bound, supersedes both `input.systemPrompt` and `strategy.systemPromptAppend` for every LLM call. Cache is keyed on `generation()`; no `prompt:rebuilt` subscription is needed.

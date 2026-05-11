@@ -66,15 +66,25 @@ const plugin: KaizenPlugin = {
   apiVersion: "3.0.0",
   driver: true,
   permissions: { tier: "unscoped" },
+  config: {
+    schema: {
+      type: "object",
+      properties: {
+        defaultSystemPrompt: {
+          type: "string",
+          description: "Fallback system prompt used by the interactive loop when prompt:system is not bound.",
+        },
+      },
+      additionalProperties: false,
+    },
+    defaults: DEFAULTS,
+  },
   services: {
     consumes: [
       "llm-events:vocabulary",
       "llm-tui:channel",
       "llm:complete",
       "sessions:store",
-      "tools:registry",
-      "tool-dispatch:strategy",
-      "prompt:system",
     ],
     provides: ["driver:run-conversation"],
   },
@@ -84,12 +94,9 @@ const plugin: KaizenPlugin = {
     ctx.consumeService("llm-tui:channel");
     ctx.consumeService("llm:complete");
     ctx.consumeService("sessions:store");
-    // Optional: when llm-system-prompt is loaded, runConversation pulls
-    // systemPrompt from prompt:system.assemble() with a generation-keyed
-    // cache (see loop.ts assemblyCache). No prompt:rebuilt listener needed —
-    // we re-check generation each turn, so any registry mutation flows in
-    // automatically on the next call.
-    ctx.consumeService("prompt:system");
+    // Optional services are discovered with safeUse() below instead of hard
+    // service edges. That keeps A-tier harnesses valid when tools/strategy or
+    // prompt:system are absent.
 
     ctx.defineService("driver:run-conversation", {
       description: "Run a (possibly nested) conversation against the LLM with optional tool dispatch.",
@@ -266,8 +273,10 @@ const plugin: KaizenPlugin = {
             await ctx.emit("turn:end", { turnId, sessionId, reason: "cancelled" });
           } else {
             // recoverable error: roll back, surface, continue
+            const message = err?.message ?? String(err);
             await handle.rollback();
-            await ctx.emit("turn:error", { turnId, sessionId, message: err?.message ?? String(err), cause: err });
+            ui.writeNotice(`error: ${message}`);
+            await ctx.emit("turn:error", { turnId, sessionId, message, cause: err });
             await ctx.emit("turn:end", { turnId, sessionId, reason: "error" });
           }
         } finally {

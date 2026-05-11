@@ -103,6 +103,17 @@ describe("llm-driver index", () => {
   it("metadata + setup defines + provides driver:run-conversation", async () => {
     expect(plugin.name).toBe("llm-driver");
     expect(plugin.driver).toBe(true);
+    expect(plugin.config?.defaults).toEqual({ defaultSystemPrompt: "" });
+    expect(plugin.config?.schema).toMatchObject({
+      type: "object",
+      properties: { defaultSystemPrompt: { type: "string" } },
+    });
+    expect(plugin.services?.consumes).toEqual([
+      "llm-events:vocabulary",
+      "llm-tui:channel",
+      "llm:complete",
+      "sessions:store",
+    ]);
     const ctx = makeCtx({ ui: makeUi([]), llm: makeLlm([]) });
     await plugin.setup!(ctx);
     expect(ctx.provided["driver:run-conversation"]).toBeDefined();
@@ -160,6 +171,7 @@ describe("llm-driver index", () => {
     await plugin.start!(ctx);
     const ends = ctx.events.filter((e: any) => e.name === "turn:end");
     expect(ends.map((e: any) => e.payload.reason)).toEqual(["error", "complete"]);
+    expect(ui.out).toContain("[notice]error: boom");
     // After rollback the second turn's outgoing request should NOT include the failed
     // user message + assistant from turn 1. Verify via the llm:request snapshot.
     const reqs = ctx.events.filter((e: any) => e.name === "llm:request");

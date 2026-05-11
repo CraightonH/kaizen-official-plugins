@@ -232,7 +232,12 @@ export type RunConversationInput = {
       userMessage?: never;
     }
   | {
-      userMessage: ChatMessage;
+      /**
+       * The user message to append before inference. When omitted, the current
+       * snapshot tail must already be a user message, such as a session:handoff
+       * seeded prompt.
+       */
+      userMessage?: ChatMessage;
       externalTurnId?: never;
       turnHandle?: never;
     }

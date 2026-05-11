@@ -157,6 +157,12 @@ describe("llm-events", () => {
     const inOk: _In = true;
     expect(inOk).toBe(true);
 
+    const seededTailInput: import("./public").RunConversationInput = {
+      systemPrompt: "",
+      sessionId: "session-1",
+    };
+    expect(seededTailInput.sessionId).toBe("session-1");
+
     type _Out = import("./public").RunConversationOutput extends {
       finalMessage: any;
       usage: { promptTokens: number; completionTokens: number };
