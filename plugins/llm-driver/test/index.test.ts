@@ -57,6 +57,7 @@ function makeSessions(): SessionsStoreService {
           open.delete(id);
         },
         rollback: async () => { open.delete(id); },
+        partialCommit: async () => { open.delete(id); },
       };
     },
     async list() { return []; },

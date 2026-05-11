@@ -57,6 +57,11 @@ function makeSessions(initial: ChatMessage[] = []): SessionsStoreService & { com
           state.closed = true;
           if (open === state) open = null;
         },
+        async partialCommit() {
+          if (state.closed) return;
+          state.closed = true;
+          if (open === state) open = null;
+        },
       };
     },
     async list() { return []; },

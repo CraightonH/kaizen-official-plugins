@@ -22,6 +22,7 @@ function makeSessions() {
         append: (msg: ChatMessage) => buffer.push(msg),
         commit: async () => { messages.set(id, [...(messages.get(id) ?? []), ...buffer]); open.delete(id); },
         rollback: async () => { open.delete(id); },
+        partialCommit: async () => { open.delete(id); },
       };
     },
     async load(id: string) { return { id, harness: "h", metadata: {}, createdAt: 1, pluginFingerprint: [] }; },

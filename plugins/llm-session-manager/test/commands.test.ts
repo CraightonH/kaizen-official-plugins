@@ -8,7 +8,7 @@ function fakeStore(overrides: Partial<SessionsStoreService> = {}): SessionsStore
     load: mock(async () => { throw new Error("not impl"); }),
     exists: mock(async () => false),
     getMessages: mock(async () => []),
-    beginTurn: mock((id: string, turnId: string) => ({ turnId, append: () => {}, commit: async () => {}, rollback: async () => {} })),
+    beginTurn: mock((id: string, turnId: string) => ({ turnId, append: () => {}, commit: async () => {}, rollback: async () => {}, partialCommit: async () => {} })),
     list: mock(async () => []),
     rename: mock(async (id, alias) => ({ id, alias: alias ?? undefined, harness: "h", metadata: {}, createdAt: 0, pluginFingerprint: [] } as SessionRecord)),
     delete: mock(async () => {}),
@@ -63,6 +63,7 @@ function fakeStoreCapturingMessages() {
       append: (m: any) => { messages.push(m); },
       commit: async () => {},
       rollback: async () => {},
+      partialCommit: async () => {},
     })),
   });
   return { store, messages };

@@ -24,6 +24,12 @@ export interface TurnHandle {
   append(msg: ChatMessage): void;
   commit(): Promise<void>;
   rollback(): Promise<void>;
+  /**
+   * Preserve the user message and any completed tool roundtrips; drop a trailing
+   * assistant message whose toolCalls have no matching tool results.
+   * If the post-trim buffer is empty, behave as rollback().
+   */
+  partialCommit(): Promise<void>;
 }
 
 export interface SessionsStoreService {
@@ -239,6 +245,9 @@ export function makeStore(deps: StoreDeps): SessionsStoreService {
         if (closed) return;
         sess.openTurn = undefined;
         closed = true;
+      },
+      async partialCommit() {
+        throw new Error("partialCommit: not yet implemented");
       },
     };
     sess.openTurn = { bufferedMessages };

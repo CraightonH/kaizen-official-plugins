@@ -20,6 +20,7 @@ function makeSessions(): SessionsStoreService {
         append: (m) => buffer.push(m),
         commit: async () => { committed.push(...buffer); open = null; },
         rollback: async () => { open = null; },
+        partialCommit: async () => { open = null; },
       };
     },
     async list() { return []; },

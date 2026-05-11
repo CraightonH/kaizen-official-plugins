@@ -10,7 +10,7 @@ function fakeStore(rec: SessionRecord): SessionsStoreService {
     load: mock(async () => rec),
     exists: mock(async () => true),
     getMessages: mock(async () => []),
-    beginTurn: mock((id: string, turnId: string) => ({ turnId, append: () => {}, commit: async () => {}, rollback: async () => {} })),
+    beginTurn: mock((id: string, turnId: string) => ({ turnId, append: () => {}, commit: async () => {}, rollback: async () => {}, partialCommit: async () => {} })),
     list: mock(async () => [rec]),
     rename: mock(async (id, alias) => ({ ...rec, id, alias: alias ?? undefined })),
     delete: mock(async () => {}),
