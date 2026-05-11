@@ -7,8 +7,8 @@ export const schema: ToolSchema = {
   name: "edit",
   description:
     "Edit a text file. Two commands:\n" +
-    "- `str_replace`: find `old_str` in the file and replace with `new_str`. `old_str` MUST appear exactly once unless `replace_all: true`. Use this to modify, replace by content (e.g. quote the exact lines you want to replace), or delete content (set `new_str` to \"\").\n" +
-    "- `insert`: insert `insert_text` after line `insert_line` (0-based; `0` = top of file; the file's line count = EOF/append). Use this to add content without modifying existing lines.",
+    "- `str_replace`: find `old_str` in the file and replace with `new_str`. `old_str` MUST appear exactly once unless `replace_all: true`. Use this to modify, replace specific known lines (quote them exactly in `old_str`), or delete content (set `new_str` to \"\").\n" +
+    "- `insert`: insert `insert_text` AT line `insert_line` (1-based; the inserted text becomes the new line `insert_line`, existing lines shift down). For a file with N lines, `insert_line: 1` prepends, `insert_line: N+1` appends. Line numbers match the 1-based numbering shown by `read`.",
   parameters: {
     type: "object",
     properties: {
@@ -21,10 +21,20 @@ export const schema: ToolSchema = {
       replace_all: { type: "boolean", default: false, description: "str_replace: when true, replace every occurrence of old_str." },
 
       // insert mode
-      insert_line: { type: "integer", minimum: 0, description: "insert: 0-based line number to insert AFTER. 0 prepends to the file; the file's line count appends to EOF." },
+      insert_line: { type: "integer", minimum: 1, description: "insert: 1-based line number where the inserted text will live. Valid range for an N-line file is 1..N+1. `1` prepends; `N+1` appends to EOF." },
       insert_text: { type: "string", description: "insert: text to insert verbatim. Trailing newlines are preserved as written." },
     },
     required: ["command", "path"],
+    oneOf: [
+      {
+        properties: { command: { const: "str_replace" } },
+        required: ["command", "path", "old_str", "new_str"],
+      },
+      {
+        properties: { command: { const: "insert" } },
+        required: ["command", "path", "insert_line", "insert_text"],
+      },
+    ],
   },
   tags: ["local", "fs"],
 };
@@ -98,8 +108,8 @@ async function handleStrReplace(args: StrReplaceArgs): Promise<string> {
 }
 
 async function handleInsert(args: InsertArgs): Promise<string> {
-  if (typeof args.insert_line !== "number" || !Number.isInteger(args.insert_line) || args.insert_line < 0) {
-    throw new Error("insert_line must be a non-negative integer");
+  if (args.insert_line === undefined) {
+    throw new Error('insert_line is required when command="insert"; supply a 1-based line number (1..N+1 where N is the file\'s line count; 1 prepends, N+1 appends)');
   }
   if (typeof args.insert_text !== "string") throw new Error("insert_text must be a string");
   if (args.insert_text === "") throw new Error("insert_text must be non-empty");
@@ -107,30 +117,36 @@ async function handleInsert(args: InsertArgs): Promise<string> {
   const abs = resolvePath(args.path);
   const original = await readFileOrThrow(abs);
   const total = countLines(original);
-  if (args.insert_line > total) {
-    throw new Error(`insert_line ${args.insert_line} exceeds file length ${total} lines`);
+  const maxLine = total + 1;
+
+  // 1-based AT semantics. `insert_line: N` means "the inserted text becomes the new line N".
+  // Valid range is 1..total+1; 1 prepends, total+1 appends.
+  if (typeof args.insert_line !== "number" || !Number.isInteger(args.insert_line) || args.insert_line < 1) {
+    throw new Error(`insert_line must be an integer in 1..${maxLine} for a ${total}-line file (got ${JSON.stringify(args.insert_line)}); 1 prepends, ${maxLine} appends`);
+  }
+  if (args.insert_line > maxLine) {
+    throw new Error(`insert_line ${args.insert_line} out of range for ${total}-line file (valid: 1..${maxLine}); 1 prepends, ${maxLine} appends to EOF`);
   }
 
-  // Convention: insert AFTER line `insert_line`. 0 means before the first line (prepend).
-  // We split the file into "before" and "after" the cut point preserving any trailing newline
-  // exactly as-is, then concatenate with insert_text verbatim.
+  // Split the file into "before" and "after" the cut point, preserving any trailing newline
+  // exactly as-is, then concatenate with insert_text verbatim. Internally we walk `insert_line - 1`
+  // newlines forward from the start (0-based "AFTER" index).
+  const afterIndex = args.insert_line - 1; // newlines to skip past
   let updated: string;
-  if (args.insert_line === 0) {
+  if (afterIndex === 0) {
     updated = args.insert_text + original;
-  } else if (args.insert_line === total) {
+  } else if (afterIndex === total) {
     // Append at EOF. If the file lacks a trailing newline, the inserted text is concatenated
-    // directly (no auto-newline) — matches the spec's "verbatim" requirement.
+    // directly (no auto-newline) — matches the "verbatim" requirement.
     updated = original + args.insert_text;
   } else {
-    // Insert AFTER line N (1 <= N < total). Find the Nth `\n` and split there.
     let idx = -1;
     let seen = 0;
-    while (seen < args.insert_line) {
+    while (seen < afterIndex) {
       idx = original.indexOf("\n", idx + 1);
       if (idx === -1) break;
       seen++;
     }
-    // `idx` points at the Nth newline; insert immediately after it.
     const cut = idx + 1;
     updated = original.slice(0, cut) + args.insert_text + original.slice(cut);
   }
