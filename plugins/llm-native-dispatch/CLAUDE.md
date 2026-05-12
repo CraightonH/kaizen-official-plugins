@@ -8,21 +8,21 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 index.ts             Plugin lifecycle: defines and provides the tool-dispatch:strategy service.
                      The only file that touches `ctx`.
 strategy.ts          makeStrategy() → ToolDispatchStrategy. Pure logic. Owns prepareRequest
-                     pass-through and the sequential handleResponse loop (assistant message +
-                     per-call invoke + tool messages + abort/cancel handling).
+                     pass-through and the sequential handleResponse loop (per-call invoke +
+                     tool messages + abort/cancel handling).
 serialize.ts         serializeResult(value) and serializeError(message). Pure helpers.
                      Encodes the string / null-undefined / JSON / circular-fallback rules.
 args-validation.ts   isValidToolArgs(value) and malformedArgsMessage(raw). Pure helpers.
                      Treats anything that isn't a plain object/array/null (or is an Error)
                      as malformed; produces the JSON `{ error, raw }` payload.
 public.d.ts          Re-exports `ToolDispatchStrategy` only. Underlying contract lives in
-                     llm-events; do not re-declare shared types here.
+                     llm-driver/public; do not re-declare it here.
 ```
 
 Boundaries:
 - `strategy.ts`, `serialize.ts`, and `args-validation.ts` are pure — no `ctx`, no I/O, no module-level state.
 - Only `index.ts` imports `kaizen/types` or touches `ctx`.
-- Shared types (`ChatMessage`, `ToolSchema`, `LLMResponse`, `ToolsRegistryService`, `ToolExecutionContext`) are imported from `llm-events/public`. Do not redeclare them.
+- `ToolDispatchStrategy` is imported from `llm-driver/public`. Foundational LLM types come from `llm-events/public`; tool execution context details come from `llm-tools-registry/public`. Do not redeclare owner-public contracts here.
 
 ## Invariants
 

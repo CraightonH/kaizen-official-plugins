@@ -39,7 +39,7 @@ describe("buildCompletionSource", () => {
     registerBuiltins(reg);
     const src = buildCompletionSource(reg);
     const items = await src.list("help");
-    expect(items[0]!.description).toMatch(/slash commands/i);
+    expect(items[0]!.detail).toMatch(/slash commands/i);
   });
 
   it("filters by namespace prefix", async () => {

@@ -5,6 +5,7 @@ import { createRegistry, type SystemPromptServiceImpl } from "./registry.ts";
 import { resolveIdentity } from "./identity.ts";
 import { makePromptSlashHandlers } from "./slash.ts";
 import type { SystemPromptService } from "./public";
+import type { SlashRegistryService } from "llm-slash-commands/public";
 
 function readEnv(ctx: any, key: string): string | undefined {
   const fromCtx = ctx.env && typeof ctx.env === "object" ? (ctx.env as any)[key] : undefined;
@@ -57,9 +58,7 @@ const plugin: KaizenPlugin = {
     await identity.reload();
     const identityHandle = registry.register(identity.section);
 
-    const slashRegistry = ctx.useService?.("slash:registry") as
-      | { register(m: { name: string; description: string; usage?: string; source: "plugin" }, h: any): () => void }
-      | undefined;
+    const slashRegistry = ctx.useService<SlashRegistryService>("slash:registry");
     if (slashRegistry) {
       const handlers = makePromptSlashHandlers({
         registry,

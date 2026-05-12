@@ -5,53 +5,56 @@ Session target: llm-events
 
 ## Summary
 
-`llm-events/public.d.ts` now matches the already-refactored owner plugins for
-shared service declarations. The runtime event vocabulary did not change.
+`llm-events/public.d.ts` no longer aggregates owner-specific service contracts.
+It now exposes only event vocabulary, foundation LLM/message/tool primitives,
+`LLMCompleteService`, and the shared runtime sentinels. The runtime event
+vocabulary did not change.
 
 ## Previous Contract
 
-- Owner: `llm-events` for shared declarations; runtime service behavior owned by
-  each provider plugin.
-- Consumers: openai-compatible `llm-*` plugins importing `llm-events/public`.
-- Service/event/tool/type/config surface: `tools:registry`, `skills:registry`,
-  `slash:registry`, `llm-tui:completion`, `tool-dispatch:strategy`, and package
-  subpath export metadata.
-- Old behavior or shape: `llm-events/public.d.ts` described older service
-  shapes, including no tool provenance APIs, `skills.rescan(): Promise<void>`,
-  slash `tryDispatch`, `SlashCommandManifest.source` values of
-  `"builtin" | "user" | "project" | "plugin"`, and a completion source shaped as
-  `list(input, cursor)`.
+- Owner: `llm-events` exposed both foundation primitives and deprecated
+  compatibility declarations for services owned by peer plugins.
+- Consumers: openai-compatible `llm-*` plugins could import service contracts
+  from `llm-events/public`.
+- Service/event/tool/type/config surface: compatibility declarations for
+  `tools:registry`, `tool-dispatch:strategy`, `skills:registry`,
+  `agents:registry`, `slash:registry`, and `llm-tui:completion`.
+- Old behavior or shape: owner-specific contracts remained importable from
+  `llm-events/public` even after each owner plugin exposed its own `public`
+  subpath.
 
 ## New Contract
 
-- New behavior or shape: shared declarations now include tool provenance
-  (`ToolSource`, `ToolRegistration`, `registerWith`, `listRegistrations`),
-  `SkillRescanResult`, current slash registry `get`/`register`/`list` shapes,
-  current TUI completion `id`/`trigger`/`list(query)` shape, and an exported
-  `./public` package subpath.
-- Compatibility notes: runtime behavior was already provided by owner plugins;
-  this change aligns the foundation type contract with that behavior.
-- Migration required by consumers: consumers typed against the stale slash
-  `tryDispatch` contract or old completion `(input, cursor)` contract must
-  migrate to the current owner-plugin APIs.
+- New behavior or shape: `llm-events/public` keeps `Vocab`, `EventName`,
+  `ChatMessage`, `ToolCall`, `ToolSchema`, `ModelInfo`, `LLMRequest`,
+  `LLMResponse`, `LLMStreamEvent`, `LLMCompleteService`, `CANCEL_TOOL`, and
+  `CODEMODE_CANCEL_SENTINEL`. It removes service contracts and their payload
+  helper types.
+- Compatibility notes: this is a breaking type-surface cleanup published as
+  `llm-events@0.7.0`. Runtime event names and sentinel values are unchanged.
+- Migration required by consumers: import service contracts from their owners:
+  `llm-tools-registry/public`, `llm-driver/public`, `llm-skills/public`,
+  `llm-agents/public`, `llm-slash-commands/public`, and `llm-tui/public`.
 
 ## Affected OpenAI-Compatible Plugins
 
-- `llm-tools-registry`: verified compatible; owner already exposes provenance.
-- `llm-skills`: verified compatible; owner already returns rescan metadata.
-- `llm-slash-commands`: verified compatible; owner already exposes `get` and
-  file-backed manifest metadata.
-- `llm-tui`: verified compatible; owner already uses `id`, string `trigger`,
-  and `list(query)`.
-- `llm-driver` / `llm-native-dispatch`: verified compatible with the
-  `ToolDispatchStrategy` declaration.
+- `llm-tools-registry`: owner for tools registry contracts; verified compatible.
+- `llm-driver`: owner for driver and dispatch strategy contracts; verified
+  compatible.
+- `llm-native-dispatch`: imports dispatch contract from `llm-driver/public`;
+  verified compatible.
+- `llm-skills`: owner for skills registry contracts; verified compatible.
+- `llm-agents`: owner for agents registry contracts; verified compatible.
+- `llm-slash-commands`: owner for slash registry contracts; verified compatible.
+- `llm-tui`: owner for completion contracts; verified compatible.
+- Other openai-compatible plugins: verified by grep to import only foundation
+  types from `llm-events/public` or owner service contracts from owner packages.
 
 ## Verification
 
-- Tests run: `bun test plugins/llm-events`; affected consumer tests for
-  tools-registry, skills, slash-commands, TUI completion, driver/native dispatch
-  compatibility; `plugins/llm-events/node_modules/.bin/tsc -p
-  plugins/llm-events/tsconfig.json`; `bunx kaizen plugin validate
-  plugins/llm-events`; `bunx kaizen marketplace validate`; `bun test`.
-- Tests not run and why: live integration tests gated by `KAIZEN_INTEGRATION=1`
-  were not enabled.
+- Tests run: `bun install --frozen-lockfile`; `bun test plugins/llm-events`;
+  `bun test`; `bunx kaizen plugin validate plugins/llm-events`; `bunx kaizen
+  marketplace validate`.
+- Tests not run and why: live integration tests gated by local services or
+  environment, such as LM Studio and MCP server integration, were not enabled
+  and were reported as skipped by `bun test`.

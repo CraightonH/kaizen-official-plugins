@@ -58,7 +58,8 @@ export interface HandlerDeps {
 }
 
 export function makeHandler(deps: HandlerDeps) {
-  return async function handler(args: SearchArgs, ctx: any): Promise<SearchResult> {
+  return async function handler(rawArgs: unknown, ctx: any): Promise<SearchResult> {
+    const args = rawArgs as SearchArgs;
     if (!args.query || typeof args.query !== "string") {
       throw new Error("web_search: query is required");
     }

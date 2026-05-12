@@ -7,9 +7,11 @@ describe("TuiStore", () => {
     let count = 0;
     s.subscribe(() => { count++; });
     s.appendOutput("hello");
+    const entry = s.snapshot().transcript[0]!;
     expect(s.snapshot().transcript.length).toBe(1);
-    expect(s.snapshot().transcript[0]!.text).toBe("hello");
-    expect(s.snapshot().transcript[0]!.kind).toBe("output");
+    expect(entry.kind).toBe("output");
+    if (entry.kind !== "output") throw new Error("expected output line");
+    expect(entry.text).toBe("hello");
     expect(count).toBe(1);
   });
 
@@ -35,8 +37,9 @@ describe("TuiStore", () => {
     const s = new TuiStore();
     s.appendNotice("setup ok");
     const last = s.snapshot().transcript.at(-1)!;
-    expect(last.text).toBe("setup ok");
     expect(last.kind).toBe("notice");
+    if (last.kind !== "notice") throw new Error("expected notice line");
+    expect(last.text).toBe("setup ok");
   });
 
   it("setBusy toggles busy with optional message", () => {

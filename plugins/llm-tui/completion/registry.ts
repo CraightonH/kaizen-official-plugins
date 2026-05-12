@@ -1,14 +1,5 @@
-import type { CompletionItem } from "../state/store.ts";
-
-export interface CompletionSource {
-  id: string;
-  trigger: string;
-  list(query: string): CompletionItem[] | Promise<CompletionItem[]>;
-}
-
-export interface TuiCompletionService {
-  register(source: CompletionSource): () => void;
-}
+import type { CompletionItem, CompletionSource, TuiCompletionService } from "../public";
+export type { CompletionItem, CompletionSource, TuiCompletionService } from "../public";
 
 export interface CompletionRegistry {
   service: TuiCompletionService;
@@ -33,7 +24,9 @@ export function makeCompletionRegistry(opts: RegistryOptions = {}): CompletionRe
   const service: TuiCompletionService = {
     register(source) {
       sources.set(source.id, source);
-      return () => { sources.delete(source.id); };
+      return () => {
+        if (sources.get(source.id) === source) sources.delete(source.id);
+      };
     },
   };
 

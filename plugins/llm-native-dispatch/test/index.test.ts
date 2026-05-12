@@ -1,7 +1,7 @@
 // plugins/llm-native-dispatch/test/index.test.ts
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "../index.ts";
-import type { ToolDispatchStrategy } from "../strategy.ts";
+import type { ToolDispatchStrategy } from "llm-driver/public";
 
 function makeCtx() {
   const provided: Record<string, unknown> = {};

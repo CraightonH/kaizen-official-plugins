@@ -1,4 +1,4 @@
-import type { AgentManifest, AgentsRegistryService } from "llm-events/public";
+import type { AgentManifest, AgentsRegistryService } from "./public";
 import type { InternalAgentManifest } from "./frontmatter.ts";
 
 export interface AgentsRegistry {

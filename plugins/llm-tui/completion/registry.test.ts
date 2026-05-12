@@ -17,6 +17,22 @@ describe("CompletionRegistry", () => {
     expect(items).toEqual([]);
   });
 
+  it("stale unregister does not remove a replacement with the same id", async () => {
+    const r = makeCompletionRegistry({ debounceMs: 0 });
+    const staleOff = r.service.register({
+      id: "same", trigger: "/",
+      list: () => [{ label: "/old", insertText: "/old " }],
+    });
+    r.service.register({
+      id: "same", trigger: "@",
+      list: () => [{ label: "@new", insertText: "@new " }],
+    });
+    staleOff();
+
+    expect(await r.query("/", "")).toEqual([]);
+    expect((await r.query("@", "")).map((i) => i.label)).toEqual(["@new"]);
+  });
+
   it("merges items across multiple sources for the same trigger", async () => {
     const r = makeCompletionRegistry({ debounceMs: 0 });
     r.service.register({

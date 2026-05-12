@@ -1,14 +1,11 @@
 // plugins/llm-native-dispatch/test/strategy.test.ts
 import { describe, it, expect, mock } from "bun:test";
 import { makeStrategy } from "../strategy.ts";
-import type { ToolsRegistryService } from "llm-tools-registry/public";
+import type { ToolDispatchRegistry } from "llm-driver/public";
 import type { ToolCall, LLMResponse, ToolSchema } from "llm-events/public";
 
-function fakeRegistry(handlers: Record<string, (args: unknown) => Promise<unknown> | unknown>): ToolsRegistryService {
-  const list: ToolSchema[] = [];
+function fakeRegistry(handlers: Record<string, (args: unknown) => Promise<unknown> | unknown>): ToolDispatchRegistry {
   return {
-    register: () => () => {},
-    list: () => list,
     invoke: async (name: string, args: unknown) => {
       const h = handlers[name];
       if (!h) throw new Error(`unknown tool: ${name}`);
@@ -17,7 +14,11 @@ function fakeRegistry(handlers: Record<string, (args: unknown) => Promise<unknow
   };
 }
 
-function input(overrides: Parameters<ReturnType<typeof makeStrategy>["handleResponse"]>[0]) {
+type StrategyInput = Parameters<ReturnType<typeof makeStrategy>["handleResponse"]>[0];
+
+function input(
+  overrides: Omit<StrategyInput, "turnId" | "sessionId"> & Partial<Pick<StrategyInput, "turnId" | "sessionId">>,
+): StrategyInput {
   return { turnId: "turn-1", sessionId: "session-1", ...overrides };
 }
 
@@ -27,16 +28,17 @@ function tc(id: string, name: string, args: unknown): ToolCall { return { id, na
 const noEmit = mock(async () => {});
 
 describe("prepareRequest", () => {
-  it("passes through available tools", () => {
+  it("passes through available tools", async () => {
     const s = makeStrategy();
-    const out = s.prepareRequest({ availableTools: [SCHEMA("a"), SCHEMA("b")] });
+    const out = await s.prepareRequest({ availableTools: [SCHEMA("a"), SCHEMA("b")] });
     expect(out.tools?.map((t) => t.name)).toEqual(["a", "b"]);
     expect(out.systemPromptAppend).toBeUndefined();
   });
 
-  it("empty tools → empty tools", () => {
+  it("empty tools → empty tools", async () => {
     const s = makeStrategy();
-    expect(s.prepareRequest({ availableTools: [] })).toEqual({ tools: [] });
+    const out = await s.prepareRequest({ availableTools: [] });
+    expect(out).toEqual({ tools: [] });
   });
 });
 
@@ -177,9 +179,7 @@ describe("handleResponse — tool calls", () => {
   it("threads turnId/sessionId into registry.invoke context", async () => {
     const s = makeStrategy();
     let seenCtx: any;
-    const reg: ToolsRegistryService = {
-      register: () => () => {},
-      list: () => [],
+    const reg: ToolDispatchRegistry = {
       invoke: async (_n, _a, ctx) => {
         seenCtx = ctx;
         return "ok";
@@ -262,9 +262,7 @@ describe("handleResponse — tool calls", () => {
   it("ctx.log forwards to emit('status:item-update')", async () => {
     const emit = mock(async () => {});
     const s = makeStrategy();
-    const reg: ToolsRegistryService = {
-      register: () => () => {},
-      list: () => [],
+    const reg: ToolDispatchRegistry = {
       invoke: async (_n, _a, ctx) => { ctx.log("hello"); return "ok"; },
     };
     await s.handleResponse(input({

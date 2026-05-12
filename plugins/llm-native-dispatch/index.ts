@@ -1,6 +1,6 @@
 import type { KaizenPlugin } from "kaizen/types";
 import { makeStrategy } from "./strategy.ts";
-import type { ToolDispatchStrategy } from "./strategy.ts";
+import type { ToolDispatchStrategy } from "llm-driver/public";
 
 const plugin: KaizenPlugin = {
   name: "llm-native-dispatch",

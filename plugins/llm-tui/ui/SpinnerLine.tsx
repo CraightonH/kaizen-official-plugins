@@ -33,7 +33,7 @@ export const SpinnerLine: React.FC<SpinnerLineProps> = ({
   if (startedAt) {
     const elapsed = Date.now() - startedAt;
     const tokens = deltaTokens ?? 0;
-    suffix = ` (${formatDuration(elapsed)} · ↓ ${tokens} tokens)`;
+    suffix = ` (${formatDuration(elapsed)} · ↓ ${tokens} tokens) * Esc to interrupt`;
   }
   return (
     <Box>

@@ -1,9 +1,8 @@
-import type { ToolsRegistryService as EventsRegistry } from "llm-events/public";
-import type { ToolsRegistryService as FullRegistry, ToolRegistration } from "llm-tools-registry/public";
+import type { ToolRegistration, ToolsRegistryService } from "llm-tools-registry/public";
 
-// The host needs both `invoke` (events surface) and `listRegistrations`
-// (full registry surface) so the worker can build a grouped kaizen global.
-type SandboxRegistry = EventsRegistry & Pick<FullRegistry, "listRegistrations">;
+// The host needs the full registry surface so the worker can invoke tools and
+// build a grouped kaizen global from registrations.
+type SandboxRegistry = ToolsRegistryService;
 import type { CodeModeConfig } from "./config.ts";
 import type { HostToWorker, WorkerToHost, InitMsg, ToolResultMsg, RegistrationMeta } from "./rpc-types.ts";
 import { wrapCode } from "./wrapper.ts";

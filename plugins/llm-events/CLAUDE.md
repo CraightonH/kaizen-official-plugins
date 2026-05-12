@@ -13,21 +13,12 @@ index.ts        Plugin lifecycle. Declares VOCAB (frozen), CANCEL_TOOL,
 public.d.ts     Foundation TypeScript contract for the harness:
                 Vocab, EventName, ChatMessage, ToolCall, ToolSchema, ModelInfo,
                 LLMRequest, LLMResponse, LLMStreamEvent, LLMCompleteService,
-                ToolsRegistryService + ToolHandler + ToolExecutionContext +
-                ToolSource + ToolRegistration,
-                ToolDispatchStrategy,
-                SkillsRegistryService + SkillManifest + SkillRescanResult,
-                AgentsRegistryService + AgentManifest,
-                SlashRegistryService + SlashCommand{Manifest,Context,Handler} +
-                SlashRegistryEntry,
-                TuiCompletionService + CompletionSource + CompletionItem.
-                No runtime code — type-only import surface for peers.
-                DriverService + RunConversation{Input,Output} are owned by
-                llm-driver/public because they depend on TurnHandle from
-                llm-session-manager.
+                CANCEL_TOOL, and CODEMODE_CANCEL_SENTINEL. No runtime code —
+                type-only import surface for peers. Service-specific contracts
+                belong in the plugin that owns the service behavior.
 index.test.ts   Bun-test suite: VOCAB shape/freeze, sentinel identity,
-                lifecycle (defineEvent + provideService), and structural type
-                probes for every re-exported service interface.
+                lifecycle (defineEvent + provideService), foundation type
+                probes, and checks that owner-specific contracts are absent.
 ```
 
 Boundaries:
@@ -59,18 +50,21 @@ Do **not** add `defineEvent` calls in any other plugin for names declared here. 
 
 ## Adding a new shared type
 
-Cross-plugin service contracts (`*Service` interfaces) and their payload types (`*Manifest`, `*Context`, etc.) belong in `public.d.ts`. Plugin-internal types should stay in the owning plugin's own `public.d.ts`.
+Foundation primitives belong in `public.d.ts`. Service-specific contracts
+(`*Service` interfaces and their payload types like `*Manifest`, `*Context`,
+etc.) should live in the owning plugin's own `public.d.ts`.
 
 Do not add contracts here if their shape requires importing another harness
 plugin. `llm-events` must remain dependency-free; put that contract in the
 owning plugin's `public.d.ts` instead.
 
-When adding a service interface here:
-- Comment with the owning plugin name (see existing `// ---------- tools:registry (owned by llm-tools-registry) ----------` headers).
-- Add a structural-probe test in `index.test.ts` to lock the public shape.
-- Compare the owning plugin's `public.d.ts`, README, implementation, and tests
-  before editing. Several owner plugins also expose local convenience types;
-  the declarations here must match the actual service object they provide.
+When considering a new service interface:
+- Put it in the plugin that provides the service.
+- Export it through that plugin's `public.d.ts` and package `exports`.
+- Import foundation primitives from `llm-events/public` as needed.
+- Add owner-plugin tests that lock the public shape.
+- Avoid adding compatibility exports here unless a documented migration requires
+  it and includes a removal plan.
 
 ## Testing
 
@@ -85,8 +79,8 @@ cd plugins/llm-events && bun test
 The Kaizen runtime prefers the bundled `dist/index.js` over source. After editing, the plugin must be re-bundled into the install dir:
 
 ```bash
-cp -R plugins/llm-events/. ~/.kaizen/marketplaces/official/plugins/llm-events@0.2.0/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-events@0.2.0 \
+cp -R plugins/llm-events/. ~/.kaizen/marketplaces/official/plugins/llm-events@0.7.0/
+(cd ~/.kaizen/marketplaces/official/plugins/llm-events@0.7.0 \
   && bun build --target=bun --outfile=dist/index.js index.ts)
 ```
 

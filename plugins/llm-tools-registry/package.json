@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./index.ts",
+    "./public": "./public.d.ts",
     "./registry": "./registry.ts"
   },
   "keywords": [

@@ -22,14 +22,16 @@ export interface SlashCommandManifest {
   filePath?: string;
 }
 
-export interface RegistryEntry {
+export interface SlashRegistryEntry {
   manifest: SlashCommandManifest;
   handler: SlashCommandHandler;
 }
 
+export type RegistryEntry = SlashRegistryEntry;
+
 export interface SlashRegistryService {
   register(manifest: SlashCommandManifest, handler: SlashCommandHandler): () => void;
-  get(name: string): RegistryEntry | undefined;
+  get(name: string): SlashRegistryEntry | undefined;
   list(): SlashCommandManifest[];
 }
 
@@ -44,7 +46,7 @@ function validateNameShape(name: string): void {
 }
 
 export function createRegistry(): SlashRegistryService {
-  const map = new Map<string, RegistryEntry>();
+  const map = new Map<string, SlashRegistryEntry>();
 
   return {
     register(manifest, handler) {

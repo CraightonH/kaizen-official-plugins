@@ -65,20 +65,29 @@ const plugin: KaizenPlugin = {
     // without re-rendering on every registration.
     const triggers = new Set<string>();
     const refCount = new Map<string, number>();
+    const registeredSources = new Map<string, { trigger: string; ref: object }>();
     const origRegister = registry.service.register;
+    const decrementTrigger = (trigger: string) => {
+      const n = (refCount.get(trigger) ?? 1) - 1;
+      if (n <= 0) {
+        refCount.delete(trigger);
+        triggers.delete(trigger);
+      } else {
+        refCount.set(trigger, n);
+      }
+    };
     registry.service.register = (source) => {
+      const previous = registeredSources.get(source.id);
+      if (previous) decrementTrigger(previous.trigger);
+      registeredSources.set(source.id, { trigger: source.trigger, ref: source });
       triggers.add(source.trigger);
       refCount.set(source.trigger, (refCount.get(source.trigger) ?? 0) + 1);
       const off = origRegister(source);
       return () => {
         off();
-        const n = (refCount.get(source.trigger) ?? 1) - 1;
-        if (n <= 0) {
-          refCount.delete(source.trigger);
-          triggers.delete(source.trigger);
-        } else {
-          refCount.set(source.trigger, n);
-        }
+        if (registeredSources.get(source.id)?.ref !== source) return;
+        registeredSources.delete(source.id);
+        decrementTrigger(source.trigger);
       };
     };
 

@@ -1,5 +1,6 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { ToolHandler, ToolSchema, ToolsRegistryService, ToolExecutionContext } from "llm-events/public";
+import type { ToolSchema } from "llm-events/public";
+import type { ToolExecutionContext, ToolHandler, ToolsRegistryService } from "llm-tools-registry/public";
 import { loadConfig, realDeps } from "./config.ts";
 import { renderSurface, surfaceHash } from "./assembler.ts";
 import { runInSandbox, type SandboxRunResult } from "./sandbox-host.ts";
@@ -23,10 +24,6 @@ const PREAMBLE = `Executes TypeScript in a sandboxed Bun Worker. Top-level await
 
 Available API surface (regenerated from the live registry on every LLM call so late MCP/agent registrations are always visible):`;
 
-interface RegistryWithListRegistrations extends ToolsRegistryService {
-  listRegistrations(): Array<{ schema: ToolSchema; source: any }>;
-}
-
 const plugin: KaizenPlugin = {
   name: "llm-codemode",
   apiVersion: "3.0.0",
@@ -40,7 +37,7 @@ const plugin: KaizenPlugin = {
 
     const config = await loadConfig(realDeps((m) => ctx.log(m)));
 
-    const toolsRegistry = ctx.useService?.("tools:registry") as RegistryWithListRegistrations | undefined;
+    const toolsRegistry = ctx.useService<ToolsRegistryService>("tools:registry");
     if (!toolsRegistry || typeof toolsRegistry.listRegistrations !== "function") {
       ctx.log("llm-codemode: tools:registry (with listRegistrations) not available; nothing to register");
       return;

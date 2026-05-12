@@ -6,16 +6,16 @@ Native OpenAI tool-calling dispatch strategy. Turns an LLM response containing s
 
 - Provides a singleton `ToolDispatchStrategy` with `prepareRequest` and `handleResponse`.
 - `prepareRequest({ availableTools })` → `{ tools: availableTools }`. Straight pass-through; no filtering, no `systemPromptAppend` (native dispatch relies on the provider's structured tool-calling, not prose).
-- `handleResponse({ response, registry, signal, emit })`:
+- `handleResponse({ response, registry, signal, emit, turnId, sessionId })`:
   - **No tool calls** → returns `[]`. Driver treats this as terminal; it has already appended the assistant text.
-  - **One or more tool calls** → returns `[assistantMessage, toolMessage_1, …, toolMessage_N]` in order. The assistant message carries `toolCalls` and is included even when the driver streamed its content, because the OpenAI Chat Completions contract requires it to immediately precede the `tool` messages on the next request.
+  - **One or more tool calls** → returns `[toolMessage_1, …, toolMessage_N]` in order. The driver has already appended the assistant message that carries `toolCalls`, so the strategy must only return the matching `tool` messages.
 - Executes tool calls **sequentially** via `registry.invoke` (the registry is the sole execution chokepoint, so `tool:*` lifecycle events fire uniformly).
 - Errors become `tool` messages, never thrown exceptions:
   - Unknown tool, handler throw, or cancellation → `content = JSON.stringify({ error: <message> })`.
   - Malformed `arguments` from the LLM (anything that isn't a plain object/array/`null`, or an `Error` sentinel) → skip `registry.invoke`, synthesize `{ error: "malformed arguments JSON from LLM", raw: <stringified> }`, emit `tool:error`, continue.
   - Result serialization: `string` passes through; `undefined`/`null` → `""`; anything else → `JSON.stringify`; circular structures fall back to `String(value)` and emit a `tool:error` with `"result not JSON-serializable, coerced to string"`.
 - `signal` aborts mid-loop: stops invoking further tools and fills `{ error: "cancelled" }` `tool` messages for this and all remaining calls so the conversation stays well-formed.
-- Per-invocation `ctx` carries `{ signal, callId: toolCall.id, log }`. `log(msg)` emits `status:item-update` with key `tool:<callId>`.
+- Per-invocation `ctx` carries `{ signal, callId: toolCall.id, turnId, sessionId, log }`. `log(msg)` emits `status:item-update` with key `tool:<callId>`.
 
 ## Wiring
 
@@ -26,22 +26,25 @@ Native OpenAI tool-calling dispatch strategy. Turns an LLM response containing s
 ```typescript
 interface ToolDispatchStrategy {
   prepareRequest(input: { availableTools: ToolSchema[] }):
-    { tools?: ToolSchema[]; systemPromptAppend?: string };
+    | { tools?: ToolSchema[]; systemPromptAppend?: string }
+    | Promise<{ tools?: ToolSchema[]; systemPromptAppend?: string }>;
   handleResponse(input: {
     response: LLMResponse;
-    registry: ToolsRegistryService;
+    registry: ToolDispatchRegistry;
     signal: AbortSignal;
     emit: (event: string, payload: unknown) => Promise<void>;
+    turnId: string;
+    sessionId: string;
   }): Promise<ChatMessage[]>;
 }
 ```
 
-The shared types (`ChatMessage`, `ToolSchema`, `LLMResponse`, `ToolsRegistryService`, `ToolExecutionContext`) come from the `llm-events` VOCAB; this plugin imports them but does not define them.
+`ToolDispatchStrategy` and `ToolDispatchRegistry` are owned by `llm-driver/public`. Foundational LLM message/schema types come from `llm-events/public`; tool execution context details come from `llm-tools-registry/public`.
 
 ### Consumes
 
 - **Service** — `tools:registry`. Required at runtime: `handleResponse` calls `registry.invoke(name, args, ctx)` for every tool call. The strategy never calls handlers directly, so all `tool:*` events flow uniformly through the registry.
-- **VOCAB** — `llm-events:vocabulary`. Source of the shared type contracts.
+- **VOCAB** — `llm-events:vocabulary`. Source of shared event names.
 
 ### Events emitted
 

@@ -1,4 +1,4 @@
-// llm-native-dispatch public surface — re-exports only.
-// Spec 0 owns the underlying contract via shared types in llm-events.
+// llm-native-dispatch public surface.
+// The driver owns the strategy contract; this plugin implements it.
 
-export type { ToolDispatchStrategy } from "./strategy";
+export type { ToolDispatchStrategy } from "llm-driver/public";

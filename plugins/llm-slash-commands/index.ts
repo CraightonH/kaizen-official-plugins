@@ -5,10 +5,7 @@ import { registerBuiltins } from "./builtins.ts";
 import { loadFileCommands, type DriverLike } from "./file-loader.ts";
 import { makeOnInputSubmit } from "./dispatcher.ts";
 import { buildCompletionSource } from "./completion.ts";
-
-interface TuiCompletionService {
-  register(source: { trigger: string; list(input: string, cursor: number): Promise<unknown[]> }): () => void;
-}
+import type { TuiCompletionService } from "llm-tui/public";
 
 const plugin: KaizenPlugin = {
   name: "llm-slash-commands",

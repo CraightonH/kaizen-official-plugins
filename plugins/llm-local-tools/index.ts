@@ -1,13 +1,7 @@
 // plugins/llm-local-tools/index.ts
 import type { KaizenPlugin } from "kaizen/types";
-import type { ToolSchema } from "llm-events/public";
+import type { ToolsRegistryService } from "llm-tools-registry/public";
 import { ALL_TOOLS } from "./tools.ts";
-
-interface ToolsRegistryService {
-  register(schema: ToolSchema, handler: (args: any, ctx: any) => Promise<unknown>): () => void;
-  list(filter?: { tags?: string[]; names?: string[] }): ToolSchema[];
-  invoke(name: string, args: unknown, ctx: any): Promise<unknown>;
-}
 
 export const TOOL_NAMES = ["read", "write", "create", "edit", "glob", "grep", "bash", "web_fetch"] as const;
 

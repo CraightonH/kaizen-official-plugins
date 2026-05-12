@@ -1,24 +1,10 @@
 import type {
   ChatMessage,
-  ToolSchema,
-  LLMResponse,
-  ToolsRegistryService,
-  ToolExecutionContext,
 } from "llm-events/public";
+import type { ToolExecutionContext } from "llm-tools-registry/public";
+import type { ToolDispatchStrategy } from "llm-driver/public";
 import { serializeResult, serializeError } from "./serialize.ts";
 import { isValidToolArgs, malformedArgsMessage } from "./args-validation.ts";
-
-export interface ToolDispatchStrategy {
-  prepareRequest(input: { availableTools: ToolSchema[] }): { tools?: ToolSchema[]; systemPromptAppend?: string };
-  handleResponse(input: {
-    response: LLMResponse;
-    registry: ToolsRegistryService;
-    signal: AbortSignal;
-    emit: (event: string, payload: unknown) => Promise<void>;
-    turnId: string;
-    sessionId: string;
-  }): Promise<ChatMessage[]>;
-}
 
 const CANCELLED_CONTENT = JSON.stringify({ error: "cancelled" });
 

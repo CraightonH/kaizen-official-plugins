@@ -6,27 +6,17 @@ import type {
   ToolSchema,
 } from "llm-events/public";
 import type { SessionsStoreService } from "llm-session-manager/public";
-import type { RunConversationInput, RunConversationOutput } from "./public";
+import type {
+  RunConversationInput,
+  RunConversationOutput,
+  ToolDispatchRegistry,
+  ToolDispatchStrategy,
+} from "./public";
 import { aggregateUsage } from "./state.ts";
 
-export interface ToolsRegistryService {
+export interface ToolsRegistryService extends ToolDispatchRegistry {
   list(filter?: { tags?: string[]; names?: string[] }): ToolSchema[];
-  invoke(name: string, args: unknown, ctx: any): Promise<unknown>;
   register?(...args: unknown[]): unknown;
-}
-
-export interface ToolDispatchStrategy {
-  prepareRequest(input: { availableTools: ToolSchema[] }):
-    | { tools?: ToolSchema[]; systemPromptAppend?: string }
-    | Promise<{ tools?: ToolSchema[]; systemPromptAppend?: string }>;
-  handleResponse(input: {
-    response: LLMResponse;
-    registry: ToolsRegistryService;
-    signal: AbortSignal;
-    emit: (event: string, payload: unknown) => Promise<void>;
-    turnId: string;
-    sessionId: string;
-  }): Promise<ChatMessage[]>;
 }
 
 export interface PromptSystemServiceLike {
