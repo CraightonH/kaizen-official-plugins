@@ -1,4 +1,4 @@
-import type { SkillManifest, SkillsRegistryService } from "llm-events/public";
+import type { SkillManifest, SkillRescanResult, SkillsRegistryService } from "./public";
 import { parseFrontmatter } from "./frontmatter.ts";
 import { scanRoot, type ScannedFile } from "./scan.ts";
 import { estimateTokens } from "./tokens.ts";
@@ -18,7 +18,7 @@ interface Entry {
   source: "project" | "user" | "programmatic";
 }
 
-export interface RescanResult { changed: boolean; count: number }
+export type RescanResult = SkillRescanResult;
 
 export interface SkillsRegistryServiceImpl extends SkillsRegistryService {
   rescan(): Promise<RescanResult>;

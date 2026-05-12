@@ -4,11 +4,15 @@
   "description": "Skills registry + default file-loader for ~/.kaizen/skills/ and <project>/.kaizen/skills/",
   "type": "module",
   "exports": {
-    ".": "./index.ts"
+    ".": "./index.ts",
+    "./public": "./public.d.ts"
   },
   "keywords": [
     "kaizen-plugin"
   ],
+  "dependencies": {
+    "llm-tools-registry": "workspace:*"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/json-schema": "^7.0.15",

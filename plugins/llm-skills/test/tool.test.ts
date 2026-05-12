@@ -1,6 +1,6 @@
 import { describe, it, expect, mock } from "bun:test";
 import { LOAD_SKILL_SCHEMA, makeLoadSkillHandler } from "../tool.ts";
-import type { SkillsRegistryService } from "llm-events/public";
+import type { SkillsRegistryService } from "../public";
 
 function fakeRegistry(): SkillsRegistryService {
   return {

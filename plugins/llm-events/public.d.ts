@@ -139,11 +139,16 @@ export interface LLMCompleteService {
 }
 
 // ---------- tools:registry (owned by `llm-tools-registry`) ----------
+// Deprecated compatibility exports: service-specific contracts belong in
+// `llm-tools-registry/public`. New consumers should import these types from
+// that owner package instead of from `llm-events/public`.
 
+/** @deprecated Import from `llm-tools-registry/public`. */
 export interface ToolHandler {
   (args: unknown, ctx: ToolExecutionContext): Promise<unknown>;
 }
 
+/** @deprecated Import from `llm-tools-registry/public`. */
 export type ToolSource =
   | { kind: "local" }
   | { kind: "mcp"; server: string }
@@ -151,12 +156,14 @@ export type ToolSource =
   | { kind: "skill" }
   | { kind: "memory" };
 
+/** @deprecated Import from `llm-tools-registry/public`. */
 export interface ToolRegistration {
   schema: ToolSchema;
   handler: ToolHandler;
   source: ToolSource;
 }
 
+/** @deprecated Import from `llm-tools-registry/public`. */
 export interface ToolExecutionContext {
   signal: AbortSignal;
   callId: string;
@@ -176,6 +183,7 @@ export interface ToolExecutionContext {
   log: (msg: string) => void;
 }
 
+/** @deprecated Import from `llm-tools-registry/public`. */
 export interface ToolsRegistryService {
   /** Returns an unregister function. */
   register(schema: ToolSchema, handler: ToolHandler): () => void;
@@ -196,10 +204,15 @@ export interface ToolsRegistryService {
 }
 
 // ---------- tool-dispatch:strategy (owned by `llm-native-dispatch`) ----------
+// Deprecated compatibility export: this service contract should move to its
+// eventual owner after the dispatch/provider ownership decision is made.
 
 /**
  * Bridge between LLM output and tool execution. Multiple strategies may exist;
  * the harness selects one by service name.
+ *
+ * @deprecated Import from the dispatch contract owner once the migration plan
+ * assigns one. Kept here temporarily for compatibility.
  */
 export interface ToolDispatchStrategy {
   /**
@@ -231,7 +244,11 @@ export interface ToolDispatchStrategy {
 }
 
 // ---------- skills:registry (owned by `llm-skills`) ----------
+// Deprecated compatibility exports: service-specific contracts belong in
+// `llm-skills/public`. New consumers should import these types from that owner
+// package instead of from `llm-events/public`.
 
+/** @deprecated Import from `llm-skills/public`. */
 export interface SkillManifest {
   name: string;
   description: string;
@@ -239,11 +256,13 @@ export interface SkillManifest {
   tokens?: number;
 }
 
+/** @deprecated Import from `llm-skills/public`. */
 export interface SkillRescanResult {
   changed: boolean;
   count: number;
 }
 
+/** @deprecated Import from `llm-skills/public`. */
 export interface SkillsRegistryService {
   list(): SkillManifest[];
   /** Returns the body to inject into the system prompt. */
@@ -254,7 +273,11 @@ export interface SkillsRegistryService {
 }
 
 // ---------- agents:registry (owned by `llm-agents`) ----------
+// Deprecated compatibility exports: service-specific contracts belong in
+// `llm-agents/public`. New consumers should import these types from that owner
+// package instead of from `llm-events/public`.
 
+/** @deprecated Import from `llm-agents/public`. */
 export interface AgentManifest {
   name: string;
   description: string;
@@ -263,13 +286,18 @@ export interface AgentManifest {
   toolFilter?: { tags?: string[]; names?: string[] };
 }
 
+/** @deprecated Import from `llm-agents/public`. */
 export interface AgentsRegistryService {
   list(): AgentManifest[];
   register(manifest: AgentManifest): () => void;
 }
 
 // ---------- slash:registry (owned by `llm-slash-commands`) ----------
+// Deprecated compatibility exports: service-specific contracts belong in
+// `llm-slash-commands/public`. New consumers should import these types from
+// that owner package instead of from `llm-events/public`.
 
+/** @deprecated Import from `llm-slash-commands/public`. */
 export interface SlashCommandManifest {
   /** Without leading slash, e.g. "help" or "mcp:reload". */
   name: string;
@@ -280,6 +308,7 @@ export interface SlashCommandManifest {
   filePath?: string;
 }
 
+/** @deprecated Import from `llm-slash-commands/public`. */
 export interface SlashCommandContext {
   /** Everything after the command name; a single leading space is stripped. */
   args: string;
@@ -291,15 +320,18 @@ export interface SlashCommandContext {
   signal: AbortSignal;
 }
 
+/** @deprecated Import from `llm-slash-commands/public`. */
 export interface SlashCommandHandler {
   (ctx: SlashCommandContext): Promise<void>;
 }
 
+/** @deprecated Import from `llm-slash-commands/public`. */
 export interface SlashRegistryEntry {
   manifest: SlashCommandManifest;
   handler: SlashCommandHandler;
 }
 
+/** @deprecated Import from `llm-slash-commands/public`. */
 export interface SlashRegistryService {
   register(manifest: SlashCommandManifest, handler: SlashCommandHandler): () => void;
   get(name: string): SlashRegistryEntry | undefined;
@@ -307,7 +339,11 @@ export interface SlashRegistryService {
 }
 
 // ---------- tui:completion (owned by `llm-tui`) ----------
+// Deprecated compatibility exports: service-specific contracts belong in
+// `llm-tui/public`. New consumers should import these types from that owner
+// package instead of from `llm-events/public`.
 
+/** @deprecated Import from `llm-tui/public`. */
 export interface CompletionItem {
   label: string;
   detail?: string;
@@ -315,6 +351,7 @@ export interface CompletionItem {
   sortWeight?: number;
 }
 
+/** @deprecated Import from `llm-tui/public`. */
 export interface CompletionSource {
   id: string;
   /** Single-character trigger matched at word-start in the input field. */
@@ -322,6 +359,7 @@ export interface CompletionSource {
   list(query: string): CompletionItem[] | Promise<CompletionItem[]>;
 }
 
+/** @deprecated Import from `llm-tui/public`. */
 export interface TuiCompletionService {
   register(source: CompletionSource): () => void;
 }

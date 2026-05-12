@@ -1,4 +1,4 @@
-import type { SkillManifest } from "llm-events/public";
+import type { SkillManifest } from "./public";
 
 const PREAMBLE = "The following skills can be loaded on demand. Each has a name, description, and a rough token cost. Call the `load_skill` tool with `{ \"name\": \"<name>\" }` to pull a skill's full content into your context for the next turn. Only load a skill when it's clearly relevant — loading is not free.";
 

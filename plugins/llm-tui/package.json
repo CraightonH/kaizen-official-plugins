@@ -4,7 +4,8 @@
   "description": "Generic LLM chat TUI: input + output + completion popup + status bar (Ink).",
   "type": "module",
   "exports": {
-    ".": "./index.tsx"
+    ".": "./index.tsx",
+    "./public": "./public.d.ts"
   },
   "keywords": [
     "kaizen-plugin"

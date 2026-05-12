@@ -1,12 +1,5 @@
 import type { SystemPromptServiceImpl } from "./registry.ts";
-
-interface SlashCtx {
-  args: string;
-  raw: string;
-  signal: AbortSignal;
-  emit: (event: string, payload: unknown) => Promise<void>;
-  print: (text: string) => Promise<void>;
-}
+import type { SlashCommandContext, SlashCommandHandler } from "llm-slash-commands/public";
 
 export interface PromptSlashOptions {
   registry: SystemPromptServiceImpl;
@@ -14,16 +7,16 @@ export interface PromptSlashOptions {
 }
 
 export interface PromptSlashHandlers {
-  show: (ctx: SlashCtx) => Promise<void>;
-  reload: (ctx: SlashCtx) => Promise<void>;
-  disable: (ctx: SlashCtx) => Promise<void>;
-  enable: (ctx: SlashCtx) => Promise<void>;
+  show: SlashCommandHandler;
+  reload: SlashCommandHandler;
+  disable: SlashCommandHandler;
+  enable: SlashCommandHandler;
 }
 
 export function makePromptSlashHandlers(opts: PromptSlashOptions): PromptSlashHandlers {
   const { registry, reloadIdentity } = opts;
 
-  async function show(ctx: SlashCtx): Promise<void> {
+  async function show(ctx: SlashCommandContext): Promise<void> {
     const stats = ctx.args.trim() === "--stats";
     const sections = registry.list().slice().sort((a, b) => a.priority - b.priority);
 
@@ -48,12 +41,12 @@ export function makePromptSlashHandlers(opts: PromptSlashOptions): PromptSlashHa
     await ctx.print(lines.join("\n"));
   }
 
-  async function reload(ctx: SlashCtx): Promise<void> {
+  async function reload(ctx: SlashCommandContext): Promise<void> {
     await reloadIdentity();
     await ctx.print("identity reloaded");
   }
 
-  async function disable(ctx: SlashCtx): Promise<void> {
+  async function disable(ctx: SlashCommandContext): Promise<void> {
     const id = ctx.args.trim();
     if (!id) {
       await ctx.print("usage: /prompt:disable <section-id>");
@@ -67,7 +60,7 @@ export function makePromptSlashHandlers(opts: PromptSlashOptions): PromptSlashHa
     await ctx.print(`disabled section "${id}"`);
   }
 
-  async function enable(ctx: SlashCtx): Promise<void> {
+  async function enable(ctx: SlashCommandContext): Promise<void> {
     const id = ctx.args.trim();
     if (!id) {
       await ctx.print("usage: /prompt:enable <section-id>");

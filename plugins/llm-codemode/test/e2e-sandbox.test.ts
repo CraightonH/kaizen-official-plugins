@@ -1,11 +1,14 @@
 import { describe, it, expect } from "bun:test";
 import { runInSandbox } from "../sandbox-host.ts";
 import { DEFAULT_CONFIG } from "../config.ts";
-import type { ToolsRegistryService, ToolSchema } from "llm-events/public";
+import type { ToolSchema } from "llm-events/public";
+import type { ToolsRegistryService } from "llm-tools-registry/public";
 
 const reg = (h: Record<string, (a:any)=>any> = {}): ToolsRegistryService => ({
   register: () => () => {},
+  registerWith: () => () => {},
   list: () => [] as ToolSchema[],
+  listRegistrations: () => [],
   invoke: async (n, a) => { const fn = h[n]; if (!fn) throw new Error(`unknown tool: ${n}`); return fn(a); },
 });
 const cfg = { ...DEFAULT_CONFIG, timeoutMs: 2000 };

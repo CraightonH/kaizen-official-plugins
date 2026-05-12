@@ -5,6 +5,9 @@
   "type": "module",
   "exports": { ".": "./index.ts" },
   "keywords": ["kaizen-plugin"],
+  "dependencies": {
+    "llm-slash-commands": "workspace:*"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "typescript": "^5.4.0"

@@ -1,5 +1,5 @@
 import type { ToolSchema } from "llm-events/public";
-import type { SkillsRegistryService } from "llm-events/public";
+import type { SkillsRegistryService } from "./public";
 import { estimateTokens } from "./tokens.ts";
 
 export const LOAD_SKILL_SCHEMA: ToolSchema = {

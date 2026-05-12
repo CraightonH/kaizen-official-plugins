@@ -1,4 +1,4 @@
-import type { AgentManifest } from "llm-events/public";
+import type { AgentManifest } from "./public";
 
 export interface InternalAgentManifest extends AgentManifest {
   modelOverride?: string;

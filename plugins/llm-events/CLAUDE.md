@@ -13,18 +13,10 @@ index.ts        Plugin lifecycle. Declares VOCAB (frozen), CANCEL_TOOL,
 public.d.ts     Foundation TypeScript contract for the harness:
                 Vocab, EventName, ChatMessage, ToolCall, ToolSchema, ModelInfo,
                 LLMRequest, LLMResponse, LLMStreamEvent, LLMCompleteService,
-                ToolsRegistryService + ToolHandler + ToolExecutionContext +
-                ToolSource + ToolRegistration,
-                ToolDispatchStrategy,
-                SkillsRegistryService + SkillManifest + SkillRescanResult,
-                AgentsRegistryService + AgentManifest,
-                SlashRegistryService + SlashCommand{Manifest,Context,Handler} +
-                SlashRegistryEntry,
-                TuiCompletionService + CompletionSource + CompletionItem.
-                No runtime code — type-only import surface for peers.
-                DriverService + RunConversation{Input,Output} are owned by
-                llm-driver/public because they depend on TurnHandle from
-                llm-session-manager.
+                and temporary deprecated compatibility service declarations.
+                No runtime code — type-only import surface for peers. New
+                service-specific contracts belong in the plugin that owns the
+                service behavior.
 index.test.ts   Bun-test suite: VOCAB shape/freeze, sentinel identity,
                 lifecycle (defineEvent + provideService), and structural type
                 probes for every re-exported service interface.
@@ -59,18 +51,23 @@ Do **not** add `defineEvent` calls in any other plugin for names declared here. 
 
 ## Adding a new shared type
 
-Cross-plugin service contracts (`*Service` interfaces) and their payload types (`*Manifest`, `*Context`, etc.) belong in `public.d.ts`. Plugin-internal types should stay in the owning plugin's own `public.d.ts`.
+Foundation primitives belong in `public.d.ts`. Service-specific contracts
+(`*Service` interfaces and their payload types like `*Manifest`, `*Context`,
+etc.) should live in the owning plugin's own `public.d.ts`. The service
+declarations still present here are deprecated compatibility exports for the
+multi-session owner-surface migration.
 
 Do not add contracts here if their shape requires importing another harness
 plugin. `llm-events` must remain dependency-free; put that contract in the
 owning plugin's `public.d.ts` instead.
 
-When adding a service interface here:
-- Comment with the owning plugin name (see existing `// ---------- tools:registry (owned by llm-tools-registry) ----------` headers).
-- Add a structural-probe test in `index.test.ts` to lock the public shape.
-- Compare the owning plugin's `public.d.ts`, README, implementation, and tests
-  before editing. Several owner plugins also expose local convenience types;
-  the declarations here must match the actual service object they provide.
+When considering a new service interface:
+- Put it in the plugin that provides the service.
+- Export it through that plugin's `public.d.ts` and package `exports`.
+- Import foundation primitives from `llm-events/public` as needed.
+- Add owner-plugin tests that lock the public shape.
+- Avoid adding a new compatibility export here unless a documented migration
+  requires it.
 
 ## Testing
 

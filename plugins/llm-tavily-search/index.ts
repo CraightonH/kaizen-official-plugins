@@ -1,14 +1,8 @@
 // plugins/llm-tavily-search/index.ts
 import type { KaizenPlugin } from "kaizen/types";
-import type { ToolSchema } from "llm-events/public";
+import type { ToolsRegistryService } from "llm-tools-registry/public";
 import { loadConfig, realDeps } from "./config.ts";
 import { schema, makeHandler } from "./tool.ts";
-
-interface ToolsRegistryService {
-  register(schema: ToolSchema, handler: (args: any, ctx: any) => Promise<unknown>): () => void;
-  list(filter?: { tags?: string[]; names?: string[] }): ToolSchema[];
-  invoke(name: string, args: unknown, ctx: any): Promise<unknown>;
-}
 
 export const TOOL_NAMES = ["web_search"] as const;
 

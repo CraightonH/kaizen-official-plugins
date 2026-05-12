@@ -4,12 +4,14 @@
   "description": "Slash command registry, dispatcher, and file loader for the openai-compatible harness.",
   "type": "module",
   "exports": {
-    ".": "./index.ts"
+    ".": "./index.ts",
+    "./public": "./public.d.ts"
   },
   "keywords": [
     "kaizen-plugin"
   ],
   "dependencies": {
+    "llm-tui": "workspace:*",
     "yaml": "^2.5.0"
   },
   "devDependencies": {

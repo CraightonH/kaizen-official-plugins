@@ -11,37 +11,35 @@ Tier 0 foundation plugin for the openai-compatible Kaizen harness.
 - **`ctx.defineEvent` registration** for every name in `VOCAB`, so the bus
   validates `emit`/`on` calls against the known set.
 - **Shared types** in `public.d.ts`. Other `llm-*` plugins import event,
-  conversation, LLM, tool, slash, status, skill, and agent contracts from here.
-  Owner-specific contracts that depend on higher-level plugins live with their
-  owning plugin, for example `driver:run-conversation` in `llm-driver/public`.
+  conversation, and LLM primitives from here. Service-specific contracts are
+  moving to their owning plugin's `public` surface; compatibility exports remain
+  here during that migration.
 
 ## Type re-exports (cross-plugin contracts)
 
-`public.d.ts` is the single import point for:
+`public.d.ts` is the stable import point for:
 
 - Conversation primitives — `ChatMessage`, `ToolCall`, `ToolSchema`,
   `ModelInfo`, `LLMRequest`, `LLMResponse`, `LLMStreamEvent`,
   `LLMCompleteService`.
 - Cancellation sentinels — `CANCEL_TOOL = Symbol.for("kaizen.cancel")` and
   `CODEMODE_CANCEL_SENTINEL = "__kaizen_cancel__"`.
-- Service interfaces (declared here, *implemented* by their owning plugin):
-  `ToolsRegistryService`, `ToolHandler`, `ToolExecutionContext`,
-  `ToolSource`, `ToolRegistration`, `ToolDispatchStrategy`,
-  `SkillsRegistryService`, `SkillManifest`, `SkillRescanResult`,
-  `AgentsRegistryService`, `AgentManifest`, `SlashRegistryService`,
-  `SlashCommandManifest`, `SlashCommandHandler`, `SlashCommandContext`,
-  `SlashRegistryEntry`, `TuiCompletionService`, `CompletionSource`,
-  `CompletionItem`.
-- Driver service interfaces — `DriverService`, `RunConversationInput`, and
-  `RunConversationOutput` — are owned by `llm-driver/public`.
+- Deprecated compatibility service interfaces — tool registry, skills, agents,
+  slash registry, TUI completion, and dispatch strategy contracts remain
+  available here temporarily, but new consumers should import each service
+  contract from the plugin that provides that service.
 
-## Why interfaces live here, not in their owning plugin
+## Service contract ownership
 
-Spec 0 is the propagation source-of-truth for foundational cross-plugin
-contracts. Hosting shared declarations in `llm-events` keeps the dependency
-graph acyclic: every `llm-*` plugin can depend on `llm-events`, and
-`llm-events` depends on nothing. Contracts that need types from a higher-level
-plugin stay with their owner so this foundation plugin remains a leaf.
+`llm-events` owns event vocabulary and foundation LLM primitives. New
+service-specific interfaces belong with the plugin that owns the service
+behavior, for example `driver:run-conversation` in `llm-driver/public` and
+`tools:registry` in `llm-tools-registry/public`.
+
+The older aggregate exports in `llm-events/public.d.ts` are compatibility
+exports while the openai-compatible plugins migrate one service surface at a
+time. Do not add new service contracts here unless the contract is deliberately
+foundation-level and has no higher-level owner.
 
 ## Permissions
 

@@ -3,6 +3,7 @@ export type {
   SlashCommandHandler,
   SlashCommandManifest,
   SlashRegistryService,
+  SlashRegistryEntry,
   RegistryEntry,
 } from "./registry";
 export {
@@ -11,4 +12,3 @@ export {
   DuplicateRegistrationError,
   InvalidNameError,
 } from "./errors";
-export type { CompletionItem, CompletionSource } from "./completion";

@@ -9,6 +9,9 @@
   "keywords": [
     "kaizen-plugin"
   ],
+  "dependencies": {
+    "llm-tools-registry": "workspace:*"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/json-schema": "^7.0.15",

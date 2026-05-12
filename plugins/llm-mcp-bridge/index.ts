@@ -1,6 +1,6 @@
 import type { KaizenPlugin } from "kaizen/types";
 import type { McpBridgeService, ServerInfo } from "./public.d.ts";
-import type { ToolsRegistryService } from "llm-events/public";
+import type { ToolsRegistryService } from "llm-tools-registry/public";
 import { loadConfig, realDeps, type ResolvedServerConfig } from "./config.ts";
 import { createClient } from "./client.ts";
 import { makeBridgeService } from "./service.ts";

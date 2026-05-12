@@ -1,5 +1,6 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { SkillsRegistryService, ToolsRegistryService } from "llm-events/public";
+import type { SkillsRegistryService } from "./public";
+import type { ToolsRegistryService } from "llm-tools-registry/public";
 import type { SystemPromptService } from "llm-system-prompt/public";
 import { homedir } from "node:os";
 import { join } from "node:path";

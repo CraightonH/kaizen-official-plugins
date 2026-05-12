@@ -53,6 +53,9 @@
     "plugins/llm-agents": {
       "name": "llm-agents",
       "version": "0.2.0",
+      "dependencies": {
+        "llm-tools-registry": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "latest",
         "@types/json-schema": "^7.0.15",
@@ -105,6 +108,9 @@
     "plugins/llm-local-tools": {
       "name": "llm-local-tools",
       "version": "0.1.0",
+      "dependencies": {
+        "llm-tools-registry": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "latest",
         "@types/json-schema": "^7.0.15",
@@ -139,6 +145,9 @@
     "plugins/llm-native-dispatch": {
       "name": "llm-native-dispatch",
       "version": "0.3.0",
+      "dependencies": {
+        "llm-tools-registry": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "latest",
         "@types/json-schema": "^7.0.15",
@@ -159,6 +168,9 @@
     "plugins/llm-skills": {
       "name": "llm-skills",
       "version": "0.1.1",
+      "dependencies": {
+        "llm-tools-registry": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "latest",
         "@types/json-schema": "^7.0.15",
@@ -169,6 +181,7 @@
       "name": "llm-slash-commands",
       "version": "0.2.0",
       "dependencies": {
+        "llm-tui": "workspace:*",
         "yaml": "^2.5.0",
       },
       "devDependencies": {
@@ -187,6 +200,9 @@
     "plugins/llm-system-prompt": {
       "name": "llm-system-prompt",
       "version": "0.1.0",
+      "dependencies": {
+        "llm-slash-commands": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "latest",
         "typescript": "^5.4.0",
@@ -195,6 +211,9 @@
     "plugins/llm-tavily-search": {
       "name": "llm-tavily-search",
       "version": "0.1.0",
+      "dependencies": {
+        "llm-tools-registry": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "latest",
         "@types/json-schema": "^7.0.15",

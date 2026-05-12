@@ -1,8 +1,7 @@
 import type {
   ToolSchema,
-  ToolHandler,
-  ToolExecutionContext,
 } from "llm-events/public";
+import type { ToolExecutionContext, ToolHandler } from "llm-tools-registry/public";
 import type {
   DriverService,
   RunConversationInput,

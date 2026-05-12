@@ -1,18 +1,5 @@
 import type { SlashRegistryService, SlashCommandManifest } from "./registry.ts";
-
-export interface CompletionItem {
-  label: string;
-  insertText: string;
-  description?: string;
-}
-
-// Matches the llm-tui CompletionSource contract: id + trigger + list(query),
-// where `query` is the text typed AFTER the trigger char (no leading "/").
-export interface CompletionSource {
-  id: string;
-  trigger: string;
-  list(query: string): Promise<CompletionItem[]>;
-}
+import type { CompletionItem, CompletionSource } from "llm-tui/public";
 
 function rank(m: SlashCommandManifest): number {
   if (m.source === "builtin" && !m.name.includes(":")) return 0;
@@ -36,7 +23,7 @@ export function buildCompletionSource(registry: SlashRegistryService): Completio
         .map((m) => ({
           label: `/${m.name}`,
           insertText: `/${m.name} `,
-          description: m.description,
+          detail: m.description,
         }));
     },
   };
