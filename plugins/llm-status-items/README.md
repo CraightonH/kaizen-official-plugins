@@ -17,6 +17,7 @@ Items emitted:
 | `turn-state` | turn/tool events | `ready` / `thinking` / `calling <tool>` | Always present. |
 | `_ctx` | `llm:done` + provider metadata | `13.2k/32k [████░░░░░░] 41%` | Denominated against the *most recent* prompt size, not session totals. Hidden when ceiling unknown. |
 | `cost-estimate` | `llm:done` | `$0.0123` | Only emitted when a rate table is present and the active model is in it. |
+| `session` | `session:active-changed` / `session:renamed` | full session id, optionally `id (alias)` | Cleared when no session is active. |
 
 Other behaviors:
 - On `harness:start` the plugin renders zero-valued counters and the empty context bar so the status line is populated before any turn runs.
@@ -41,9 +42,19 @@ Subscribed events:
 - `tool:result`
 - `tool:error`
 - `conversation:cleared`
+- `session:active-changed`
+- `session:renamed`
 
 **Service** — `llm:complete` (required, used lazily).
 Only `listModels()` is invoked, the first time a context ceiling is needed. The service is consumed at `setup` but resolved on demand so the producing plugin's setup order does not matter. Providers that don't implement `listModels` (or throw) are tolerated — the `_ctx` item is simply hidden.
+
+**Service** — `slash:registry` (optional). When present at `harness:start`,
+registers `/status:show`, which prints the current model, session, context
+window, token totals, throughput, and cost snapshot.
+
+**Service** — `tools:registry` (optional). When present at `harness:start`,
+registers a zero-argument `status:show` tool that returns the same structured
+snapshot used by `/status:show`.
 
 ### Events emitted
 
@@ -73,7 +84,43 @@ Cost estimation reads a JSON rate table from disk at setup. Missing file → cos
 
 Cost is computed as `(promptTokens * promptCentsPerMTok + completionTokens * completionCentsPerMTok) / 1_000_000` per `llm:done`, accumulated, and rendered as `$d.dddd`. Models not in the table emit nothing (any prior `cost-estimate` is cleared).
 
-Malformed JSON throws at setup; an absent file is fine.
+Malformed JSON throws at setup; an absent file is fine. Invalid rate entries
+also throw at setup. Each model entry must define non-negative numeric
+`promptCentsPerMTok` and `completionCentsPerMTok`.
+
+## Slash Command And Tool
+
+`/status:show` prints a human-readable snapshot.
+
+`status:show` takes no arguments:
+
+```json
+{
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}
+```
+
+It returns:
+
+```typescript
+interface StatusSnapshot {
+  model: string | null;
+  session: { id: string | null; alias: string | null };
+  contextWindow: {
+    lastPromptTokens: number;
+    contextLength: number | null;
+    pctUsed: number | null;
+  };
+  sessionTotals: {
+    promptTokens: number;
+    completionTokens: number;
+  };
+  tokensPerSec: number | null;
+  costCents: number | null;
+}
+```
 
 ## Permissions
 

@@ -31,6 +31,18 @@ describe("loadRateTable", () => {
     ).rejects.toThrow(/llm-status-items.*cost-table.*malformed/i);
   });
 
+  it("throws when rates is not an object", async () => {
+    await expect(
+      loadRateTable(makeDeps({ readFile: async () => JSON.stringify({ rates: [] }) })),
+    ).rejects.toThrow(/rates.*object/i);
+  });
+
+  it("throws when a rate entry is missing numeric prices", async () => {
+    await expect(
+      loadRateTable(makeDeps({ readFile: async () => JSON.stringify({ rates: { "bad-model": { promptCentsPerMTok: "free" } } }) })),
+    ).rejects.toThrow(/bad-model.*promptCentsPerMTok.*completionCentsPerMTok/i);
+  });
+
   it("uses ~/.kaizen/plugins/llm-status-items/cost-table.json by default", async () => {
     let path = "";
     await loadRateTable(makeDeps({

@@ -1,5 +1,5 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { LLMCompleteService, ModelInfo } from "llm-events/public";
+import type { LLMCompleteService, ModelInfo, Vocab } from "llm-events/public";
 import { applyEvent, initialState, type StatusState } from "./state.ts";
 import { formatDollars, loadRateTable, realCostDeps, tokensToCents, type CostDeps, type RateTable } from "./cost.ts";
 import { formatContextItem } from "./context.ts";
@@ -7,28 +7,31 @@ import { buildSnapshot } from "./snapshot.ts";
 import { registerStatusSlash, type SlashRegistryLike } from "./slash.ts";
 import { registerStatusTool, type ToolsRegistryLike } from "./tool.ts";
 
-const SUBSCRIBED = [
-  "harness:start",
-  "llm:before-call",
-  "llm:done",
-  "turn:start",
-  "turn:end",
-  "tool:before-execute",
-  "tool:result",
-  "tool:error",
-  "conversation:cleared",
-  "session:active-changed",
-  "session:renamed",
-] as const;
+function subscribedEvents(vocab: Vocab): string[] {
+  return [
+    vocab.HARNESS_START,
+    vocab.LLM_BEFORE_CALL,
+    vocab.LLM_DONE,
+    vocab.TURN_START,
+    vocab.TURN_END,
+    vocab.TOOL_BEFORE_EXECUTE,
+    vocab.TOOL_RESULT,
+    vocab.TOOL_ERROR,
+    vocab.CONVERSATION_CLEARED,
+    vocab.SESSION_ACTIVE_CHANGED,
+    vocab.SESSION_RENAMED,
+  ];
+}
 
 const plugin: KaizenPlugin = {
   name: "llm-status-items",
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
-  services: { consumes: ["llm-events:vocabulary", "llm:complete", "slash:registry", "tools:registry"] },
+  services: { consumes: ["llm-events:vocabulary", "llm:complete"] },
 
   async setup(ctx) {
     ctx.consumeService("llm-events:vocabulary");
+    const vocab = ctx.useService<Vocab>("llm-events:vocabulary");
     // Consumed lazily — listModels() only runs the first time we see a
     // model id at runtime, by which point the provider has registered.
     ctx.consumeService("llm:complete");
@@ -117,15 +120,15 @@ const plugin: KaizenPlugin = {
         : null;
       if (sessionDisplay !== lastEmitted.session) {
         if (sessionDisplay === null) {
-          await ctx.emit("status:item-clear", { key: "session" });
+          await ctx.emit(vocab.STATUS_ITEM_CLEAR, { key: "session" });
         } else {
-          await ctx.emit("status:item-update", { key: "session", value: sessionDisplay });
+          await ctx.emit(vocab.STATUS_ITEM_UPDATE, { key: "session", value: sessionDisplay });
         }
         lastEmitted.session = sessionDisplay;
       }
       // model
       if (state.model && state.model !== lastEmitted.model) {
-        await ctx.emit("status:item-update", { key: "model", value: state.model });
+        await ctx.emit(vocab.STATUS_ITEM_UPDATE, { key: "model", value: state.model });
         lastEmitted.model = state.model;
       }
       // tokens — show in / out separately. Total was redundant (the user can
@@ -140,17 +143,17 @@ const plugin: KaizenPlugin = {
         for (const key of ["in", "out", "tok/s"] as const) {
           const slot = key === "in" ? "tokensIn" : key === "out" ? "tokensOut" : "tokensPerSec";
           if (lastEmitted[slot] !== null) {
-            await ctx.emit("status:item-clear", { key });
+            await ctx.emit(vocab.STATUS_ITEM_CLEAR, { key });
           }
         }
         lastEmitted.tokensIn = lastEmitted.tokensOut = lastEmitted.tokensPerSec = null;
       } else if (haveTokens) {
         if (inV !== lastEmitted.tokensIn) {
-          await ctx.emit("status:item-update", { key: "in", value: inV });
+          await ctx.emit(vocab.STATUS_ITEM_UPDATE, { key: "in", value: inV });
           lastEmitted.tokensIn = inV;
         }
         if (outV !== lastEmitted.tokensOut) {
-          await ctx.emit("status:item-update", { key: "out", value: outV });
+          await ctx.emit(vocab.STATUS_ITEM_UPDATE, { key: "out", value: outV });
           lastEmitted.tokensOut = outV;
         }
       }
@@ -161,26 +164,26 @@ const plugin: KaizenPlugin = {
           ? state.tokensPerSec.toFixed(0)
           : state.tokensPerSec.toFixed(1);
       if (tpsValue !== null && tpsValue !== lastEmitted.tokensPerSec) {
-        await ctx.emit("status:item-update", { key: "tok/s", value: tpsValue });
+        await ctx.emit(vocab.STATUS_ITEM_UPDATE, { key: "tok/s", value: tpsValue });
         lastEmitted.tokensPerSec = tpsValue;
       }
       // turn-state
       if (state.turnState !== lastEmitted.turnState) {
-        await ctx.emit("status:item-update", { key: "turn-state", value: state.turnState });
+        await ctx.emit(vocab.STATUS_ITEM_UPDATE, { key: "turn-state", value: state.turnState });
         lastEmitted.turnState = state.turnState;
       }
       // context window — only renderable once we know the ceiling AND have
       // a prompt-token sample. State.cleared resets both, so the cleared
       // branch above already covers the clear case.
       if (state.cleared && lastEmitted.ctx !== null) {
-        await ctx.emit("status:item-clear", { key: "_ctx" });
+        await ctx.emit(vocab.STATUS_ITEM_CLEAR, { key: "_ctx" });
         lastEmitted.ctx = null;
       } else if (state.contextLength) {
         // Render with zero used before any call has been made. Keeps the bar
         // visible from harness:start instead of waiting for first llm:done.
         const value = formatContextItem(state.lastPromptTokens, state.contextLength);
         if (value !== lastEmitted.ctx) {
-          await ctx.emit("status:item-update", { key: "_ctx", value });
+          await ctx.emit(vocab.STATUS_ITEM_UPDATE, { key: "_ctx", value });
           lastEmitted.ctx = value;
         }
       }
@@ -188,23 +191,23 @@ const plugin: KaizenPlugin = {
 
     async function emitCost(eventName: string, payload: any) {
       if (!hasAnyRate) return; // fully local — never emit cost-estimate
-      if (eventName === "conversation:cleared") {
+      if (eventName === vocab.CONVERSATION_CLEARED) {
         costCents = 0;
         if (costActive) {
-          await ctx.emit("status:item-clear", { key: "cost-estimate" });
+          await ctx.emit(vocab.STATUS_ITEM_CLEAR, { key: "cost-estimate" });
           lastEmitted.cost = null;
           costActive = false;
         }
         return;
       }
-      if (eventName !== "llm:done") return;
+      if (eventName !== vocab.LLM_DONE) return;
       const usage = payload?.response?.usage;
       if (!usage || !state.model) return;
       const inc = tokensToCents(rates, state.model, usage);
       if (inc === null) {
         // Model not in table — clear any prior cost-estimate.
         if (costActive) {
-          await ctx.emit("status:item-clear", { key: "cost-estimate" });
+          await ctx.emit(vocab.STATUS_ITEM_CLEAR, { key: "cost-estimate" });
           lastEmitted.cost = null;
           costActive = false;
         }
@@ -213,13 +216,13 @@ const plugin: KaizenPlugin = {
       costCents += inc;
       const display = formatDollars(costCents);
       if (display !== lastEmitted.cost) {
-        await ctx.emit("status:item-update", { key: "cost-estimate", value: display });
+        await ctx.emit(vocab.STATUS_ITEM_UPDATE, { key: "cost-estimate", value: display });
         lastEmitted.cost = display;
         costActive = true;
       }
     }
 
-    for (const name of SUBSCRIBED) {
+    for (const name of subscribedEvents(vocab)) {
       ctx.on(name, async (payload: any) => {
         state = applyEvent(state, name, payload);
         // harness:start: probe the provider once so the bar can render
@@ -248,16 +251,32 @@ const plugin: KaizenPlugin = {
     // Soft registration on harness:start — slash and tools registries are
     // optional peers. Both adapters are thin wrappers around the same
     // getSnapshot closure; either can be absent without affecting the other.
-    ctx.on("harness:start", () => {
+    let adaptersRegistered = false;
+    let adapterUnregisters: Array<() => void> = [];
+    ctx.on(vocab.HARNESS_START, async () => {
+      if (adaptersRegistered) return;
+      adaptersRegistered = true;
       try {
         const slash = ctx.useService<SlashRegistryLike>("slash:registry");
-        if (slash) registerStatusSlash(slash, getSnapshot);
+        if (slash) adapterUnregisters.push(...registerStatusSlash(slash, getSnapshot));
       } catch { /* slash:registry absent — skip */ }
       try {
         const toolsReg = ctx.useService<ToolsRegistryLike>("tools:registry");
-        if (toolsReg) registerStatusTool(toolsReg, getSnapshot);
+        if (toolsReg) adapterUnregisters.push(...registerStatusTool(toolsReg, getSnapshot));
       } catch { /* tools:registry absent — skip */ }
     });
+
+    (plugin as any)._stop = () => {
+      for (const unregister of adapterUnregisters.splice(0)) {
+        try { unregister(); } catch { /* ignore */ }
+      }
+      adaptersRegistered = false;
+    };
+  },
+
+  async stop() {
+    const fn = (plugin as any)._stop;
+    if (typeof fn === "function") fn();
   },
 };
 

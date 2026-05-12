@@ -10,6 +10,7 @@ index.ts      Plugin lifecycle. The only file that touches `ctx`. Owns:
               - lazy listModels() probe + per-model context-cache
               - emitDiff() — the only place status:item-update / status:item-clear are emitted for the non-cost items
               - emitCost() — the only place the cost-estimate item is emitted
+              - soft `/status:show` + `status:show` tool registration and teardown
               - lastEmitted dedup map
 state.ts      applyEvent(prev, name, payload) → StatusState. Pure reducer.
               Owns the StatusState shape, the `cleared` one-shot flag, tok/s
@@ -33,6 +34,7 @@ Boundaries:
 - **Context ceiling is resolved at most once per model id.** `contextCache` and `modelsListed` gate `listModels()`. Providers without `listModels` must not be retried.
 - **`lastPromptTokens` ≠ cumulative `promptTokens`.** The `_ctx` item is denominated against the most recent call's prompt size (what the model actually saw), not session totals. Don't "fix" this.
 - **Empty status is worse than zeros.** `initialized` flips on `harness:start` so zero-valued counters are emitted before the first turn runs. Don't suppress them.
+- **Slash/tool adapters are soft and idempotent.** `slash:registry` and `tools:registry` are not manifest dependencies. They are probed at `harness:start`, registered at most once, and unregistered from `stop()`.
 
 ## Adding a new status item
 
@@ -46,6 +48,11 @@ Boundaries:
 `cost-table.json` is intentionally flat (`{ rates: { <model-id>: { promptCentsPerMTok, completionCentsPerMTok } } }`). If you add fields, treat them as optional and keep the existing shape backward-compatible — users hand-edit this file.
 
 `tokensToCents` returning `null` is the "model not priced" signal. Preserve that — `emitCost` clears any prior estimate when it's seen, and downgrading to zero would be wrong (a partially-priced session is misleading).
+
+`loadRateTable` validates user-edited entries strictly. An absent file disables
+costs, but malformed JSON or entries without non-negative numeric
+`promptCentsPerMTok` and `completionCentsPerMTok` should fail setup with a clear
+`llm-status-items:` error.
 
 ## Testing
 

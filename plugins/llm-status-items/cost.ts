@@ -1,5 +1,6 @@
 import { readFile as fsReadFile } from "node:fs/promises";
 import { homedir } from "node:os";
+import { join } from "node:path";
 
 export interface RateEntry {
   promptCentsPerMTok: number;
@@ -21,8 +22,16 @@ export function realCostDeps(): CostDeps {
 
 const RATE_FILE_REL = ".kaizen/plugins/llm-status-items/cost-table.json";
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function asNonNegativeNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
 export async function loadRateTable(deps: CostDeps): Promise<RateTable> {
-  const path = `${deps.home}/${RATE_FILE_REL}`;
+  const path = join(deps.home, RATE_FILE_REL);
   let text: string;
   try {
     text = await deps.readFile(path);
@@ -37,8 +46,29 @@ export async function loadRateTable(deps: CostDeps): Promise<RateTable> {
     throw new Error(`llm-status-items: cost-table at ${path} is malformed JSON: ${(e as Error).message}`);
   }
   const rates = parsed?.rates;
-  if (rates && typeof rates === "object") return rates as RateTable;
-  return {};
+  if (rates === undefined) return {};
+  if (!isPlainObject(rates)) {
+    throw new Error(`llm-status-items: cost-table at ${path} must contain a "rates" object`);
+  }
+
+  const table: RateTable = {};
+  for (const [model, raw] of Object.entries(rates)) {
+    if (!isPlainObject(raw)) {
+      throw new Error(`llm-status-items: cost-table entry "${model}" must be an object`);
+    }
+    const prompt = asNonNegativeNumber(raw.promptCentsPerMTok);
+    const completion = asNonNegativeNumber(raw.completionCentsPerMTok);
+    if (prompt === null || completion === null) {
+      throw new Error(
+        `llm-status-items: cost-table entry "${model}" must define non-negative numeric promptCentsPerMTok and completionCentsPerMTok`,
+      );
+    }
+    table[model] = {
+      promptCentsPerMTok: prompt,
+      completionCentsPerMTok: completion,
+    };
+  }
+  return table;
 }
 
 export function tokensToCents(
