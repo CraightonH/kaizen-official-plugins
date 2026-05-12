@@ -13,11 +13,13 @@ index.ts        Plugin lifecycle. Declares VOCAB (frozen), CANCEL_TOOL,
 public.d.ts     Foundation TypeScript contract for the harness:
                 Vocab, EventName, ChatMessage, ToolCall, ToolSchema, ModelInfo,
                 LLMRequest, LLMResponse, LLMStreamEvent, LLMCompleteService,
-                ToolsRegistryService + ToolHandler + ToolExecutionContext,
+                ToolsRegistryService + ToolHandler + ToolExecutionContext +
+                ToolSource + ToolRegistration,
                 ToolDispatchStrategy,
-                SkillsRegistryService + SkillManifest,
+                SkillsRegistryService + SkillManifest + SkillRescanResult,
                 AgentsRegistryService + AgentManifest,
-                SlashRegistryService + SlashCommand{Manifest,Context,Handler},
+                SlashRegistryService + SlashCommand{Manifest,Context,Handler} +
+                SlashRegistryEntry,
                 TuiCompletionService + CompletionSource + CompletionItem.
                 No runtime code — type-only import surface for peers.
                 DriverService + RunConversation{Input,Output} are owned by
@@ -66,6 +68,9 @@ owning plugin's `public.d.ts` instead.
 When adding a service interface here:
 - Comment with the owning plugin name (see existing `// ---------- tools:registry (owned by llm-tools-registry) ----------` headers).
 - Add a structural-probe test in `index.test.ts` to lock the public shape.
+- Compare the owning plugin's `public.d.ts`, README, implementation, and tests
+  before editing. Several owner plugins also expose local convenience types;
+  the declarations here must match the actual service object they provide.
 
 ## Testing
 

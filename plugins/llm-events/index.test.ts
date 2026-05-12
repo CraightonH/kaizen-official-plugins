@@ -1,4 +1,6 @@
 import { describe, it, expect, mock } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import plugin, { VOCAB } from "./index.ts";
 import { CANCEL_TOOL } from "./index.ts";
 
@@ -27,6 +29,21 @@ describe("llm-events", () => {
     expect(plugin.apiVersion).toBe("3.0.0");
   });
 
+  it("package version matches openai-compatible harness and marketplace pins", () => {
+    const pkg = JSON.parse(readFileSync(join(import.meta.dir, "package.json"), "utf8"));
+    const harness = JSON.parse(readFileSync(
+      join(import.meta.dir, "..", "..", "harnesses", "openai-compatible.json"),
+      "utf8",
+    ));
+    const marketplace = JSON.parse(readFileSync(
+      join(import.meta.dir, "..", "..", ".kaizen", "marketplace.json"),
+      "utf8",
+    ));
+    expect(harness.plugins).toContain(`official/llm-events@${pkg.version}`);
+    const entry = marketplace.entries.find((e: any) => e.kind === "plugin" && e.name === "llm-events");
+    expect(entry?.versions?.[0]?.version).toBe(pkg.version);
+  });
+
   it("VOCAB is frozen", () => {
     expect(Object.isFrozen(VOCAB)).toBe(true);
   });
@@ -44,7 +61,7 @@ describe("llm-events", () => {
   });
 
   it("CANCEL_TOOL is the well-known symbol", () => {
-    expect(CANCEL_TOOL).toBe(Symbol.for("kaizen.cancel"));
+    expect(CANCEL_TOOL as symbol).toBe(Symbol.for("kaizen.cancel"));
   });
 
   it("VOCAB contains every Spec 0 event name", () => {
@@ -113,7 +130,9 @@ describe("llm-events", () => {
   it("re-exports tools:registry interface types", async () => {
     type _Probe = import("./public").ToolsRegistryService extends {
       register: (...a: any[]) => any;
+      registerWith: (...a: any[]) => any;
       list: (...a: any[]) => any;
+      listRegistrations: (...a: any[]) => any;
       invoke: (...a: any[]) => any;
     } ? true : false;
     const ok: _Probe = true;
@@ -132,6 +151,14 @@ describe("llm-events", () => {
       (args: unknown, ctx: any) => Promise<unknown> ? true : false;
     const handlerOk: _Handler = true;
     expect(handlerOk).toBe(true);
+
+    type _Reg = import("./public").ToolRegistration extends {
+      schema: import("./public").ToolSchema;
+      handler: import("./public").ToolHandler;
+      source: import("./public").ToolSource;
+    } ? true : false;
+    const regOk: _Reg = true;
+    expect(regOk).toBe(true);
   });
 
   it("re-exports tool-dispatch:strategy interface type", () => {
@@ -148,7 +175,7 @@ describe("llm-events", () => {
       list: () => any;
       load: (name: string) => Promise<string>;
       register: (...a: any[]) => () => void;
-      rescan: () => Promise<void>;
+      rescan: () => Promise<import("./public").SkillRescanResult>;
     } ? true : false;
     const ok: _Reg = true;
     expect(ok).toBe(true);
@@ -181,8 +208,8 @@ describe("llm-events", () => {
   it("re-exports slash:registry interface types", () => {
     type _Reg = import("./public").SlashRegistryService extends {
       register: (...a: any[]) => () => void;
+      get: (name: string) => import("./public").SlashRegistryEntry | undefined;
       list: () => any;
-      tryDispatch: (...a: any[]) => Promise<boolean>;
     } ? true : false;
     const ok: _Reg = true;
     expect(ok).toBe(true);
@@ -190,14 +217,16 @@ describe("llm-events", () => {
     type _Manifest = import("./public").SlashCommandManifest extends {
       name: string;
       description: string;
-      source: "builtin" | "user" | "project" | "plugin";
+      source: "builtin" | "plugin" | "file";
     } ? true : false;
     const mOk: _Manifest = true;
     expect(mOk).toBe(true);
 
     type _Ctx = import("./public").SlashCommandContext extends {
       args: string;
+      raw: string;
       emit: (event: string, payload: unknown) => Promise<void>;
+      print: (text: string) => Promise<void>;
       signal: AbortSignal;
     } ? true : false;
     const cOk: _Ctx = true;
@@ -217,8 +246,9 @@ describe("llm-events", () => {
     expect(ok).toBe(true);
 
     type _Source = import("./public").CompletionSource extends {
-      trigger: string | RegExp;
-      list: (input: string, cursor: number) => Promise<any[]>;
+      id: string;
+      trigger: string;
+      list: (query: string) => Promise<any[]> | any[];
     } ? true : false;
     const sOk: _Source = true;
     expect(sOk).toBe(true);

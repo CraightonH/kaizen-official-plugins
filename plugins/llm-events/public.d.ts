@@ -144,6 +144,19 @@ export interface ToolHandler {
   (args: unknown, ctx: ToolExecutionContext): Promise<unknown>;
 }
 
+export type ToolSource =
+  | { kind: "local" }
+  | { kind: "mcp"; server: string }
+  | { kind: "agent" }
+  | { kind: "skill" }
+  | { kind: "memory" };
+
+export interface ToolRegistration {
+  schema: ToolSchema;
+  handler: ToolHandler;
+  source: ToolSource;
+}
+
 export interface ToolExecutionContext {
   signal: AbortSignal;
   callId: string;
@@ -166,7 +179,12 @@ export interface ToolExecutionContext {
 export interface ToolsRegistryService {
   /** Returns an unregister function. */
   register(schema: ToolSchema, handler: ToolHandler): () => void;
-  list(filter?: { tags?: string[]; names?: string[] }): ToolSchema[];
+  /** Register a tool with explicit provenance. */
+  registerWith(reg: ToolRegistration): () => void;
+  list(filter?: { tags?: string[]; names?: string[]; sources?: ToolSource["kind"][] }): ToolSchema[];
+  listRegistrations(
+    filter?: { tags?: string[]; names?: string[]; sources?: ToolSource["kind"][] },
+  ): ToolRegistration[];
   /**
    * Single execution entry point. Emits `tool:before-execute`, `tool:execute`,
    * `tool:result` / `tool:error` around the handler call. Subscribers to
@@ -193,7 +211,9 @@ export interface ToolDispatchStrategy {
    */
   prepareRequest(input: {
     availableTools: ToolSchema[];
-  }): { tools?: ToolSchema[]; systemPromptAppend?: string };
+  }):
+    | { tools?: ToolSchema[]; systemPromptAppend?: string }
+    | Promise<{ tools?: ToolSchema[]; systemPromptAppend?: string }>;
 
   /**
    * Consumes a complete LLM response, executes any tool calls / code blocks,
@@ -219,13 +239,18 @@ export interface SkillManifest {
   tokens?: number;
 }
 
+export interface SkillRescanResult {
+  changed: boolean;
+  count: number;
+}
+
 export interface SkillsRegistryService {
   list(): SkillManifest[];
   /** Returns the body to inject into the system prompt. */
   load(name: string): Promise<string>;
   register(manifest: SkillManifest, loader: () => Promise<string>): () => void;
   /** Re-discover file-backed skills; used by `/skills reload`. */
-  rescan(): Promise<void>;
+  rescan(): Promise<SkillRescanResult>;
 }
 
 // ---------- agents:registry (owned by `llm-agents`) ----------
@@ -249,18 +274,20 @@ export interface SlashCommandManifest {
   /** Without leading slash, e.g. "help" or "mcp:reload". */
   name: string;
   description: string;
-  /**
-   * If set, the command body is rendered with `{{args}}` substitution and
-   * re-emitted as a user message. If unset, `handler` runs.
-   */
-  body?: string;
-  source: "builtin" | "user" | "project" | "plugin";
+  usage?: string;
+  source: "builtin" | "plugin" | "file";
+  /** Absolute source path for file-backed commands. */
+  filePath?: string;
 }
 
 export interface SlashCommandContext {
   /** Everything after the command name; a single leading space is stripped. */
   args: string;
+  /** Full submitted input, including the leading slash. */
+  raw: string;
   emit: (event: string, payload: unknown) => Promise<void>;
+  /** Emit a system-visible response for the command. */
+  print: (text: string) => Promise<void>;
   signal: AbortSignal;
 }
 
@@ -268,36 +295,31 @@ export interface SlashCommandHandler {
   (ctx: SlashCommandContext): Promise<void>;
 }
 
+export interface SlashRegistryEntry {
+  manifest: SlashCommandManifest;
+  handler: SlashCommandHandler;
+}
+
 export interface SlashRegistryService {
-  register(manifest: SlashCommandManifest, handler?: SlashCommandHandler): () => void;
+  register(manifest: SlashCommandManifest, handler: SlashCommandHandler): () => void;
+  get(name: string): SlashRegistryEntry | undefined;
   list(): SlashCommandManifest[];
-  /**
-   * Returns true if the input matched a registered command (and was dispatched);
-   * false if no match. Subscribers to `input:submit` call this to decide
-   * whether to emit `input:handled`.
-   */
-  tryDispatch(input: string, ctx: Omit<SlashCommandContext, "args">): Promise<boolean>;
 }
 
 // ---------- tui:completion (owned by `llm-tui`) ----------
 
 export interface CompletionItem {
-  /** Shown in the popup. */
   label: string;
-  /** Replaces trigger+typed-text on accept. */
-  insertText: string;
-  /** Shown alongside `label`. */
-  description?: string;
-  /** Shown below the selection (preview/help). */
   detail?: string;
+  insertText: string;
+  sortWeight?: number;
 }
 
 export interface CompletionSource {
-  /** Matched at word-start in the input field. */
-  trigger: string | RegExp;
-  list(input: string, cursor: number): Promise<CompletionItem[]>;
-  /** Higher weight sorts first when multiple sources merge into one popup. */
-  weight?: number;
+  id: string;
+  /** Single-character trigger matched at word-start in the input field. */
+  trigger: string;
+  list(query: string): CompletionItem[] | Promise<CompletionItem[]>;
 }
 
 export interface TuiCompletionService {

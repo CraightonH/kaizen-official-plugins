@@ -22,13 +22,16 @@ Tier 0 foundation plugin for the openai-compatible Kaizen harness.
 - Conversation primitives — `ChatMessage`, `ToolCall`, `ToolSchema`,
   `ModelInfo`, `LLMRequest`, `LLMResponse`, `LLMStreamEvent`,
   `LLMCompleteService`.
-- Cancellation sentinel — `CANCEL_TOOL = Symbol.for("kaizen.cancel")`.
+- Cancellation sentinels — `CANCEL_TOOL = Symbol.for("kaizen.cancel")` and
+  `CODEMODE_CANCEL_SENTINEL = "__kaizen_cancel__"`.
 - Service interfaces (declared here, *implemented* by their owning plugin):
   `ToolsRegistryService`, `ToolHandler`, `ToolExecutionContext`,
-  `ToolDispatchStrategy`, `SkillsRegistryService`, `SkillManifest`,
+  `ToolSource`, `ToolRegistration`, `ToolDispatchStrategy`,
+  `SkillsRegistryService`, `SkillManifest`, `SkillRescanResult`,
   `AgentsRegistryService`, `AgentManifest`, `SlashRegistryService`,
   `SlashCommandManifest`, `SlashCommandHandler`, `SlashCommandContext`,
-  `TuiCompletionService`, `CompletionSource`, `CompletionItem`.
+  `SlashRegistryEntry`, `TuiCompletionService`, `CompletionSource`,
+  `CompletionItem`.
 - Driver service interfaces — `DriverService`, `RunConversationInput`, and
   `RunConversationOutput` — are owned by `llm-driver/public`.
 

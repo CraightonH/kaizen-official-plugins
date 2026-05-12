@@ -13,20 +13,31 @@ import type {
   LLMResponse,
   LLMStreamEvent,
   ToolsRegistryService,
+  ToolRegistration,
+  ToolSource,
   ToolExecutionContext,
   ToolDispatchStrategy,
+  SkillRescanResult,
   SkillsRegistryService,
   AgentsRegistryService,
+  SlashCommandContext,
+  SlashCommandHandler,
+  SlashCommandManifest,
+  SlashRegistryEntry,
   SlashRegistryService,
   TuiCompletionService,
   CompletionSource,
   CompletionItem,
 } from "../public";
-import { CANCEL_TOOL } from "../index.ts";
+import { CANCEL_TOOL, CODEMODE_CANCEL_SENTINEL } from "../index.ts";
 
 describe("llm-events: Spec 0 acceptance-criteria imports", () => {
   it("CANCEL_TOOL is the well-known Symbol.for('kaizen.cancel')", () => {
-    expect(CANCEL_TOOL).toBe(Symbol.for("kaizen.cancel"));
+    expect(CANCEL_TOOL as symbol).toBe(Symbol.for("kaizen.cancel"));
+  });
+
+  it("CODEMODE_CANCEL_SENTINEL is the well-known codemode cancellation string", () => {
+    expect(CODEMODE_CANCEL_SENTINEL).toBe("__kaizen_cancel__");
   });
 
   it("every foundational Spec 0 type name resolves at the declaration level", () => {
@@ -38,10 +49,17 @@ describe("llm-events: Spec 0 acceptance-criteria imports", () => {
     type _Lres = LLMResponse;
     type _Lse = LLMStreamEvent;
     type _Trs = ToolsRegistryService;
+    type _Tr = ToolRegistration;
+    type _Tsrc = ToolSource;
     type _Tec = ToolExecutionContext;
     type _Tds = ToolDispatchStrategy;
+    type _Srr = SkillRescanResult;
     type _Skr = SkillsRegistryService;
     type _Agr = AgentsRegistryService;
+    type _Scm = SlashCommandManifest;
+    type _Scc = SlashCommandContext;
+    type _Sch = SlashCommandHandler;
+    type _Sre = SlashRegistryEntry;
     type _Slr = SlashRegistryService;
     type _Tcs = TuiCompletionService;
     type _Cs = CompletionSource;
