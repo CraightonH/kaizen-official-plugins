@@ -1,3 +1,2 @@
 1. Add tool call approval gate plugin. Subscribe to tool:before (or similar) event and intercept the request. Present a prompt to the user if they approve of the call - Yes/No option navigated with up/down arrow, enter to submit. Place the UI above the inputbox. Show the tool request in human readable format, ie. not the raw json.
 2. Have TUI detect markdown in the LLM's response and default to markdown rendering. Then implement a keyboard shortcut to copy the raw text from the latest message, and a keyboard shortcut to copy the rendered markdown from the latest message, if possible.
-3. Remove `tool:762529152 grep: ripgrep not found; using JS fallback` from status-it

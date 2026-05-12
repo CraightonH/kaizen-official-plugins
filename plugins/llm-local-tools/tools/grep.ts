@@ -43,15 +43,8 @@ function detectRgPath(): string | null {
 }
 
 let probedRg: string | null | undefined = undefined;
-let warned = false;
-function probeRgOnce(log: (msg: string) => void): string | null {
-  if (probedRg === undefined) {
-    probedRg = detectRgPath();
-    if (probedRg === null && !warned) {
-      log("grep: ripgrep not found; using JS fallback (slower)");
-      warned = true;
-    }
-  }
+function probeRgOnce(): string | null {
+  if (probedRg === undefined) probedRg = detectRgPath();
   return probedRg;
 }
 
@@ -84,9 +77,8 @@ async function walkFiles(root: string, out: string[]): Promise<void> {
 }
 
 export function makeHandler(opts: { rgPath: string | null }) {
-  return async function handler(args: GrepArgs, ctx: any): Promise<string> {
-    const log = (ctx?.log ?? (() => {})) as (m: string) => void;
-    const rg = opts.rgPath !== undefined ? opts.rgPath : probeRgOnce(log);
+  return async function handler(args: GrepArgs, _ctx: any): Promise<string> {
+    const rg = opts.rgPath !== undefined ? opts.rgPath : probeRgOnce();
     return runJsFallback(args, rg);
   };
 }
