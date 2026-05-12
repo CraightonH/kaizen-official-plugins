@@ -5,7 +5,8 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 ## Module map
 
 ```
-index.ts        Plugin lifecycle: defines events, wires service, registers identity at p=10, registers slash commands.
+index.ts        Plugin lifecycle: consumes llm-events vocabulary, wires service, registers identity at p=10,
+                and registers slash commands when slash:registry is present.
                 The only file that touches `ctx`.
 registry.ts     createRegistry({ emit }) → SystemPromptServiceImpl. Pure logic. Owns generation counter
                 and assembly cache. Handle-scoped ownership: each register() returns an unregister/bumpGeneration handle.

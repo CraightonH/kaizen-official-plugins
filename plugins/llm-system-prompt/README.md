@@ -50,13 +50,16 @@ Semantics:
 
 ### Consumes
 
-**Service** — `slash:registry` (optional). When present, the plugin registers four diagnostic slash commands:
+**Service** — `llm-events:vocabulary` (required). Owns the `PROMPT_REBUILT`
+and `PROMPT_RELOAD` event names and defines them before this plugin emits.
+
+**Service** — `slash:registry` (optional). When already provided at setup, the plugin registers four diagnostic slash commands:
 - `/prompt:show [--stats]` — print the assembled prompt with section headers; `--stats` adds per-section char counts and the generation counter.
 - `/prompt:reload` — re-read identity files from disk and bump generation.
 - `/prompt:disable <id>` — render a section as empty without removing it.
 - `/prompt:enable <id>` — undo `/prompt:disable`.
 
-If `slash:registry` is absent, the service still works; only the slash commands are skipped.
+If `slash:registry` is absent or loaded later, the service still works; only the slash commands are skipped.
 
 ### Events emitted
 
@@ -77,4 +80,5 @@ Environment variables (read at setup time):
 
 ## Permissions
 
-`tier: trusted` — reads two files under the user's home/project directories.
+`tier: unscoped` — reads identity markdown from the user's home/project
+directories or env-override paths. No writes, network, or process execution.

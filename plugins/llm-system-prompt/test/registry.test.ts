@@ -16,6 +16,13 @@ describe("registry — basic operations", () => {
     expect(emit).toHaveBeenCalledWith("prompt:rebuilt", { generation: 1 });
   });
 
+  it("emits using the configured prompt rebuilt event name", async () => {
+    const emit = mock(async (_e: string, _p: unknown) => {});
+    const r = createRegistry({ emit, events: { promptRebuilt: "custom:rebuilt" } });
+    r.register({ id: "a", priority: 100, render: () => "A" });
+    expect(emit).toHaveBeenCalledWith("custom:rebuilt", { generation: 1 });
+  });
+
   it("assemble returns sections sorted by priority", async () => {
     const r = createRegistry({ emit: mock(() => Promise.resolve()) });
     r.register({ id: "b", priority: 200, render: () => "BBB" });

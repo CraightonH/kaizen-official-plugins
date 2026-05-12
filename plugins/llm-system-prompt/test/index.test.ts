@@ -9,13 +9,18 @@ import type {
   RegisteredSection,
 } from "../public";
 
-function makeFakeCtx() {
+function makeFakeCtx(opts: { slash?: boolean } = {}) {
   const services: Record<string, unknown> = {};
   const provided: Record<string, unknown> = {};
   const consumed: string[] = [];
   const events: string[] = [];
   const emitted: Array<{ name: string; payload: unknown }> = [];
   const slashRegistrations: Array<{ name: string; description: string }> = [];
+  const slash = opts.slash ?? true;
+  const vocab = {
+    PROMPT_REBUILT: "prompt:rebuilt",
+    PROMPT_RELOAD: "prompt:reload",
+  };
 
   const slashRegistry = {
     register(manifest: { name: string; description: string }, _h: unknown) {
@@ -34,8 +39,9 @@ function makeFakeCtx() {
     provideService: <T,>(n: string, v: T) => { provided[n] = v; },
     consumeService: (n: string) => { consumed.push(n); },
     useService: (n: string) => {
-      if (n === "slash:registry") return slashRegistry;
-      return undefined;
+      if (n === "llm-events:vocabulary") return vocab;
+      if (n === "slash:registry" && slash) return slashRegistry;
+      throw new Error(`missing service ${n}`);
     },
     defineEvent: (n: string) => { events.push(n); },
     emit: async (n: string, p: unknown) => { emitted.push({ name: n, payload: p }); },
@@ -49,11 +55,16 @@ describe("llm-system-prompt plugin manifest", () => {
   it("exports a KaizenPlugin with the correct name and apiVersion", () => {
     expect(plugin.name).toBe("llm-system-prompt");
     expect(plugin.apiVersion).toBe("3.0.0");
-    expect(plugin.permissions?.tier).toBe("trusted");
+    expect(plugin.permissions?.tier).toBe("unscoped");
   });
 
   it("provides prompt:system", () => {
     expect(plugin.services?.provides).toContain("prompt:system");
+  });
+
+  it("requires the llm-events vocabulary and leaves slash commands optional", () => {
+    expect(plugin.services?.consumes).toContain("llm-events:vocabulary");
+    expect(plugin.services?.consumes ?? []).not.toContain("slash:registry");
   });
 });
 
@@ -76,7 +87,7 @@ describe("index.ts — plugin lifecycle", () => {
   it("setup defines and provides prompt:system", async () => {
     const ctx = makeFakeCtx();
     await plugin.setup!(ctx as any);
-    expect(ctx.consumed).toContain("slash:registry");
+    expect(ctx.consumed).toContain("llm-events:vocabulary");
     expect("prompt:system" in ctx.services).toBe(true);
     expect("prompt:system" in ctx.provided).toBe(true);
   });
@@ -102,6 +113,13 @@ describe("index.ts — plugin lifecycle", () => {
     await plugin.setup!(ctx as any);
     const names = ctx.slashRegistrations.map((m) => m.name).sort();
     expect(names).toEqual(["prompt:disable", "prompt:enable", "prompt:reload", "prompt:show"]);
+  });
+
+  it("setup still provides prompt:system when slash:registry is absent", async () => {
+    const ctx = makeFakeCtx({ slash: false });
+    await plugin.setup!(ctx as any);
+    expect("prompt:system" in ctx.provided).toBe(true);
+    expect(ctx.slashRegistrations).toEqual([]);
   });
 
   it("setup with global file present picks it up", async () => {

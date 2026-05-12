@@ -3,8 +3,13 @@
   "version": "0.1.0",
   "description": "System-prompt assembler service (prompt:system) for the openai-compatible harness",
   "type": "module",
-  "exports": { ".": "./index.ts" },
-  "keywords": ["kaizen-plugin"],
+  "exports": {
+    ".": "./index.ts",
+    "./public": "./public.d.ts"
+  },
+  "keywords": [
+    "kaizen-plugin"
+  ],
   "dependencies": {
     "llm-slash-commands": "workspace:*"
   },

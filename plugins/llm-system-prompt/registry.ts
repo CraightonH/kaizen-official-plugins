@@ -14,6 +14,9 @@ interface RegistryEntry {
 
 export interface CreateRegistryOptions {
   emit: (event: string, payload: unknown) => void | Promise<void>;
+  events?: {
+    promptRebuilt?: string;
+  };
 }
 
 export interface SystemPromptServiceImpl extends SystemPromptService {
@@ -25,6 +28,7 @@ export interface SystemPromptServiceImpl extends SystemPromptService {
 
 export function createRegistry(opts: CreateRegistryOptions): SystemPromptServiceImpl {
   const map = new Map<string, RegistryEntry>();
+  const promptRebuiltEvent = opts.events?.promptRebuilt ?? "prompt:rebuilt";
   let generation = 0;
   let order = 0;
   let cachedAssembly: string | null = null;
@@ -33,7 +37,7 @@ export function createRegistry(opts: CreateRegistryOptions): SystemPromptService
   function bump(): void {
     generation += 1;
     cachedAssembly = null;
-    void opts.emit("prompt:rebuilt", { generation });
+    void opts.emit(promptRebuiltEvent, { generation });
   }
 
   function register(section: SystemPromptSection): RegisteredSection {
