@@ -53,6 +53,7 @@ Already owner-local and should stay owner-local:
 
 - `DriverService`, `RunConversationInput`, `RunConversationOutput` ->
   `llm-driver/public`
+- `ToolDispatchStrategy`, `ToolDispatchRegistry` -> `llm-driver/public`
 - `SystemPromptService`, `SystemPromptSection`, `RegisteredSection` ->
   `llm-system-prompt/public`
 - `SessionsStoreService`, `SessionRecord`, `TurnHandle` ->
@@ -66,11 +67,9 @@ Decision points to handle deliberately:
   specifically OpenAI-owned. Recommendation: leave it in `llm-events` until
   there is a neutral provider-contract owner or multiple provider plugins need
   a shared non-events package.
-- `ToolDispatchStrategy`: the current provider is `llm-native-dispatch`, but
-  the driver consumes the strategy and future dispatch plugins may exist.
-  Recommendation: decide in the dispatch migration session whether the contract
-  belongs in `llm-native-dispatch/public`, `llm-driver/public`, or a future
-  neutral dispatch-contract package. Do not move it opportunistically.
+- `ToolDispatchStrategy`: resolved in Session 6. The driver owns this strategy
+  extension point in `llm-driver/public`; `llm-native-dispatch` implements the
+  contract.
 - `CANCEL_TOOL`: the behavior is tool-registry-owned, but the symbol identity is
   intentionally cross-plugin. Recommendation: keep the runtime export from
   `llm-events` during the migration. Do not expose it from
@@ -217,11 +216,11 @@ Validation:
 
 Scope:
 
-- Decide the owner for `ToolDispatchStrategy`.
-- Decide whether `LLMCompleteService` remains a foundation primitive or needs a
-  new owner.
-- Apply only the decisions made in this session. Avoid also removing deprecated
-  exports from `llm-events`.
+- Resolve `ToolDispatchStrategy` to `llm-driver/public`.
+- Keep `LLMCompleteService` in `llm-events` as a neutral provider contract for
+  now.
+- Apply only those decisions. Avoid also removing deprecated exports from
+  `llm-events`.
 
 Validation:
 

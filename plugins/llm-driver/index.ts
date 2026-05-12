@@ -4,8 +4,8 @@ import type {
   LLMCompleteService,
 } from "llm-events/public";
 import type { SessionsStoreService } from "llm-session-manager/public";
-import type { DriverService, RunConversationInput, RunConversationOutput } from "./public";
-import { runConversation, type RunConversationDeps, type ToolDispatchStrategy, type ToolsRegistryService } from "./loop.ts";
+import type { DriverService, RunConversationInput, RunConversationOutput, ToolDispatchStrategy } from "./public";
+import { runConversation, type RunConversationDeps, type ToolsRegistryService } from "./loop.ts";
 import { type CurrentTurn } from "./state.ts";
 import { newTurnId } from "./ids.ts";
 import { wireCancel } from "./cancel.ts";

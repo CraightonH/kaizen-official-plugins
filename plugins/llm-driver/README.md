@@ -59,6 +59,8 @@ interface DriverService {
 }
 ```
 
+`llm-driver/public` also owns the `ToolDispatchStrategy` and `ToolDispatchRegistry` contracts for the optional `tool-dispatch:strategy` extension point. Dispatch plugins implement the strategy; registry plugins provide the invoke surface the driver passes into the strategy.
+
 Semantics:
 - The driver does not select a model. If `input.model` is omitted, the LLM provider behind `llm:complete` substitutes its own default.
 - `sessionId` selects the persisted transcript. The driver reads fresh messages from `sessions:store` before each LLM call and appends assistant/tool messages through a turn handle.

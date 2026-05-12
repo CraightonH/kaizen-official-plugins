@@ -1,9 +1,8 @@
 import { describe, it, expect } from "bun:test";
 
-// The Spec 0 acceptance criteria require Tier 1+ plugins to be able to import
-// the foundational names from `llm-events/public.d.ts` without circular
-// dependencies. This test imports them together; if any name is missing or
-// renamed, this file fails to type-check and `bun test` reports the error.
+// Foundation names must remain importable from `llm-events/public.d.ts`
+// without circular dependencies. Owner-specific service contracts are tested
+// in their owner plugins' public surfaces.
 import type {
   Vocab,
   EventName,
@@ -15,22 +14,6 @@ import type {
   LLMResponse,
   LLMStreamEvent,
   LLMCompleteService,
-  ToolsRegistryService,
-  ToolRegistration,
-  ToolSource,
-  ToolExecutionContext,
-  ToolDispatchStrategy,
-  SkillRescanResult,
-  SkillsRegistryService,
-  AgentsRegistryService,
-  SlashCommandContext,
-  SlashCommandHandler,
-  SlashCommandManifest,
-  SlashRegistryEntry,
-  SlashRegistryService,
-  TuiCompletionService,
-  CompletionSource,
-  CompletionItem,
 } from "../public";
 import { CANCEL_TOOL, CODEMODE_CANCEL_SENTINEL } from "../index.ts";
 
@@ -72,7 +55,7 @@ describe("llm-events: Spec 0 acceptance-criteria imports", () => {
     await expect(service.listModels()).resolves.toEqual([model]);
   });
 
-  it("every foundational Spec 0 type name resolves at the declaration level", () => {
+  it("every foundation type name resolves at the declaration level", () => {
     type _V = Vocab;
     type _En = EventName;
     type _Cm = ChatMessage;
@@ -83,22 +66,6 @@ describe("llm-events: Spec 0 acceptance-criteria imports", () => {
     type _Lres = LLMResponse;
     type _Lse = LLMStreamEvent;
     type _Lcs = LLMCompleteService;
-    type _Trs = ToolsRegistryService;
-    type _Tr = ToolRegistration;
-    type _Tsrc = ToolSource;
-    type _Tec = ToolExecutionContext;
-    type _Tds = ToolDispatchStrategy;
-    type _Srr = SkillRescanResult;
-    type _Skr = SkillsRegistryService;
-    type _Agr = AgentsRegistryService;
-    type _Scm = SlashCommandManifest;
-    type _Scc = SlashCommandContext;
-    type _Sch = SlashCommandHandler;
-    type _Sre = SlashRegistryEntry;
-    type _Slr = SlashRegistryService;
-    type _Tcs = TuiCompletionService;
-    type _Cs = CompletionSource;
-    type _Ci = CompletionItem;
 
     // Use one at runtime so TS doesn't elide the whole import.
     const probe: _Cm = { role: "user", content: "ok" };

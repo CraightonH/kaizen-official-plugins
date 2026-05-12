@@ -90,7 +90,7 @@
     },
     "plugins/llm-events": {
       "name": "llm-events",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "devDependencies": {
         "@types/bun": "latest",
         "@types/json-schema": "^7.0.15",
@@ -146,6 +146,7 @@
       "name": "llm-native-dispatch",
       "version": "0.3.0",
       "dependencies": {
+        "llm-driver": "workspace:*",
         "llm-tools-registry": "workspace:*",
       },
       "devDependencies": {

@@ -4,7 +4,8 @@
   "description": "Coordination plugin for the openai-compatible harness: turn loop, conversation state, lifecycle events.",
   "type": "module",
   "exports": {
-    ".": "./index.ts"
+    ".": "./index.ts",
+    "./public": "./public.d.ts"
   },
   "keywords": [
     "kaizen-plugin"

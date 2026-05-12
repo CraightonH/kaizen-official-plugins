@@ -19,8 +19,10 @@ cancel.ts           wireCancel(ctx, getCurrent) → unsubscribe. Subscribes to t
 ids.ts              newTurnId() (uuid-prefixed), makeIdGen(seq) for deterministic test ids.
 busy-messages.ts    Random "thinking…" pool for ui.setBusy().
 done-messages.ts    Random verb pool for the post-turn duration notice.
-public.d.ts         DriverService / RunConversationInput / RunConversationOutput. Re-exports
-                    the chat/llm types from llm-events/public so consumers have one import.
+public.d.ts         DriverService / RunConversationInput / RunConversationOutput, plus
+                    ToolDispatchStrategy / ToolDispatchRegistry for the dispatch extension
+                    point. Re-exports the chat/llm types from llm-events/public so
+                    consumers have one import.
 ```
 
 Boundaries:
