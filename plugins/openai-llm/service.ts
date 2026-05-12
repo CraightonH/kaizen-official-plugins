@@ -28,7 +28,16 @@ export function makeService(cfg: OpenAILLMConfig, ctx: CtxLike, deps?: Partial<S
       for (let attempt = 1; attempt <= cfg.retry.maxAttempts; attempt++) {
         if (opts.signal.aborted) { yield { type: "error", message: "aborted" }; return; }
 
-        const result = yield* runAttempt({ url, headers, body, fetchImpl, signal: opts.signal, log: ctx.log });
+        const result = yield* runAttempt({
+          url,
+          headers,
+          body,
+          fetchImpl,
+          signal: opts.signal,
+          log: ctx.log,
+          connectTimeoutMs: cfg.connectTimeoutMs,
+          requestTimeoutMs: cfg.requestTimeoutMs,
+        });
         if (result.kind === "ok") return;
 
         const cls = classifyError(result as AttemptOutcome);
@@ -138,43 +147,123 @@ type AttemptResult =
   | (AttemptOutcome & { tokenYielded: boolean });
 
 async function* runAttempt(p: {
-  url: string; headers: Record<string, string>; body: string; fetchImpl: typeof fetch; signal: AbortSignal; log: (s: string) => void;
+  url: string;
+  headers: Record<string, string>;
+  body: string;
+  fetchImpl: typeof fetch;
+  signal: AbortSignal;
+  log: (s: string) => void;
+  connectTimeoutMs: number;
+  requestTimeoutMs: number;
 }): AsyncGenerator<LLMStreamEvent, AttemptResult, void> {
+  const timed = makeTimedSignal(p.signal, p.connectTimeoutMs, p.requestTimeoutMs);
   let res: Response;
   try {
-    res = await p.fetchImpl(p.url, { method: "POST", headers: p.headers, body: p.body, signal: p.signal });
+    res = await p.fetchImpl(p.url, { method: "POST", headers: p.headers, body: p.body, signal: timed.signal });
+    timed.markConnected();
   } catch (e: any) {
-    if (p.signal.aborted) return { kind: "aborted", tokenYielded: false };
+    const interrupted = timed.interrupted();
+    timed.cleanup();
+    if (interrupted) return interruptedResult(interrupted, false);
     return { kind: "network", cause: e, tokenYielded: false };
   }
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    const retryAfter = res.status === 429 || res.status === 503
-      ? parseRetryAfter(res.headers.get("retry-after"))
-      : undefined;
-    return { kind: "http", status: res.status, body: text.slice(0, 512), retryAfterMs: retryAfter, tokenYielded: false } as any;
-  }
-  if (!res.body) return { kind: "network", cause: new Error("no body"), tokenYielded: false };
-
   let tokenYielded = false;
   try {
-    const frames = readSseFrames(res.body, p.signal);
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      const retryAfter = res.status === 429 || res.status === 503
+        ? parseRetryAfter(res.headers.get("retry-after"))
+        : undefined;
+      return { kind: "http", status: res.status, body: text.slice(0, 512), retryAfterMs: retryAfter, tokenYielded: false } as any;
+    }
+    if (!res.body) return { kind: "network", cause: new Error("no body"), tokenYielded: false };
+
+    const frames = readSseFrames(res.body as ReadableStream<Uint8Array>, timed.signal);
     for await (const event of runStream(frames, p.log)) {
       if (event.type === "token" || event.type === "tool-call") tokenYielded = true;
-      yield event;
-      if (event.type === "done") return { kind: "ok" };
       if (event.type === "error") {
-        if (event.message === "aborted") return { kind: "aborted", tokenYielded };
+        const interrupted = timed.interrupted();
+        if (interrupted) return interruptedResult(interrupted, tokenYielded);
+        yield event;
         if (event.message.startsWith("malformed")) return { kind: "malformed", tokenYielded };
         return { kind: "malformed", cause: (event as any).cause, tokenYielded };
       }
+      yield event;
+      if (event.type === "done") return { kind: "ok" };
     }
-    if (p.signal.aborted) return { kind: "aborted", tokenYielded };
+    const interrupted = timed.interrupted();
+    if (interrupted) return interruptedResult(interrupted, tokenYielded);
     return { kind: "network", cause: new Error("stream ended without done"), tokenYielded };
   } catch (e: any) {
-    if (p.signal.aborted) return { kind: "aborted", tokenYielded };
+    const interrupted = timed.interrupted();
+    if (interrupted) return interruptedResult(interrupted, tokenYielded);
     return { kind: "network", cause: e, tokenYielded };
+  } finally {
+    timed.cleanup();
   }
+}
+
+type InterruptedKind = "aborted" | "connect-timeout" | "request-timeout";
+
+function makeTimedSignal(parent: AbortSignal, connectTimeoutMs: number, requestTimeoutMs: number): {
+  signal: AbortSignal;
+  markConnected: () => void;
+  interrupted: () => InterruptedKind | null;
+  cleanup: () => void;
+} {
+  const controller = new AbortController();
+  let connected = false;
+  let connectTimedOut = false;
+  let requestTimedOut = false;
+  let cleaned = false;
+
+  const abort = () => {
+    if (!controller.signal.aborted) controller.abort();
+  };
+  const onParentAbort = () => abort();
+
+  if (parent.aborted) abort();
+  else parent.addEventListener("abort", onParentAbort, { once: true });
+
+  const connectTimer = setTimeout(() => {
+    if (!connected && !controller.signal.aborted) {
+      connectTimedOut = true;
+      abort();
+    }
+  }, connectTimeoutMs);
+  const requestTimer = setTimeout(() => {
+    if (!controller.signal.aborted) {
+      requestTimedOut = true;
+      abort();
+    }
+  }, requestTimeoutMs);
+
+  return {
+    signal: controller.signal,
+    markConnected: () => {
+      connected = true;
+      clearTimeout(connectTimer);
+    },
+    interrupted: () => {
+      if (parent.aborted) return "aborted";
+      if (connectTimedOut) return "connect-timeout";
+      if (requestTimedOut) return "request-timeout";
+      return null;
+    },
+    cleanup: () => {
+      if (cleaned) return;
+      cleaned = true;
+      clearTimeout(connectTimer);
+      clearTimeout(requestTimer);
+      parent.removeEventListener("abort", onParentAbort);
+    },
+  };
+}
+
+function interruptedResult(kind: InterruptedKind, tokenYielded: boolean): AttemptResult {
+  if (kind === "aborted") return { kind: "aborted", tokenYielded };
+  if (kind === "connect-timeout") return { kind: "connect-timeout", tokenYielded };
+  return { kind: "request-timeout", tokenYielded };
 }
 
 function toEvent(o: AttemptResult): LLMStreamEvent {

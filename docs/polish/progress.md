@@ -4,3 +4,4 @@
 - session target: llm-tui
 - session target: llm-system-prompt
 - session target: llm-status-items
+- session target: openai-llm

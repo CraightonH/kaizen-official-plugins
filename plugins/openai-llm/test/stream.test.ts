@@ -75,8 +75,16 @@ describe("runStream", () => {
     expect((out.at(-1) as any).message).toMatch(/unexpected end of stream/);
   });
 
-  it("DONE-only (no finish) with no tool state → done with stop", async () => {
-    expect(true).toBe(true);
+  it("DONE-only (no finish) with no tool state -> done with stop", async () => {
+    const out = await collect(runStream(gen(content("hi"), "[DONE]"), log()));
+    expect(out.map(e => e.type)).toEqual(["token", "done"]);
+    expect((out.at(-1) as any).response).toMatchObject({ content: "hi", finishReason: "stop" });
+  });
+
+  it("DONE-only with partial tool state -> error", async () => {
+    const out = await collect(runStream(gen(tcFragment([{ index: 0, id: "a", name: "f", args: "{}" }]), "[DONE]"), log()));
+    expect(out.map(e => e.type)).toEqual(["error"]);
+    expect((out[0] as any).message).toMatch(/tool-call state but finish_reason/);
   });
 
   it("tool-state non-empty but finish_reason=stop → error", async () => {

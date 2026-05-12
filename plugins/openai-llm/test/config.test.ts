@@ -6,21 +6,21 @@ function makeDeps(overrides: Partial<ConfigDeps> = {}): ConfigDeps {
     home: "/home/u",
     env: {},
     readFile: async () => { throw Object.assign(new Error("ENOENT"), { code: "ENOENT" }); },
-    log: mock(() => {}),
+    log: mock((_msg: string) => {}),
     ...overrides,
   };
 }
 
 describe("loadConfig", () => {
   it("returns defaults silently when default-path file is absent", async () => {
-    const log = mock(() => {});
+    const log = mock((_msg: string) => {});
     const cfg = await loadConfig(makeDeps({ log }));
     expect(cfg).toEqual(DEFAULT_CONFIG);
     expect(log).not.toHaveBeenCalled();
   });
 
   it("logs when KAIZEN_OPENAI_LLM_CONFIG points at a missing path", async () => {
-    const log = mock(() => {});
+    const log = mock((_msg: string) => {});
     const cfg = await loadConfig(makeDeps({
       log,
       env: { KAIZEN_OPENAI_LLM_CONFIG: "/etc/missing.json" },
@@ -77,5 +77,19 @@ describe("loadConfig", () => {
     await expect(loadConfig(makeDeps({
       readFile: async () => JSON.stringify({ retry: { maxAttempts: 0 } }),
     }))).rejects.toThrow();
+  });
+
+  it("rejects malformed object-shaped config fields", async () => {
+    await expect(loadConfig(makeDeps({
+      readFile: async () => JSON.stringify({ baseUrl: "not a url" }),
+    }))).rejects.toThrow(/baseUrl/i);
+
+    await expect(loadConfig(makeDeps({
+      readFile: async () => JSON.stringify({ extraHeaders: ["x"] }),
+    }))).rejects.toThrow(/extraHeaders/i);
+
+    await expect(loadConfig(makeDeps({
+      readFile: async () => JSON.stringify({ extraHeaders: { "X-Test": 1 } }),
+    }))).rejects.toThrow(/extraHeaders\.X-Test/i);
   });
 });

@@ -86,8 +86,47 @@ describe("makeService.complete", () => {
     expect(first.value.type).toBe("token");
     ac.abort();
     const last = await it.next();
-    expect(last.value?.type ?? last.done).toBeDefined();
-    // either error event or completed; if completed the previous next was the error.
+    expect(last.value).toEqual({ type: "error", message: "aborted" });
+  });
+
+  it("connect timeout emits a retryable connect-timeout error", async () => {
+    const cfg2: OpenAILLMConfig = {
+      ...cfg,
+      connectTimeoutMs: 1,
+      requestTimeoutMs: 1000,
+      retry: { ...cfg.retry, maxAttempts: 1 },
+    };
+    const fetchStub = mock(async (_url: string, init: RequestInit) => {
+      await new Promise((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      });
+      throw new Error("unreachable");
+    });
+    const svc = makeService(cfg2, ctxStub, { fetch: fetchStub as any, version: "0.1.0" });
+    const out = await collect(svc.complete({ model: "x", messages: [{ role: "user", content: "hi" }] }, { signal: new AbortController().signal }));
+    expect(out).toEqual([{ type: "error", message: "connect timeout" }]);
+    expect(fetchStub).toHaveBeenCalledTimes(1);
+  });
+
+  it("request timeout mid-stream emits request-timeout after any yielded token", async () => {
+    const cfg2: OpenAILLMConfig = {
+      ...cfg,
+      connectTimeoutMs: 1000,
+      requestTimeoutMs: 1,
+      retry: { ...cfg.retry, maxAttempts: 3 },
+    };
+    const fetchStub = mock(async () => {
+      const stream = new ReadableStream({
+        start(c) {
+          c.enqueue(new TextEncoder().encode(`data: ${chatChunk("hi")}\n\n`));
+        },
+      });
+      return new Response(stream, { status: 200 });
+    });
+    const svc = makeService(cfg2, ctxStub, { fetch: fetchStub as any, version: "0.1.0" });
+    const out = await collect(svc.complete({ model: "x", messages: [{ role: "user", content: "hi" }] }, { signal: new AbortController().signal }));
+    expect(out).toEqual([{ type: "token", delta: "hi" }, { type: "error", message: "request timeout" }]);
+    expect(fetchStub).toHaveBeenCalledTimes(1);
   });
 
   it("apiKeyEnv override beats apiKey", async () => {
@@ -112,7 +151,10 @@ describe("makeService.complete", () => {
 
 describe("makeService.listModels", () => {
   it("parses OK 200", async () => {
-    const fetchStub = mock(async () => new Response(JSON.stringify({ object: "list", data: [{ id: "m1", context_length: 8192, owned_by: "me" }] }), { status: 200 }));
+    const fetchStub = mock(async (url: string) => {
+      if (url.endsWith("/api/v0/models")) return new Response("nope", { status: 404 });
+      return new Response(JSON.stringify({ object: "list", data: [{ id: "m1", context_length: 8192, owned_by: "me" }] }), { status: 200 });
+    });
     const svc = makeService(cfg, ctxStub, { fetch: fetchStub as any, version: "0.1.0" });
     const models = await svc.listModels();
     expect(models).toEqual([{ id: "m1", contextLength: 8192, description: "me" }]);

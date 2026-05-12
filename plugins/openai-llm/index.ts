@@ -8,7 +8,7 @@ const VERSION = "0.1.0"; // keep in sync with package.json on release
 const plugin: KaizenPlugin = {
   name: "openai-llm",
   apiVersion: "3.0.0",
-  permissions: { tier: "trusted" },
+  permissions: { tier: "unscoped" },
   services: { provides: ["llm:complete"] },
 
   async setup(ctx) {

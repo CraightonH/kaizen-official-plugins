@@ -45,12 +45,20 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 
 function validate(cfg: OpenAILLMConfig): void {
   if (!cfg.baseUrl || typeof cfg.baseUrl !== "string") throw new Error("openai-llm config: baseUrl required");
-  if (cfg.requestTimeoutMs <= 0) throw new Error("openai-llm config: requestTimeoutMs must be > 0");
-  if (cfg.connectTimeoutMs <= 0) throw new Error("openai-llm config: connectTimeoutMs must be > 0");
-  if (cfg.retry.maxAttempts < 1) throw new Error("openai-llm config: retry.maxAttempts must be >= 1");
-  if (cfg.retry.initialDelayMs < 0) throw new Error("openai-llm config: retry.initialDelayMs must be >= 0");
-  if (cfg.retry.maxDelayMs < cfg.retry.initialDelayMs) throw new Error("openai-llm config: retry.maxDelayMs < initialDelayMs");
+  try { new URL(cfg.baseUrl); } catch { throw new Error("openai-llm config: baseUrl must be a valid URL"); }
+  if (typeof cfg.apiKey !== "string") throw new Error("openai-llm config: apiKey must be a string");
+  if (cfg.apiKeyEnv !== undefined && typeof cfg.apiKeyEnv !== "string") throw new Error("openai-llm config: apiKeyEnv must be a string");
+  if (!cfg.defaultModel || typeof cfg.defaultModel !== "string") throw new Error("openai-llm config: defaultModel required");
+  if (typeof cfg.defaultTemperature !== "number" || !Number.isFinite(cfg.defaultTemperature)) throw new Error("openai-llm config: defaultTemperature must be a finite number");
+  if (typeof cfg.requestTimeoutMs !== "number" || !Number.isFinite(cfg.requestTimeoutMs) || cfg.requestTimeoutMs <= 0) throw new Error("openai-llm config: requestTimeoutMs must be > 0");
+  if (typeof cfg.connectTimeoutMs !== "number" || !Number.isFinite(cfg.connectTimeoutMs) || cfg.connectTimeoutMs <= 0) throw new Error("openai-llm config: connectTimeoutMs must be > 0");
+  if (typeof cfg.retry.maxAttempts !== "number" || !Number.isInteger(cfg.retry.maxAttempts) || cfg.retry.maxAttempts < 1) throw new Error("openai-llm config: retry.maxAttempts must be an integer >= 1");
+  if (typeof cfg.retry.initialDelayMs !== "number" || !Number.isFinite(cfg.retry.initialDelayMs) || cfg.retry.initialDelayMs < 0) throw new Error("openai-llm config: retry.initialDelayMs must be >= 0");
+  if (typeof cfg.retry.maxDelayMs !== "number" || !Number.isFinite(cfg.retry.maxDelayMs) || cfg.retry.maxDelayMs < cfg.retry.initialDelayMs) throw new Error("openai-llm config: retry.maxDelayMs < initialDelayMs");
   if (cfg.retry.jitter !== "full" && cfg.retry.jitter !== "none") throw new Error("openai-llm config: retry.jitter must be 'full' or 'none'");
+  for (const [key, value] of Object.entries(cfg.extraHeaders)) {
+    if (typeof value !== "string") throw new Error(`openai-llm config: extraHeaders.${key} must be a string`);
+  }
 }
 
 export async function loadConfig(deps: ConfigDeps): Promise<OpenAILLMConfig> {
@@ -75,6 +83,8 @@ export async function loadConfig(deps: ConfigDeps): Promise<OpenAILLMConfig> {
     throw new Error(`openai-llm config at ${path} malformed: ${(err as Error).message}`);
   }
   if (!isPlainObject(parsed)) throw new Error(`openai-llm config at ${path} must be a JSON object`);
+  if (parsed.retry !== undefined && !isPlainObject(parsed.retry)) throw new Error(`openai-llm config at ${path}: retry must be a JSON object`);
+  if (parsed.extraHeaders !== undefined && !isPlainObject(parsed.extraHeaders)) throw new Error(`openai-llm config at ${path}: extraHeaders must be a JSON object`);
 
   const merged: OpenAILLMConfig = {
     ...DEFAULT_CONFIG,

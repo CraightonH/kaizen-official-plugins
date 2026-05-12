@@ -56,10 +56,11 @@ describe("buildChatBody", () => {
   };
   it("uses defaultModel when req.model is empty + prepends system + sets stream/usage", () => {
     const body = buildChatBody(req, cfg);
+    const messages = body.messages as Array<Record<string, unknown>>;
     expect(body.model).toBe(cfg.defaultModel);
     expect(body.stream).toBe(true);
     expect(body.stream_options).toEqual({ include_usage: true });
-    expect(body.messages[0]).toEqual({ role: "system", content: "be terse" });
+    expect(messages[0]).toEqual({ role: "system", content: "be terse" });
     expect(body.temperature).toBe(cfg.defaultTemperature);
     expect("max_tokens" in body).toBe(false);
     expect("stop" in body).toBe(false);
@@ -67,8 +68,9 @@ describe("buildChatBody", () => {
   });
   it("does not duplicate system message when index 0 already system", () => {
     const body = buildChatBody({ ...req, messages: [{ role: "system", content: "ignore" }, { role: "user", content: "hi" }] }, cfg);
-    expect(body.messages.filter((m: any) => m.role === "system").length).toBe(1);
-    expect(body.messages[0].content).toBe("ignore");
+    const messages = body.messages as Array<{ role: string; content: string }>;
+    expect(messages.filter((m) => m.role === "system").length).toBe(1);
+    expect(messages[0]!.content).toBe("ignore");
   });
   it("includes tools and tool_choice:auto when req.tools present", () => {
     const body = buildChatBody({ ...req, tools: [{ name: "f", description: "d", parameters: {} }] }, cfg);

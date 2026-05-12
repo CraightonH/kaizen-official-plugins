@@ -17,6 +17,10 @@ export async function* runStream(
     const next = await iter.next();
     if (next.done) break;
     const raw = next.value;
+    if (raw === "[DONE]") {
+      finishReason = "stop";
+      break outer;
+    }
     const c = parseChunk(raw);
     if (c.kind === "malformed") {
       yield { type: "error", message: "malformed SSE data", cause: { raw: c.raw } };
@@ -53,6 +57,7 @@ export async function* runStream(
   for (;;) {
     const next = await iter.next();
     if (next.done) break;
+    if (next.value === "[DONE]") break;
     const c = parseChunk(next.value);
     if (c.kind === "usage") { usage = c.usage; }
   }
