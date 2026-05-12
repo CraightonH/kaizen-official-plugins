@@ -4,6 +4,8 @@ Use this document to seed focused polish sessions for the official Kaizen plugin
 marketplace. The intended cadence is one session, one plugin, one bounded set of
 quality improvements.
 
+Review polish/progress.md to ensure the target plugin hasn't already been completed. If so, raise it to the user and ask if they'd like to continue or choose another plugin.
+
 ## Scope
 
 Polish only plugins included by `harnesses/openai-compatible.json`:
