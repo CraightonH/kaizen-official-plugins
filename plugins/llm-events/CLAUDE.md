@@ -8,7 +8,8 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 index.ts        Plugin lifecycle. Declares VOCAB (frozen), CANCEL_TOOL,
                 CODEMODE_CANCEL_SENTINEL. setup() defines the
                 `llm-events:vocabulary` service, provides VOCAB as its impl,
-                and calls ctx.defineEvent() once per VOCAB value.
+                defines the neutral `llm:complete` provider slot, and calls
+                ctx.defineEvent() once per VOCAB value.
                 The only file that touches `ctx`.
 public.d.ts     Foundation TypeScript contract for the harness:
                 Vocab, EventName, ChatMessage, ToolCall, ToolSchema, ModelInfo,
@@ -17,18 +18,23 @@ public.d.ts     Foundation TypeScript contract for the harness:
                 type-only import surface for peers. Service-specific contracts
                 belong in the plugin that owns the service behavior.
 index.test.ts   Bun-test suite: VOCAB shape/freeze, sentinel identity,
-                lifecycle (defineEvent + provideService), foundation type
-                probes, and checks that owner-specific contracts are absent.
+                lifecycle (defineEvent + defineService + provideService),
+                foundation type probes, and checks that owner-specific
+                contracts are absent.
 ```
 
 Boundaries:
 - `index.ts` is the only stateful module. `public.d.ts` is types-only.
 - This plugin is a leaf: no `services.consumes`, no event subscriptions, no I/O.
+  It defines `llm:complete` but does not provide an implementation.
 - Tests run independently (`bun test`) and use a hand-rolled fake `ctx`.
 
 ## Invariants
 
 - **Single owner of the shared vocab.** This plugin is the *only* one that calls `ctx.defineEvent()` for any name in `VOCAB`. Peer plugins emit and subscribe — they never define. Re-defining a name elsewhere is a wiring bug; the harness will reject it.
+- **Single owner of the provider-neutral LLM service slot.** This plugin calls
+  `ctx.defineService("llm:complete", ...)`. Provider plugins call
+  `ctx.provideService("llm:complete", impl)` only.
 - **VOCAB is frozen.** `Object.isFrozen(VOCAB) === true`. Tests assert this. Don't replace the freeze with a runtime mutable map.
 - **Names are stable wire identifiers.** Renaming or removing a key is a breaking change for every peer plugin. Treat the literal string values as a public ABI.
 - **Type identity matters.** Each VOCAB value is typed as its own string literal (`readonly LLM_TOKEN: "llm:token"`). Peers rely on this for narrowed event-payload typing. New entries must follow the same pattern in `public.d.ts`.
@@ -59,7 +65,8 @@ plugin. `llm-events` must remain dependency-free; put that contract in the
 owning plugin's `public.d.ts` instead.
 
 When considering a new service interface:
-- Put it in the plugin that provides the service.
+- Put it in the plugin that provides the service unless it is deliberately a
+  provider-neutral foundation slot like `llm:complete`.
 - Export it through that plugin's `public.d.ts` and package `exports`.
 - Import foundation primitives from `llm-events/public` as needed.
 - Add owner-plugin tests that lock the public shape.

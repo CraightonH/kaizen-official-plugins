@@ -58,3 +58,22 @@ vocabulary did not change.
 - Tests not run and why: live integration tests gated by local services or
   environment, such as LM Studio and MCP server integration, were not enabled
   and were reported as skipped by `bun test`.
+
+## Follow-Up: `llm:complete` Runtime Definition
+
+Date: 2026-05-12
+
+`llm-events` now also owns the runtime definition of the provider-neutral
+`llm:complete` service by calling `ctx.defineService("llm:complete", ...)`.
+Concrete provider plugins, starting with `openai-llm`, provide the
+implementation with `ctx.provideService("llm:complete", impl)` and do not define
+the service.
+
+Compatibility notes:
+
+- The service name and `LLMCompleteService` TypeScript shape did not change.
+- Harnesses that load `openai-llm` must also load `llm-events` first. The
+  openai-compatible harness already does this, and `openai-llm` now declares a
+  `llm-events:vocabulary` consumption edge to make the setup order explicit.
+- Only one loaded provider can bind `llm:complete` because Kaizen services are
+  cardinality-one.

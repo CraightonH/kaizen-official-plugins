@@ -10,6 +10,7 @@ const RUN = process.env.KAIZEN_INTEGRATION === "1";
     const ctx: any = {
       log: console.log,
       defineService: () => {},
+      consumeService: () => {},
       provideService: (_n: string, impl: any) => { svcImpl = impl; },
     };
     await plugin.setup(ctx);

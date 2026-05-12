@@ -1,7 +1,7 @@
 {
   "name": "llm-events",
   "version": "0.7.0",
-  "description": "Event vocabulary and shared types for the openai-compatible harness",
+  "description": "Event vocabulary, shared LLM types, and provider service definitions",
   "type": "module",
   "exports": {
     ".": "./index.ts",

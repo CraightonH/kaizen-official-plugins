@@ -23,13 +23,15 @@ are owned by `llm-events/public` and should be imported from there.
 
 **Provides**: `llm:complete`
 
+**Consumes**: `llm-events:vocabulary`
+
 The service implementation satisfies `LLMCompleteService` from
 `llm-events/public`.
 
-`openai-llm` currently calls `ctx.defineService("llm:complete", ...)` before it
-provides the service because the runtime service definition has not yet been
-moved to a neutral LLM-provider contract plugin. See
-`docs/polish/openai-llm-refactor-opportunities.md` for the follow-up.
+`llm-events` owns the neutral `llm:complete` service definition. `openai-llm`
+declares a dependency on `llm-events:vocabulary` so `llm-events` setup runs
+first, then this plugin binds the concrete OpenAI-compatible implementation with
+`ctx.provideService("llm:complete", ...)`.
 
 ## Public Surface
 

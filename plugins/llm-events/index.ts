@@ -62,6 +62,9 @@ const plugin: KaizenPlugin = {
     ctx.defineService("llm-events:vocabulary", {
       description: "Event-name vocabulary for the openai-compatible harness.",
     });
+    ctx.defineService("llm:complete", {
+      description: "Provider-neutral streaming LLM completion service.",
+    });
     ctx.provideService<Vocab>("llm-events:vocabulary", VOCAB);
     for (const name of Object.values(VOCAB)) ctx.defineEvent(name);
   },

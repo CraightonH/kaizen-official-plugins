@@ -5,17 +5,19 @@ import plugin, { VOCAB } from "./index.ts";
 import { CANCEL_TOOL } from "./index.ts";
 
 function makeCtx() {
-  const defined: string[] = [];
+  const definedEvents: string[] = [];
+  const definedServices: string[] = [];
   const provided: Record<string, unknown> = {};
   return {
-    defined,
+    definedEvents,
+    definedServices,
     provided,
     log: mock(() => {}),
     config: {},
-    defineEvent: mock((name: string) => { defined.push(name); }),
+    defineEvent: mock((name: string) => { definedEvents.push(name); }),
     on: mock(() => {}),
     emit: mock(async () => []),
-    defineService: mock(() => {}),
+    defineService: mock((name: string) => { definedServices.push(name); }),
     provideService: mock((name: string, impl: unknown) => { provided[name] = impl; }),
     consumeService: mock(() => {}),
     useService: mock(() => undefined),
@@ -180,12 +182,14 @@ describe("llm-events", () => {
     expect(VOCAB.SESSION_HANDOFF).toBe("session:handoff");
   });
 
-  it("provides llm-events:vocabulary and defines every event name", async () => {
+  it("provides llm-events:vocabulary and defines foundation services/events", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
+    expect(ctx.definedServices).toEqual(["llm-events:vocabulary", "llm:complete"]);
     expect(ctx.provided["llm-events:vocabulary"]).toBe(VOCAB);
+    expect(ctx.provided["llm:complete"]).toBeUndefined();
     for (const name of Object.values(VOCAB)) {
-      expect(ctx.defined).toContain(name);
+      expect(ctx.definedEvents).toContain(name);
     }
   });
 });

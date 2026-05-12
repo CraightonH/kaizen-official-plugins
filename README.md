@@ -6,8 +6,8 @@ Official kaizen plugin marketplace. Hosts plugins and harnesses for [kaizen](htt
 
 ### Foundation
 
-- **llm-events** — event vocabulary and shared types for openai-compatible harnesses.
-- **openai-llm** — OpenAI-compatible LLM provider. Provides `llm:complete`. Configure at `~/.kaizen/plugins/openai-llm/config.json`; see the plugin's README for the schema.
+- **llm-events** — event vocabulary, shared LLM primitives, and the neutral `llm:complete` service definition for openai-compatible harnesses.
+- **openai-llm** — OpenAI-compatible LLM provider. Implements `llm:complete`. Configure at `~/.kaizen/plugins/openai-llm/config.json`; see the plugin's README for the schema.
 
 ### Tools
 

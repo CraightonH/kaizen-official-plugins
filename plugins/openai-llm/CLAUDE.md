@@ -6,15 +6,17 @@ from this plugin.
 
 ## Ownership
 
-- Implements `llm:complete`.
+- Provides `llm:complete`; `llm-events` defines the service slot.
+- Consumes `llm-events:vocabulary` to force foundation setup before provider
+  binding.
 - Uses `LLMCompleteService`, `LLMRequest`, `LLMStreamEvent`, and `ModelInfo` from
   `llm-events/public`.
 - OpenAI wire-protocol details belong here: request body mapping, SSE parsing,
   tool-call accumulation, retry, timeout, and model-list enrichment.
 
-The current runtime still calls `ctx.defineService("llm:complete", ...)` before
-`ctx.provideService(...)`. Treat that as a compatibility shim until the service
-definition moves to a neutral provider-contract owner.
+Do not call `ctx.defineService("llm:complete", ...)` here. That would move
+interface ownership back into this concrete provider and break alternate LLM
+providers that should slot into the same service.
 
 ## File Map
 

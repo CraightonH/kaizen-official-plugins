@@ -9,11 +9,11 @@ const plugin: KaizenPlugin = {
   name: "openai-llm",
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
-  services: { provides: ["llm:complete"] },
+  services: { provides: ["llm:complete"], consumes: ["llm-events:vocabulary"] },
 
   async setup(ctx) {
+    ctx.consumeService("llm-events:vocabulary");
     const config = await loadConfig(realDeps((m) => ctx.log(m)));
-    ctx.defineService("llm:complete", { description: "OpenAI-compatible chat completion provider." });
     ctx.provideService<LLMCompleteService>("llm:complete", makeService(config, { log: (m) => ctx.log(m) }, { fetch, version: VERSION }));
   },
 };
