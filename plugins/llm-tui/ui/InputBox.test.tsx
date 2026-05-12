@@ -149,7 +149,7 @@ describe("InputBox", () => {
     const ctx = setup();
     ctx.triggers.add("/");
     ctx.reg.service.register({ id: "a", trigger: "/", list: () => [] });
-    let submitted: string | null = null;
+    let submitted = "";
     const { stdin } = render(
       <InputBox store={ctx.store} registry={ctx.reg} triggers={ctx.triggers} theme={DEFAULT_THEME} onSubmit={(t) => { submitted = t; }} />,
     );

@@ -40,7 +40,7 @@ describe("loadTheme", () => {
   });
 
   it("malformed JSON: log a notice, fall back to defaults", async () => {
-    const log = mock(() => {});
+    const log = mock((_msg: string) => {});
     const t = await loadTheme(makeDeps({
       readFile: async () => "{not-json",
       log,

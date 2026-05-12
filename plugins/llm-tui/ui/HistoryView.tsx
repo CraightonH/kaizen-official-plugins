@@ -1,11 +1,18 @@
 import React, { useSyncExternalStore } from "react";
 import { Box, Text, useInput } from "ink";
-import type { TuiStore, TranscriptLine } from "../state/store.ts";
+import type { PlainTranscriptLine, ToolCallEntry, TuiStore, TranscriptLine } from "../state/store.ts";
 import type { TuiTheme } from "../theme/loader.ts";
 
 export interface HistoryViewProps {
   store: TuiStore;
   theme: TuiTheme;
+}
+
+type ThoughtsEntry = PlainTranscriptLine & { kind: "thoughts" };
+type HistoryEntry = ThoughtsEntry | ToolCallEntry;
+
+function isHistoryEntry(entry: TranscriptLine): entry is HistoryEntry {
+  return entry.kind === "thoughts" || entry.kind === "tool_call";
 }
 
 /**
@@ -30,9 +37,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ store, theme }) => {
     if (input === "c")                  { store.historySetAllExpanded(false); return; }
   });
 
-  const blocks = snap.transcript.filter(
-    (e: TranscriptLine) => e.kind === "thoughts" || e.kind === "tool_call",
-  );
+  const blocks = snap.transcript.filter(isHistoryEntry);
   const focusedId = blocks[snap.historyView.focusIdx]?.id ?? null;
   const expanded = snap.historyView.expanded;
 

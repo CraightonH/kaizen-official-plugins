@@ -11,7 +11,8 @@ index.tsx              Plugin lifecycle. Defines the four services, loads theme,
 fallback.ts            createFallbackChannel() → TuiChannelService for non-TTY environments
                        (writes to stdout/stderr, reads lines via readline). Pure; no React.
 public.d.ts            Exported types — TuiChannelService, TuiCompletionService,
-                       TuiStatusService, TuiThemeService, CompletionItem, CompletionSource.
+                       TuiStatusService, TuiThemeService, TuiToolRendererService,
+                       TuiToolRenderer, ToolCallStatus, CompletionItem, CompletionSource.
                        Canonical service contracts. Re-exports TuiTheme from theme/loader.
 state/store.ts         TuiStore class. Single source of truth: transcript, busy, input,
                        popup, status map, history, live thinking. Subscriber pattern; produces
@@ -118,8 +119,8 @@ cd plugins/llm-tui && bun test
 The Kaizen runtime prefers the bundled `dist/index.js` over source. After editing, copy and re-bundle into the install dir:
 
 ```bash
-cp -R plugins/llm-tui/. ~/.kaizen/marketplaces/official/plugins/llm-tui@0.1.0/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-tui@0.1.0 \
+cp -R plugins/llm-tui/. ~/.kaizen/marketplaces/official/plugins/llm-tui@0.2.0/
+(cd ~/.kaizen/marketplaces/official/plugins/llm-tui@0.2.0 \
   && bun build --target=bun --outfile=dist/index.js index.tsx)
 ```
 

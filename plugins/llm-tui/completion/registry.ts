@@ -24,7 +24,9 @@ export function makeCompletionRegistry(opts: RegistryOptions = {}): CompletionRe
   const service: TuiCompletionService = {
     register(source) {
       sources.set(source.id, source);
-      return () => { sources.delete(source.id); };
+      return () => {
+        if (sources.get(source.id) === source) sources.delete(source.id);
+      };
     },
   };
 
