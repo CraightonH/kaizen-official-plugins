@@ -23,3 +23,4 @@ export type {
   SlashRegistryEntry,
   RegistryEntry,
 } from "./contracts/slash-registry";
+export type { SkillsRegistryService, SkillManifest, SkillRescanResult } from "./contracts/skills-registry";

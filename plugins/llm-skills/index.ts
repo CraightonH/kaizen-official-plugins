@@ -1,5 +1,5 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { SkillsRegistryService } from "./public";
+import type { SkillsRegistryService } from "llm-contracts/public";
 import type { ToolsRegistryService } from "llm-tools-registry/public";
 import type { SystemPromptService } from "llm-contracts/public";
 import { homedir } from "node:os";
@@ -77,7 +77,6 @@ const plugin: KaizenPlugin = {
     // Initial scan.
     const initial = await registry.rescan();
 
-    ctx.defineService("skills:registry", { description: "Skill discovery + on-demand loading." });
     ctx.provideService<SkillsRegistryService>("skills:registry", registry);
 
     void ctx.emit("skill:available-changed", { count: initial.count });
