@@ -174,7 +174,7 @@ const plugin: KaizenPlugin = {
         log: ctx.log.bind(ctx),
         idGen: newTurnId,
         defaultSystemPrompt: state.systemPrompt || (ctx.config as DriverConfig)?.defaultSystemPrompt || DEFAULTS.defaultSystemPrompt,
-        promptSystem: safeUse<{ assemble(): Promise<string>; generation(): number }>("prompt:system"),
+        promptSystem: safeUse<{ assemble(): Promise<string>; generation(): number }>("prompt:registry"),
       };
       return depsCache;
     };

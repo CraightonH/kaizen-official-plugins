@@ -49,7 +49,7 @@ function makeCtx(opts: { tools?: any; driver?: any } = {}) {
       };
       if (name === "driver:run-conversation") return opts.driver;
       if (name === "sessions:store") return sessions;
-      if (name === "prompt:system") return {
+      if (name === "prompt:registry") return {
         register: () => ({ unregister: () => {}, bumpGeneration: () => {} }),
         assemble: async () => "",
         list: () => [],

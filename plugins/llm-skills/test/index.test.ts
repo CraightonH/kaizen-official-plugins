@@ -39,7 +39,7 @@ function makeCtx(opts: {
   const definedEvents: string[] = [];
   const services: Record<string, unknown> = {};
   if (opts.toolsRegistry) services["tools:registry"] = opts.toolsRegistry;
-  if (opts.promptSystem) services["prompt:system"] = opts.promptSystem;
+  if (opts.promptSystem) services["prompt:registry"] = opts.promptSystem;
 
   const ctx: any = {
     cwd: opts.cwd,
@@ -71,7 +71,7 @@ describe("plugin metadata", () => {
     expect(plugin.name).toBe("llm-skills");
     expect(plugin.permissions?.tier).toBe("unscoped");
     expect(plugin.services?.provides).toContain("skills:registry");
-    expect(plugin.services?.consumes).toContain("prompt:system");
+    expect(plugin.services?.consumes).toContain("prompt:registry");
   });
 });
 
@@ -153,13 +153,13 @@ describe("plugin setup — prompt:system section registration", () => {
     expect(rendered).toBe("");
   });
 
-  it("emits harness:error and skips section when prompt:system unavailable", async () => {
+  it("emits harness:error and skips section when prompt:registry unavailable", async () => {
     const { ctx, emitted } = makeCtx();
     await plugin.setup(ctx);
     const errors = emitted.filter(e => e.name === "harness:error");
     expect(errors.length).toBeGreaterThan(0);
     const msg = (errors[0].payload as any).message as string;
-    expect(msg).toContain("prompt:system");
+    expect(msg).toContain("prompt:registry");
   });
 
   it("calls bumpGeneration after initial scan", async () => {

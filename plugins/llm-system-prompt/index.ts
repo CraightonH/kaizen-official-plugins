@@ -4,7 +4,7 @@ import type { KaizenPlugin, PluginContext } from "kaizen/types";
 import { createRegistry, type SystemPromptServiceImpl } from "./registry.ts";
 import { resolveIdentity } from "./identity.ts";
 import { makePromptSlashHandlers } from "./slash.ts";
-import type { SystemPromptService } from "./public";
+import type { SystemPromptService } from "llm-contracts/public";
 import type { SlashRegistryService } from "llm-slash-commands/public";
 
 interface PromptEventVocabulary {
@@ -51,7 +51,7 @@ const plugin: KaizenPlugin = {
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
   services: {
-    provides: ["prompt:system"],
+    provides: ["prompt:registry"],
     consumes: ["events:vocabulary"],
   },
 
@@ -68,10 +68,7 @@ const plugin: KaizenPlugin = {
       },
     });
 
-    ctx.defineService("prompt:system", {
-      description: "Assembles the assistant's system prompt from registered sections.",
-    });
-    ctx.provideService<SystemPromptService>("prompt:system", registry);
+    ctx.provideService<SystemPromptService>("prompt:registry", registry);
 
     const identity = resolveIdentity({
       globalPath: resolveGlobalPath(runtime),

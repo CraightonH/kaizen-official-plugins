@@ -40,7 +40,7 @@ function makePromptSystem() {
 function makeCtx(promptSystemSvc?: any, env: Record<string, string | undefined> = {}) {
   const services: Record<string, unknown> = {};
   const handlers: Record<string, Function[]> = {};
-  if (promptSystemSvc) services["prompt:system"] = promptSystemSvc;
+  if (promptSystemSvc) services["prompt:registry"] = promptSystemSvc;
   return {
     log: mock(() => {}),
     defineService: mock(() => {}),
@@ -112,7 +112,7 @@ describe("llm-memory setup wiring", () => {
       const calls: any[] = (ctx.emit as any).mock.calls;
       const errorCall = calls.find(([evt]: [string]) => evt === "harness:error");
       expect(errorCall).toBeTruthy();
-      expect(errorCall[1].message).toMatch(/prompt:system/);
+      expect(errorCall[1].message).toMatch(/prompt:registry/);
       expect(errorCall[1].message).toMatch(/saved-memories section disabled/);
     } finally {
       if (orig !== undefined) process.env.HOME = orig;

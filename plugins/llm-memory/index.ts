@@ -1,5 +1,5 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { SystemPromptService, RegisteredSection } from "llm-system-prompt/public";
+import type { SystemPromptService, RegisteredSection } from "llm-contracts/public";
 import { loadConfig, realDeps } from "./config.ts";
 import { resolveDirs, ensureDir, sweepStaleTempFiles } from "./paths.ts";
 import { makeMemoryStore } from "./service.ts";
@@ -37,8 +37,8 @@ const plugin: KaizenPlugin = {
     await sweepStaleTempFiles(globalDir, config.staleTempMs);
     if (projectDir) await sweepStaleTempFiles(projectDir, config.staleTempMs);
 
-    // Resolve prompt:system before creating the store so onChange can bump generation.
-    const promptSystem = ctx.useService<SystemPromptService>("prompt:system");
+    // Resolve prompt:registry before creating the store so onChange can bump generation.
+    const promptSystem = ctx.useService<SystemPromptService>("prompt:registry");
 
     const store = makeMemoryStore({
       globalDir,
@@ -84,7 +84,7 @@ const plugin: KaizenPlugin = {
       // the degraded state.
       void ctx.emit("harness:error", {
         message:
-          "llm-memory: prompt:system service unavailable; saved-memories section disabled",
+          "llm-memory: prompt:registry service unavailable; saved-memories section disabled",
       });
     }
 

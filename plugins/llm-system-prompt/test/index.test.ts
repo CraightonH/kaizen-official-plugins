@@ -58,8 +58,8 @@ describe("llm-system-prompt plugin manifest", () => {
     expect(plugin.permissions?.tier).toBe("unscoped");
   });
 
-  it("provides prompt:system", () => {
-    expect(plugin.services?.provides).toContain("prompt:system");
+  it("provides prompt:registry", () => {
+    expect(plugin.services?.provides).toContain("prompt:registry");
   });
 
   it("requires the llm-events vocabulary and leaves slash commands optional", () => {
@@ -84,12 +84,11 @@ describe("public.d.ts type surface", () => {
 });
 
 describe("index.ts — plugin lifecycle", () => {
-  it("setup defines and provides prompt:system", async () => {
+  it("setup provides prompt:registry", async () => {
     const ctx = makeFakeCtx();
     await plugin.setup!(ctx as any);
     expect(ctx.consumed).toContain("events:vocabulary");
-    expect("prompt:system" in ctx.services).toBe(true);
-    expect("prompt:system" in ctx.provided).toBe(true);
+    expect("prompt:registry" in ctx.provided).toBe(true);
   });
 
   it("setup does not redefine prompt:rebuilt / prompt:reload (owned by llm-events VOCAB)", async () => {
@@ -102,7 +101,7 @@ describe("index.ts — plugin lifecycle", () => {
   it("setup registers identity section at priority 10", async () => {
     const ctx = makeFakeCtx();
     await plugin.setup!(ctx as any);
-    const svc = ctx.provided["prompt:system"] as any;
+    const svc = ctx.provided["prompt:registry"] as any;
     const sections = svc.list();
     expect(sections.find((s: any) => s.id === "identity")).toBeTruthy();
     expect(sections.find((s: any) => s.id === "identity")!.priority).toBe(10);
@@ -115,10 +114,10 @@ describe("index.ts — plugin lifecycle", () => {
     expect(names).toEqual(["prompt:disable", "prompt:enable", "prompt:reload", "prompt:show"]);
   });
 
-  it("setup still provides prompt:system when slash:registry is absent", async () => {
+  it("setup still provides prompt:registry when slash:registry is absent", async () => {
     const ctx = makeFakeCtx({ slash: false });
     await plugin.setup!(ctx as any);
-    expect("prompt:system" in ctx.provided).toBe(true);
+    expect("prompt:registry" in ctx.provided).toBe(true);
     expect(ctx.slashRegistrations).toEqual([]);
   });
 
@@ -130,7 +129,7 @@ describe("index.ts — plugin lifecycle", () => {
     const ctx = makeFakeCtx();
     ctx.env.KAIZEN_SYSTEM_PROMPT_GLOBAL = join(dir, "global", "system-prompt.md");
     await plugin.setup!(ctx as any);
-    const svc = ctx.provided["prompt:system"] as any;
+    const svc = ctx.provided["prompt:registry"] as any;
     const out = await svc.assemble();
     expect(out).toContain("GLOBAL-MARKER");
     rmSync(dir, { recursive: true, force: true });

@@ -31,7 +31,7 @@ function makeCtx(opts: { tools?: any; driver?: any; sessions?: any; promptSystem
       if (name === "tools:registry") return opts.tools;
       if (name === "driver:run-conversation") return opts.driver;
       if (name === "sessions:store") return opts.sessions ?? makeSessions();
-      if (name === "prompt:system") return opts.promptSystem;
+      if (name === "prompt:registry") return opts.promptSystem;
       return undefined;
     },
     secrets: { get: async () => undefined, refresh: async () => undefined },
