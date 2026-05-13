@@ -1,5 +1,5 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { AgentsRegistryService } from "./public";
+import type { AgentsRegistryService } from "llm-contracts/public";
 import type { ToolsRegistryService } from "llm-tools-registry/public";
 import type { DriverService } from "llm-driver/public";
 import type { SessionsStoreService } from "llm-contracts/public";
@@ -46,7 +46,6 @@ const plugin: KaizenPlugin = {
 
     let ready = false;
 
-    ctx.defineService("agents:registry", { description: "Agent manifest registry." });
     ctx.provideService<AgentsRegistryService>("agents:registry", handle.service);
 
     const tracker = makeTurnTracker();

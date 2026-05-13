@@ -25,3 +25,4 @@ export type {
 } from "./contracts/slash-registry";
 export type { SkillsRegistryService, SkillManifest, SkillRescanResult } from "./contracts/skills-registry";
 export type { MemoryStoreService, MemoryEntry, MemoryType, MemoryScope } from "./contracts/memory-store";
+export type { AgentsRegistryService, AgentManifest } from "./contracts/agents-registry";
