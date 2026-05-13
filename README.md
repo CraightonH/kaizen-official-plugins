@@ -2,6 +2,14 @@
 
 Official kaizen plugin marketplace. Hosts plugins and harnesses for [kaizen](https://github.com/CraightonH/kaizen) 0.3+.
 
+## Install the marketplace
+
+```sh
+kaizen marketplace add https://github.com/CraightonH/kaizen-official-plugins.git --id official
+```
+
+This registers the marketplace under the id `official`, which is the prefix used in every plugin / harness ref below (`official/<name>@<version>`).
+
 ## Plugins
 
 ### Foundation
@@ -50,14 +58,6 @@ Official kaizen plugin marketplace. Hosts plugins and harnesses for [kaizen](htt
 
 - Use **claude-wrapper** if you have a Claude Code login and want the existing Claude UX over `claude -p`.
 - Use **openai-compatible** for everything else: local LLMs (LM Studio, Ollama, vLLM) and any third-party OpenAI-compatible endpoint.
-
-## Install the marketplace
-
-```sh
-kaizen marketplace add https://github.com/CraightonH/kaizen-official-plugins.git --id official
-```
-
-This registers the marketplace under the id `official`, which is the prefix used in every plugin / harness ref below (`official/<name>@<version>`).
 
 ## Usage
 
