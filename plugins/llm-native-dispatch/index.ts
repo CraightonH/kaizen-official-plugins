@@ -8,7 +8,9 @@ const plugin: KaizenPlugin = {
   permissions: { tier: "trusted" },
   services: {
     provides: ["dispatch:strategy"],
-    consumes: ["tools:registry", "events:vocabulary"],
+    // No hard consume edges: dispatch:strategy receives tools:registry via
+    // the driver's deps injection (not via ctx), and events:vocabulary is not
+    // used directly by this plugin. Both were topo-sort hints only.
   },
 
   async setup(ctx) {

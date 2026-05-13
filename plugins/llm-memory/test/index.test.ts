@@ -12,8 +12,12 @@ describe("llm-memory metadata", () => {
   it("provides memory:store", () => {
     expect(plugin.services?.provides).toContain("memory:store");
   });
-  it("only hard-consumes events:vocabulary (other services degrade gracefully)", () => {
-    expect(plugin.services?.consumes).toEqual(["events:vocabulary"]);
+  it("has no hard consumes (all integrations degrade gracefully; events use hardcoded names)", () => {
+    // events:vocabulary removed from consumes: llm-memory never calls
+    // useService("events:vocabulary") and emits events with hardcoded names.
+    // All other services (prompt:registry, tools:registry, driver:run-conversation)
+    // are optional and degrade cleanly.
+    expect(plugin.services?.consumes).toBeUndefined();
   });
 });
 

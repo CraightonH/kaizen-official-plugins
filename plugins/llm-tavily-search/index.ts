@@ -15,6 +15,7 @@ const plugin: KaizenPlugin = {
   services: { consumes: ["tools:registry"] },
 
   async setup(ctx) {
+    ctx.consumeService("tools:registry");
     const registry = ctx.useService<ToolsRegistryService>("tools:registry");
     if (!registry) throw new Error("llm-tavily-search: tools:registry service not available");
 

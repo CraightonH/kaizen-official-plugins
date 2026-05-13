@@ -26,8 +26,9 @@ describe("llm-native-dispatch plugin", () => {
     expect(plugin.apiVersion).toBe("3.0.0");
     expect(plugin.permissions).toEqual({ tier: "trusted" });
     expect(plugin.services?.provides).toContain("dispatch:strategy");
-    expect(plugin.services?.consumes).toContain("tools:registry");
-    expect(plugin.services?.consumes).toContain("events:vocabulary");
+    // consumes array removed: dispatch:strategy uses tools:registry only via
+    // the driver's deps injection, not via ctx. No hard consume edges here.
+    expect(plugin.services?.consumes).toBeUndefined();
   });
 
   it("setup provides dispatch:strategy", async () => {

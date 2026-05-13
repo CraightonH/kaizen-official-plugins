@@ -25,7 +25,10 @@ describe("llm-tools-registry plugin", () => {
     expect(plugin.apiVersion).toBe("3.0.0");
     expect(plugin.permissions).toEqual({ tier: "unscoped" });
     expect(plugin.services?.provides).toContain("tools:registry");
-    expect(plugin.services?.consumes).toContain("events:vocabulary");
+    // events:vocabulary removed from consumes: this plugin never calls
+    // useService("events:vocabulary") — events use hardcoded names from
+    // llm-events/public. The old entry was a topo-sort hint only.
+    expect(plugin.services?.consumes).toBeUndefined();
   });
 
   it("setup provides tools:registry with the registry instance (defineService is in llm-contracts)", async () => {

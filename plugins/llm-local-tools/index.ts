@@ -11,9 +11,14 @@ const plugin: KaizenPlugin = {
   name: "llm-local-tools",
   apiVersion: "3.0.0",
   permissions: { tier: "trusted" },
-  services: { consumes: ["tools:registry", "events:vocabulary"] },
+  services: {
+    consumes: ["tools:registry"],
+    // events:vocabulary was listed as a topo-sort hint; this plugin never
+    // calls useService("events:vocabulary"), so it has been removed per AGENTS.md.
+  },
 
   async setup(ctx) {
+    ctx.consumeService("tools:registry");
     const registry = ctx.useService<ToolsRegistryService>("tools:registry");
     if (!registry) throw new Error("llm-local-tools: tools:registry service not available");
 

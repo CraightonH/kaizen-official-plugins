@@ -30,6 +30,7 @@ const plugin: KaizenPlugin = {
   },
 
   async setup(ctx) {
+    ctx.consumeService("events:vocabulary");
     const log = (m: string) => ctx.log(m);
     const config = await loadConfig(realDeps(log));
 

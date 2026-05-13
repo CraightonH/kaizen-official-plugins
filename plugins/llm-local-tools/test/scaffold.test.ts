@@ -21,6 +21,7 @@ function makeCtx(registry: any) {
   return {
     log: mock(() => {}),
     useService: mock((name: string) => name === "tools:registry" ? registry : undefined),
+    consumeService: mock(() => {}),
     defineEvent: mock(() => {}),
     on: mock(() => {}),
     emit: mock(async () => []),
@@ -58,6 +59,7 @@ describe("llm-local-tools plugin", () => {
     const ctx = {
       log: () => {},
       useService: () => undefined,
+      consumeService: () => {},
     } as any;
     await expect(plugin.setup!(ctx)).rejects.toThrow(/tools:registry/);
   });

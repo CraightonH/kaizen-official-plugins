@@ -53,9 +53,12 @@ const plugin: KaizenPlugin = {
     // if it's present), but it's listed here so kaizen's topo-sort orders
     // this plugin AFTER the registry's provider when one exists. Without
     // this edge, useService("tools:registry") may run before the registry
-    // is provided and silently miss load_skill registration. prompt:system
-    // is a hard requirement for the Available-skills section.
-    consumes: ["tools:registry", "prompt:registry"],
+    // is provided and silently miss load_skill registration. This is an
+    // acknowledged AGENTS.md edge case: the entry is a topo-sort hint, not
+    // a hard boot requirement (no consumeService call backs it up).
+    // prompt:registry is optional — the available-skills section is disabled
+    // when absent (harness:error emitted), but the plugin otherwise runs fine.
+    consumes: ["tools:registry"],
   },
 
   async setup(ctx) {

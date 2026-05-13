@@ -17,9 +17,10 @@ const plugin: KaizenPlugin = {
   permissions: { tier: "unscoped" },
   services: {
     provides: ["memory:store"],
-    // All consumed services are optional — the plugin degrades cleanly when any are
-    // absent. Hard `consumes` is reserved for required services per AGENTS.md.
-    consumes: ["events:vocabulary"],
+    // No hard consume edges: all integrations (prompt:registry, tools:registry,
+    // driver:run-conversation) are optional and degrade cleanly when absent.
+    // events:vocabulary is not used directly by this plugin (events are emitted
+    // with hardcoded names), so it is not listed here.
   },
 
   async setup(ctx) {

@@ -327,4 +327,60 @@ For each implementation plugin, create a throwaway stub plugin in a test fixture
 - `.kaizen/marketplace.json` contains an `llm-contracts` entry resolving to `plugins/llm-contracts`.
 - The substitutability acid test passes for every implementation plugin (verified in Phase 4).
 - `openai-compatible.json` lists `llm-contracts` first and boots cleanly.
+
+## 8. Hard-vs-Optional consumption table (Task 20 audit)
+
+Edges where current/target differ have been adjusted. This table reflects post-audit state.
+
+Rules applied per AGENTS.md §"Required vs Optional Dependencies":
+- **hard**: plugin cannot meaningfully run without the contract. Requires `ctx.consumeService(id)` in `setup()` AND `id` in `services.consumes`.
+- **optional**: plugin degrades gracefully when absent. Uses guarded `ctx.useService<T>(id)` at point-of-use. NOT in `services.consumes`. No `consumeService` call.
+- **topo-only**: appears in `services.consumes` solely for topo-sort ordering without a `consumeService` call — a pattern AGENTS.md discourages. These have been removed from `consumes` in this audit.
+
+| Plugin | Contract | Category | Reasoning |
+|---|---|---|---|
+| `llm-agents` | `events:vocabulary` | hard | **changed: promoted inconsistent→hard** — `services.consumes` declared it hard but `consumeService()` call was missing; added the call to match the declared intent. Agents emit events and require vocab to be defined before setup. |
+| `llm-agents` | `tools:registry` | optional | `useService` with guard + harness:error; no `consumeService`; not in `consumes`. Dispatch disabled when absent, plugin otherwise operational. |
+| `llm-agents` | `driver:run-conversation` | optional | Same guard pattern as `tools:registry`. Dispatch disabled when absent. |
+| `llm-agents` | `sessions:store` | optional | Same guard pattern. Dispatch disabled when absent. |
+| `llm-agents` | `prompt:registry` | optional | `useService` with guard; available-agents section disabled when absent. |
+| `llm-agents` | `skills:registry` | optional | `useService` inline in a closure; checked at call time for presence only. |
+| `llm-driver` | `events:vocabulary` | hard | Both `consumeService` and `services.consumes`. Driver cannot subscribe to events without vocabulary definition. |
+| `llm-driver` | `ui:channel` | hard | Both `consumeService` and `services.consumes`. Driver interactive loop requires a UI surface. |
+| `llm-driver` | `llm:complete` | hard | Both `consumeService` and `services.consumes`. Driver cannot make LLM calls without it. |
+| `llm-driver` | `sessions:store` | hard | Both `consumeService` and `services.consumes`. Driver cannot manage conversations without session persistence. |
+| `llm-driver` | `tools:registry` | optional | `safeUse<>()` only; not in `consumes`. Degrades to single-LLM-call (A-tier) without tools. |
+| `llm-driver` | `dispatch:strategy` | optional | `safeUse<>()` only; not in `consumes`. Degrades to single-LLM-call without strategy. |
+| `llm-driver` | `prompt:registry` | optional | `safeUse<>()` only; not in `consumes`. Uses `defaultSystemPrompt` config fallback when absent. |
+| `llm-system-prompt` | `events:vocabulary` | hard | Both `consumeService` and `services.consumes`. Uses vocab for event names (`prompt:rebuilt`, `prompt:reload`). |
+| `llm-system-prompt` | `slash:registry` | optional | `safeUseService()` guard; not in `consumes`. Slash commands (prompt:show etc.) disabled when absent. |
+| `llm-tui` | `events:vocabulary` | hard | Both `consumeService` and `services.consumes`. TUI needs vocabulary before subscribing to events. |
+| `llm-native-dispatch` | `tools:registry` | — (removed) | **changed: demoted topo-only→no-dep** — was in `services.consumes` as topo-sort hint only; plugin receives `tools:registry` via driver deps injection (not `ctx`). No `consumeService` or `useService` call. Removed from `consumes`. |
+| `llm-native-dispatch` | `events:vocabulary` | — (removed) | **changed: demoted topo-only→no-dep** — same as above; plugin never calls `useService("events:vocabulary")`. Removed from `consumes`. |
+| `llm-tavily-search` | `tools:registry` | hard | **changed: promoted inconsistent→hard** — `services.consumes` declared it but `consumeService()` was missing; plugin `throw`s on absence (cannot register `web_search`). Added `consumeService` call. |
+| `llm-memory` | `events:vocabulary` | — (removed) | **changed: demoted topo-only→no-dep** — was in `services.consumes` but plugin never calls `useService("events:vocabulary")`; emits with hardcoded names. Removed from `consumes`. |
+| `llm-memory` | `prompt:registry` | optional | `useService` with guard; saved-memories section disabled when absent (harness:error emitted). |
+| `llm-memory` | `tools:registry` | optional | `useService` with guard; `memory_recall`/`memory_save` tools not registered when absent. |
+| `llm-memory` | `driver:run-conversation` | optional | `useService` inline in `turn:end` handler; auto-extract silently skipped when absent. |
+| `llm-status-items` | `events:vocabulary` | hard | Both `consumeService` and `services.consumes`. Cannot subscribe to events by name without vocabulary. |
+| `llm-status-items` | `llm:complete` | hard | Both `consumeService` and `services.consumes`. Plugin's purpose is tracking LLM calls; cannot fulfill it without the provider. Lazy `useService` in `listOnce()` is defensive coding after a hard consume. |
+| `llm-status-items` | `slash:registry` | optional | Guarded `useService` at `harness:start`; not in `consumes`. `/status:show` not available when absent. |
+| `llm-status-items` | `tools:registry` | optional | Guarded `useService` at `harness:start`; not in `consumes`. `status:show` tool not available when absent. |
+| `openai-llm` | `events:vocabulary` | hard | Both `consumeService` and `services.consumes`. Provider forces vocab setup before it binds `llm:complete`. |
+| `llm-skills` | `tools:registry` | AMBIGUOUS — topo-only in `consumes`, no `consumeService` | Listed in `services.consumes` as topo-sort hint to ensure load ordering after the registry provider. AGENTS.md says not to use `consumes` for discovery-only edges, but removing it risks `useService("tools:registry")` running before the registry is provided. Left as-is pending a kaizen harness-level ordering API. |
+| `llm-skills` | `prompt:registry` | optional | **changed: demoted inconsistent→optional** — was in `services.consumes` without `consumeService`; plugin gracefully degrades (available-skills section disabled, harness:error emitted). Removed from `consumes`. |
+| `llm-tools-registry` | `events:vocabulary` | — (removed) | **changed: demoted topo-only→no-dep** — was in `services.consumes`; plugin never calls `useService("events:vocabulary")`; tool events use hardcoded sentinel names from `llm-events/public`. Removed from `consumes`. |
+| `llm-hooks-shell` | `events:vocabulary` | hard | Both `consumeService` and `services.consumes`. Requires vocabulary to validate hook event names at config load time. |
+| `llm-local-tools` | `tools:registry` | hard | **changed: promoted inconsistent→hard** — `services.consumes` declared it but `consumeService()` was missing; plugin `throw`s on absence. Added `consumeService` call. |
+| `llm-local-tools` | `events:vocabulary` | — (removed) | **changed: demoted topo-only→no-dep** — was in `services.consumes`; plugin never calls `useService("events:vocabulary")`. Removed from `consumes`. |
+| `llm-slash-commands` | `driver:run-conversation` | optional | Guarded `useService?.`; not in `consumes`. File commands degrade to no-op without driver. |
+| `llm-slash-commands` | `ui:completion-source` | optional | Guarded `useService` at `harness:start`; not in `consumes`. Tab-completion disabled when absent. |
+| `llm-session-manager` | `events:vocabulary` | hard | Both `consumeService` and `services.consumes`. Session manager subscribes to trace events by vocab name. |
+| `llm-session-manager` | `slash:registry` | optional | Guarded `useService` at `harness:start`; not in `consumes`. Session slash commands not registered when absent. |
+| `llm-session-manager` | `tools:registry` | optional | Guarded `useService` at `harness:start`; not in `consumes`. Session tool commands not registered when absent. |
+| `llm-mcp-bridge` | `tools:registry` | optional | **changed: demoted inconsistent→optional** — was in `services.consumes` without `consumeService`; plugin provides a no-op `mcp:bridge` service when absent (`/mcp:list` still works). Removed from `consumes`. |
+| `llm-mcp-bridge` | `events:vocabulary` | — (removed) | **changed: demoted topo-only→no-dep** — was in `services.consumes`; plugin never calls `useService("events:vocabulary")`. Removed from `consumes`. |
+| `llm-mcp-bridge` | `slash:registry` | optional | Guarded `useService`; not in `consumes`. `/mcp:*` commands not registered when absent. |
+| `llm-codemode` | `tools:registry` | hard | Both `consumeService` and `services.consumes`. Plugin's sole purpose is registering `execute_typescript` into the tools registry; cannot fulfill it without the registry. The `if (!toolsRegistry)` guard is defensive coding after the hard consume. |
+| `llm-codemode` | `ui:tool-renderer` | optional | Guarded `useService?.`; not in `consumes`. Inline TUI renderer not available without `llm-tui`; CLAUDE.md explicitly documents this as optional. |
 - AGENTS.md review checklist passes for each contract.

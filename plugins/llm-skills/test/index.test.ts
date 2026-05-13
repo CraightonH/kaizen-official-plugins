@@ -71,7 +71,11 @@ describe("plugin metadata", () => {
     expect(plugin.name).toBe("llm-skills");
     expect(plugin.permissions?.tier).toBe("unscoped");
     expect(plugin.services?.provides).toContain("skills:registry");
-    expect(plugin.services?.consumes).toContain("prompt:registry");
+    // prompt:registry is optional (degrades cleanly when absent), so it is no
+    // longer listed in services.consumes. tools:registry is the only consumes
+    // entry and is a topo-sort hint (no consumeService call backs it up).
+    expect(plugin.services?.consumes).toContain("tools:registry");
+    expect(plugin.services?.consumes).not.toContain("prompt:registry");
   });
 });
 
