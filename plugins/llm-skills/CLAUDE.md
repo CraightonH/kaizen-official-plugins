@@ -23,8 +23,10 @@ injection.ts      buildSkillsBlock(list). Pure string builder for the prompt:sys
 tool.ts           LOAD_SKILL_SCHEMA and makeLoadSkillHandler(registry, emit). Pure factory;
                   no state.
 tokens.ts         estimateTokens(body) → ceil(len / 4). One line; the heuristic.
-public.d.ts       Re-exports SkillManifest and SkillsRegistryService from llm-events/public.
-                  This plugin owns no public types of its own.
+public.d.ts       Owns SkillManifest, SkillRescanResult, SkillsRegistryService. These are
+                  feature-owned by this plugin (skills:registry is a feature service, not a
+                  llm-events foundation contract — see AGENTS.md). Other plugins should
+                  import from `llm-skills/public`.
 ```
 
 Boundaries:
@@ -41,7 +43,7 @@ Boundaries:
 - **Empty registry → no section.** `buildSkillsBlock` returns `""` for an empty list; the `prompt:system` registry's "empty sections are dropped" invariant ensures no `## Available skills` header appears.
 - **Skills contribute via `prompt:system`.** A section with id `"llm-skills:available"` and priority 160 is registered at setup. Its title is "Available skills". Generation is bumped after any rescan-changed event and after programmatic register/unregister calls.
 - **Tokens are cached at registration.** `manifest.tokens` is computed once (heuristic or frontmatter override) and never recomputed by `list()`. The `load_skill` handler recomputes only as a fallback when `list()` doesn't carry a token count for the loaded skill.
-- **`load_skill` is registered late and unregistered on stop.** The `services.consumes: ["tools:registry"]` declaration is what guarantees topological ordering — without it, `useService("tools:registry")` may run before the registry is ready.
+- **`load_skill` is registered late and unregistered on stop.** The `services.consumes: ["tools:registry"]` declaration is what guarantees topological ordering — without it, `useService("tools:registry")` may run before the registry is ready. The cleanup callback is held in a module-scope `let` and drained by `stop()`, which is idempotent.
 - **Rescan throttling is wall-clock based.** `lastScanAt` is captured by the `turn:start` closure. If `KAIZEN_LLM_SKILLS_RESCAN_MS` is invalid or non-positive, fall back to the 30 s default. Never treat 0 as "always rescan".
 
 ## Adding a programmatic skill from another plugin
@@ -89,8 +91,9 @@ When adding a new test that touches the disk, prefer creating a fixture director
 The Kaizen runtime prefers the bundled `dist/index.js` over source. After editing, the plugin must be re-bundled into the install dir:
 
 ```bash
-cp -R plugins/llm-skills/. ~/.kaizen/marketplaces/official/plugins/llm-skills@0.1.0/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-skills@0.1.0 \
+mkdir -p ~/.kaizen/marketplaces/official/plugins/llm-skills@0.1.2/
+cp -R plugins/llm-skills/. ~/.kaizen/marketplaces/official/plugins/llm-skills@0.1.2/
+(cd ~/.kaizen/marketplaces/official/plugins/llm-skills@0.1.2 \
   && bun build --target=bun --outfile=dist/index.js index.ts)
 ```
 

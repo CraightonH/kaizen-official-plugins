@@ -12,8 +12,8 @@ describe("llm-memory metadata", () => {
   it("provides memory:store", () => {
     expect(plugin.services?.provides).toContain("memory:store");
   });
-  it("consumes prompt:system", () => {
-    expect(plugin.services?.consumes).toContain("prompt:system");
+  it("only hard-consumes llm-events:vocabulary (other services degrade gracefully)", () => {
+    expect(plugin.services?.consumes).toEqual(["llm-events:vocabulary"]);
   });
 });
 

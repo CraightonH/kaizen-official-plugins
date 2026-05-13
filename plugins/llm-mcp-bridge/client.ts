@@ -5,10 +5,14 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { ResolvedServerConfig } from "./config.ts";
 
 // Lazy import zod from the SDK's own dependency to register notification handlers.
-// Wrapped in a function to avoid top-level errors if zod resolution fails at runtime.
+// The MCP SDK requires a Zod schema for setNotificationHandler. We resolve zod at
+// runtime (it ships with @modelcontextprotocol/sdk) rather than declaring a direct
+// dependency. Typed as `any` to avoid pulling zod types into this plugin.
 async function getZodLiteral(value: string): Promise<unknown | null> {
   try {
-    const { z } = await import("zod");
+    const mod: any = await import(/* @vite-ignore */ "zod" as string);
+    const z = mod.z ?? mod.default?.z ?? mod.default;
+    if (!z) return null;
     return z.object({ method: z.literal(value) }).passthrough();
   } catch {
     return null;

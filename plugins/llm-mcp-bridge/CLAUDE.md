@@ -102,8 +102,8 @@ KAIZEN_INTEGRATION=1 bun test plugins/llm-mcp-bridge/test/integration/
 The Kaizen runtime prefers the bundled `dist/index.js` over source. After editing, the plugin must be re-bundled into the install dir:
 
 ```bash
-cp -R plugins/llm-mcp-bridge/. ~/.kaizen/marketplaces/official/plugins/llm-mcp-bridge@0.1.0/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-mcp-bridge@0.1.0 \
+cp -R plugins/llm-mcp-bridge/. ~/.kaizen/marketplaces/official/plugins/llm-mcp-bridge@0.1.2/
+(cd ~/.kaizen/marketplaces/official/plugins/llm-mcp-bridge@0.1.2 \
   && bun build --target=bun --outfile=dist/index.js index.ts)
 ```
 

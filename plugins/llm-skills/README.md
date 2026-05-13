@@ -63,8 +63,8 @@ Handler returns `{ name, tokens, body }`. Errors (missing/empty `name`, unknown 
 
 ### Consumes
 
-- **Service** — `tools:registry` (optional, declared in `services.consumes` so topo-sort orders this plugin after the registry's provider when present). Without it, `load_skill` is not registered and the plugin logs a warning; the `prompt:system` section still appears but the LLM cannot pull bodies.
-- **Service** — `prompt:system`. Section id `llm-skills:available`, priority 160, title "Available skills". Registered at setup; generation bumped on rescan-changed and on programmatic register/unregister.
+- **Service** — `tools:registry` (declared in `services.consumes` so kaizen's topo-sort orders this plugin after the registry's provider when one exists). Functionally optional at runtime: if the service is absent, `load_skill` is not registered and the plugin logs a warning; the `prompt:system` section still appears but the LLM cannot pull bodies.
+- **Service** — `prompt:system` (required; declared in `services.consumes`). Section id `llm-skills:available`, priority 160, title "Available skills". Registered at setup; generation bumped on rescan-changed and on programmatic register/unregister. If absent, a `harness:error` is emitted and the section is skipped.
 - **Event** — `turn:start`. Drives throttled rescans.
 
 ### Events emitted

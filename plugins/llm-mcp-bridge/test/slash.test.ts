@@ -84,7 +84,7 @@ describe("registerSlashCommands", () => {
     registerSlashCommands(sr as any, bridge as any, async () => new Map(), () => {});
     const r = sr.registered.find((e) => e.manifest.name === "mcp:reconnect")!;
     const emitted: Array<{ name: string; payload: unknown }> = [];
-    await r.handler({ args: "", emit: async (n, p) => { emitted.push({ name: n, payload: p }); }, signal: new AbortController().signal });
+    await r.handler({ args: "", emit: async (n: string, p: unknown) => { emitted.push({ name: n, payload: p }); }, signal: new AbortController().signal });
     expect(String((emitted.at(-1)?.payload as any).content).toLowerCase()).toContain("usage");
   });
 

@@ -4,12 +4,14 @@ import { makeRegistry } from "../registry.ts";
 
 const FIXTURES = join(import.meta.dir, "fixtures");
 
-function deps(overrides: Partial<Parameters<typeof makeRegistry>[0]> = {}) {
+function deps(overrides: { projectRoot?: string; userRoot?: string } = {}) {
+  const warn = mock((_: string) => {});
+  const error = mock((_: string) => {});
   return {
     projectRoot: undefined as string | undefined,
     userRoot: undefined as string | undefined,
-    warn: mock((_: string) => {}),
-    error: mock((_: string) => {}),
+    warn,
+    error,
     ...overrides,
   };
 }

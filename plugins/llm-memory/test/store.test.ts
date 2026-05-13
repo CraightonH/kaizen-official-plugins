@@ -10,7 +10,7 @@ function tmp(): string {
   return mkdtempSync(join(tmpdir(), "llm-memory-store-"));
 }
 
-function deps(globalDir: string | null, projectDir: string | null) {
+function deps(globalDir: string, projectDir: string | null) {
   const calls: { dir: string }[] = [];
   return {
     deps: {

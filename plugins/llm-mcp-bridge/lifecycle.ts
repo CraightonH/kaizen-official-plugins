@@ -6,7 +6,6 @@ import type { ServerInfo, ServerStatus } from "./public.d.ts";
 import type { ToolRegistration } from "llm-tools-registry/public";
 
 export interface RegistryLike {
-  register(schema: { name: string; description: string; parameters: object; tags?: string[] }, handler: (args: unknown, ctx: any) => Promise<unknown>): () => void; // legacy, kept for transition
   registerWith(reg: ToolRegistration): () => void;
 }
 

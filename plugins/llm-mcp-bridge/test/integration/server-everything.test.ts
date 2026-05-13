@@ -7,8 +7,12 @@ const RUN = process.env.KAIZEN_INTEGRATION === "1";
 const maybe = RUN ? describe : describe.skip;
 
 class FakeRegistry {
-  registered = new Map<string, { schema: any; handler: any }>();
+  registered = new Map<string, { schema: any; handler: any; source?: any }>();
   register(s: any, h: any) { this.registered.set(s.name, { schema: s, handler: h }); return () => this.registered.delete(s.name); }
+  registerWith(reg: any) {
+    this.registered.set(reg.schema.name, { schema: reg.schema, handler: reg.handler, source: reg.source });
+    return () => this.registered.delete(reg.schema.name);
+  }
 }
 
 function tick(ms: number) { return new Promise((r) => setTimeout(r, ms)); }

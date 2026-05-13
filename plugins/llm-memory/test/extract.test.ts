@@ -41,7 +41,7 @@ describe("maybeExtract", () => {
     const d = baseDeps();
     await maybeExtract({ reason: "complete", lastUserMessage: "From now on always lower-case my variables.", turnId: "t1", sessionId: "s1" }, d as any);
     expect(d.runConversation).toHaveBeenCalledTimes(1);
-    const arg = (d.runConversation.mock.calls[0]![0]) as any;
+    const arg = ((d.runConversation.mock.calls as any[])[0][0]) as any;
     expect(arg.toolFilter).toEqual({ names: ["memory_save"] });
     expect(arg.parentTurnId).toBe("t1");
     expect(arg.sessionId).toBe("s1");

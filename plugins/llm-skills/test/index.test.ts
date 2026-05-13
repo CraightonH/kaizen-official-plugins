@@ -202,24 +202,6 @@ describe("plugin setup — load_skill registered into tools:registry", () => {
     expect(registered[0].source).toEqual({ kind: "skill" });
   });
 
-  it("falls back to register() when registerWith is absent", async () => {
-    const registered: any[] = [];
-    const toolsRegistry = {
-      register: (schema: any, handler: any) => { registered.push({ schema, handler }); return () => {}; },
-      list: () => registered.map(r => r.schema),
-      invoke: async () => undefined,
-    };
-    const ps = makePromptSystem();
-    const { ctx } = makeCtx({
-      env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
-      toolsRegistry,
-      promptSystem: ps.service,
-    });
-    await plugin.setup(ctx);
-    expect(registered.length).toBe(1);
-    expect(registered[0].schema.name).toBe("load_skill");
-  });
-
   it("boots without error when tools:registry is absent", async () => {
     const ps = makePromptSystem();
     const { ctx, provided } = makeCtx({ promptSystem: ps.service });
@@ -287,5 +269,45 @@ describe("plugin setup — onChange bumpGeneration on programmatic register", ()
     const callsAfterRegister = ps.bumpGeneration.mock.calls.length;
     unregister();
     expect(ps.bumpGeneration.mock.calls.length).toBeGreaterThan(callsAfterRegister);
+  });
+});
+
+describe("plugin stop() — lifecycle cleanup", () => {
+  it("unregisters the load_skill tool and the prompt:system section", async () => {
+    let toolUnregistered = 0;
+    const toolsRegistry = {
+      registerWith: (_reg: any) => () => { toolUnregistered++; },
+      list: () => [],
+      invoke: async () => undefined,
+    };
+    const ps = makePromptSystem();
+    const { ctx } = makeCtx({
+      env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
+      toolsRegistry,
+      promptSystem: ps.service,
+    });
+    await plugin.setup(ctx);
+    await plugin.stop!({} as any);
+    expect(toolUnregistered).toBe(1);
+    expect(ps.unregister).toHaveBeenCalled();
+  });
+
+  it("is idempotent — calling stop() twice does not double-unregister", async () => {
+    let toolUnregistered = 0;
+    const toolsRegistry = {
+      registerWith: (_reg: any) => () => { toolUnregistered++; },
+      list: () => [],
+      invoke: async () => undefined,
+    };
+    const ps = makePromptSystem();
+    const { ctx } = makeCtx({
+      env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
+      toolsRegistry,
+      promptSystem: ps.service,
+    });
+    await plugin.setup(ctx);
+    await plugin.stop!({} as any);
+    await plugin.stop!({} as any);
+    expect(toolUnregistered).toBe(1);
   });
 });

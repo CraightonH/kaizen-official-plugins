@@ -1,6 +1,6 @@
 {
   "name": "llm-skills",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Skills registry + default file-loader for ~/.kaizen/skills/ and <project>/.kaizen/skills/",
   "type": "module",
   "exports": {
@@ -11,6 +11,8 @@
     "kaizen-plugin"
   ],
   "dependencies": {
+    "llm-events": "workspace:*",
+    "llm-system-prompt": "workspace:*",
     "llm-tools-registry": "workspace:*"
   },
   "devDependencies": {

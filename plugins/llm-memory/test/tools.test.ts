@@ -97,6 +97,30 @@ describe("registerTools", () => {
     expect(out.ok).toBe(false);
     expect(out.error).toMatch(/already exists/i);
   });
+  it("memory_save returns structured error when name fails validation (no throw)", async () => {
+    const { svc } = fakeStore();
+    // Real store path: route through makeStore so we hit validateName.
+    const { makeStore } = await import("../store.ts");
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join: pjoin } = await import("node:path");
+    const dir = mkdtempSync(pjoin(tmpdir(), "llm-memory-save-err-"));
+    const store = makeStore({
+      globalDir: dir, projectDir: null,
+      regenerateIndex: async () => {}, log: () => {},
+    });
+    const { registry, registered } = fakeRegistry();
+    registerTools(registry as any, store, { log: () => {}, denyTypes: [] });
+    const save = registered.find((r) => r.schema.name === "memory_save")!.handler;
+    // Upper-case names fail the [a-z0-9_-]{1,64} validator. The handler must
+    // surface that as a structured tool result, not a thrown Error.
+    const out = await save({ name: "BAD NAME", description: "d", content: "B", type: "user" }, ctx);
+    expect(out.ok).toBe(false);
+    expect(typeof out.error).toBe("string");
+    expect(out.error).toMatch(/invalid name/i);
+    // svc unused — quiet TS:
+    void svc;
+  });
   it("memory_save with `!` suffix overwrites and strips the suffix", async () => {
     const { svc, calls } = fakeStore();
     await svc.put({ name: "x", description: "d", type: "user", scope: "global", body: "old" });

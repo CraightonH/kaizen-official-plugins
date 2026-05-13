@@ -1,13 +1,14 @@
 import type { KaizenPlugin } from "kaizen/types";
 import type { McpBridgeService, ServerInfo } from "./public.d.ts";
 import type { ToolsRegistryService } from "llm-tools-registry/public";
-import { loadConfig, realDeps, type ResolvedServerConfig } from "./config.ts";
+import pkg from "./package.json" with { type: "json" };
+import { loadConfig, realDeps } from "./config.ts";
 import { createClient } from "./client.ts";
 import { makeBridgeService } from "./service.ts";
 import { registerSlashCommands, type SlashRegistryLike } from "./slash.ts";
 import { registerToolPeers } from "./tools-peers.ts";
 
-const VERSION = "0.1.0";
+const VERSION = pkg.version;
 
 const plugin: KaizenPlugin = {
   name: "llm-mcp-bridge",
@@ -39,11 +40,10 @@ const plugin: KaizenPlugin = {
 
     const svc = makeBridgeService({
       registry: {
-        register: (s, h) => registry.register(s as any, h as any),
         registerWith: (reg) => registry.registerWith(reg),
       },
       log,
-      emit: (e, p) => ctx.emit(e, p),
+      emit: (e, p) => { void ctx.emit(e, p); },
       createClient: (cfg) => createClient(cfg, { log, version: VERSION }),
       initialServers: initial.servers,
     });

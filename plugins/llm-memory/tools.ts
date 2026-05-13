@@ -1,10 +1,11 @@
 import type { MemoryEntry, MemoryScope, MemoryStoreService, MemoryType } from "./public.d.ts";
-import type { ToolRegistration } from "llm-tools-registry/public";
+import type { ToolRegistration, ToolSchema } from "llm-tools-registry/public";
 
-// Match the Spec 0 ToolsRegistryService surface without importing it (avoid build-time coupling).
+// Match the ToolsRegistryService surface without importing the full service interface
+// (avoid build-time coupling to llm-tools-registry's optional ctx surface).
 export interface ToolsRegistryLike {
   register(
-    schema: { name: string; description: string; parameters: Record<string, unknown>; tags?: string[] },
+    schema: ToolSchema,
     handler: (args: any, ctx: { signal: AbortSignal; callId: string; turnId?: string; log: (m: string) => void }) => Promise<unknown>,
   ): () => void;
   registerWith?(registration: ToolRegistration): () => void;
@@ -74,15 +75,25 @@ export function registerTools(
           `memory "${name}" already exists. Choose a new name, or pass "${name}!" to overwrite intentionally.`,
       };
     }
-    await store.put({ name, description, type, scope, body: content });
+    try {
+      await store.put({ name, description, type, scope, body: content });
+    } catch (err) {
+      // Translate store-layer validation/write failures into a structured
+      // tool result so the LLM sees a recoverable message rather than the
+      // registry surfacing a raw thrown Error.
+      return { ok: false, error: `memory_save failed: ${(err as Error).message}` };
+    }
     return { ok: true, path: `${scope}:${name}` };
   };
 
-  const recallSchema = {
+  const recallSchema: ToolSchema = {
     name: "memory_recall",
-    description: "Load the full body of one or more saved memories from llm-memory.",
+    description:
+      "Load the full body of one or more saved memories from llm-memory. " +
+      "Pass `names` to exact-load known entries, or `query` to fuzzy-match name/description (up to 5).",
     parameters: {
       type: "object",
+      additionalProperties: false,
       properties: {
         query: { type: "string" },
         names: { type: "array", items: { type: "string" } },
@@ -92,11 +103,12 @@ export function registerTools(
     tags: ["memory", "read"],
   };
 
-  const saveSchema = {
+  const saveSchema: ToolSchema = {
     name: "memory_save",
     description: "Persist a new memory for future turns. Refuses overwrite unless name ends with `!`.",
     parameters: {
       type: "object",
+      additionalProperties: false,
       required: ["name", "description", "content", "type"],
       properties: {
         name: { type: "string" },

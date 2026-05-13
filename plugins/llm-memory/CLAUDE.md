@@ -6,9 +6,11 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 
 ```
 index.ts        Plugin lifecycle: loads config, resolves dirs, ensures global dir + sweeps stale temps,
-                wires `memory:store`, subscribes to `llm:before-call` for injection, registers tools
-                into `tools:registry` (optional), and (if autoExtract) subscribes to `turn:end`.
-                The only file that touches `ctx`.
+                wires `memory:store`, registers a `prompt:system` section that injects the memory block
+                (id `llm-memory:auto`, priority 170), registers `memory_recall`/`memory_save` into
+                `tools:registry` (optional), and (if autoExtract) subscribes to `turn:end`.
+                The only file that touches `ctx`. Module-scope handles (`sectionHandle`, `toolsUnregister`)
+                let `stop()` clean up idempotently on reload.
 config.ts       loadConfig({ home, env, readFile, log }) → MemoryConfig. Reads
                 `~/.kaizen/plugins/llm-memory/config.json` (or KAIZEN_LLM_MEMORY_CONFIG override).
                 Pure logic; defaults frozen as DEFAULT_CONFIG. Validates injectionByteCap, staleTempMs,
@@ -103,8 +105,8 @@ When adding a new disk-touching test, always use `mkdtemp` under `os.tmpdir()` a
 The Kaizen runtime prefers the bundled `dist/index.js` over source. After editing, the plugin must be re-bundled into the install dir:
 
 ```bash
-cp -R plugins/llm-memory/. ~/.kaizen/marketplaces/official/plugins/llm-memory@0.1.0/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-memory@0.1.0 \
+cp -R plugins/llm-memory/. ~/.kaizen/marketplaces/official/plugins/llm-memory@0.1.2/
+(cd ~/.kaizen/marketplaces/official/plugins/llm-memory@0.1.2 \
   && bun build --target=bun --outfile=dist/index.js index.ts)
 ```
 

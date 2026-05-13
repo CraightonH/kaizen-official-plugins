@@ -63,9 +63,15 @@ Semantics:
 
 | Tool name | Source | Notes |
 |---|---|---|
-| `mcp:<server>:<toolname>` | each MCP tool from each connected server | tags `["mcp", "mcp:<server>"]` |
-| `read_mcp_resource` | bridge | `{ server: string, uri: string }` |
-| `list_mcp_resources` | bridge | `{ server?: string }` |
+| `mcp:<server>:<toolname>` | each MCP tool from each connected server | `source: { kind: "mcp", server: <name> }`; tags `["mcp", "mcp:<server>"]` |
+| `read_mcp_resource` | bridge | `source: { kind: "local" }`; `{ server: string, uri: string }` |
+| `list_mcp_resources` | bridge | `source: { kind: "local" }`; `{ server?: string }` |
+| `mcp:list` | bridge | LLM-callable peer of `/mcp:list`; returns `ServerInfo[]` |
+| `mcp:reload` | bridge | LLM-callable peer of `/mcp:reload`; returns the diff |
+| `mcp:reconnect` | bridge | LLM-callable peer of `/mcp:reconnect`; `{ server: string }` |
+| `mcp:disable` | bridge | LLM-callable peer of `/mcp:disable`; `{ server: string }` |
+
+The bridge declares `source.kind = "mcp"` (with `server: string`) only for tools brokered from a real MCP server. The control tools above register as `{ kind: "local" }` because they are implemented by the bridge itself, not brokered. This honors the open `ToolSource` shape owned by `llm-tools-registry` (see `docs/polish/llm-tools-registry-contract-change.md`).
 
 **Slash commands** registered into `slash:registry` (when present), all with `source: "plugin"` (Spec 8 namespacing required):
 

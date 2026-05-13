@@ -12,7 +12,7 @@ const DEFAULT_RESCAN_MS = 30000;
 
 function readEnv(ctx: any, key: string): string | undefined {
   // Prefer ctx.env if the harness exposes it; fall back to process.env.
-  const fromCtx = ctx.env && typeof ctx.env === "object" ? (ctx.env as any)[key] : undefined;
+  const fromCtx = ctx.env && typeof ctx.env === "object" ? (ctx.env as Record<string, string | undefined>)[key] : undefined;
   if (typeof fromCtx === "string" && fromCtx.length > 0) return fromCtx;
   const fromProc = process.env[key];
   return fromProc && fromProc.length > 0 ? fromProc : undefined;
@@ -39,17 +39,22 @@ function rescanIntervalMs(ctx: any): number {
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_RESCAN_MS;
 }
 
+// Module-scope cleanup handles. setup() populates these; stop() drains them.
+let unregisterTool: (() => void) | undefined;
+let sectionHandle: { bumpGeneration(): void; unregister(): void } | undefined;
+
 const plugin: KaizenPlugin = {
   name: "llm-skills",
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
   services: {
     provides: ["skills:registry"],
-    // tools:registry is optional (A-tier harnesses may omit it), but if a
-    // provider IS in the harness we want to initialize after it so
-    // load_skill can register. Without this edge, kaizen's topo-sort has
-    // no reason to order us after llm-tools-registry and useService
-    // fails even though the registry is configured.
+    // tools:registry is functionally optional (load_skill is only registered
+    // if it's present), but it's listed here so kaizen's topo-sort orders
+    // this plugin AFTER the registry's provider when one exists. Without
+    // this edge, useService("tools:registry") may run before the registry
+    // is provided and silently miss load_skill registration. prompt:system
+    // is a hard requirement for the Available-skills section.
     consumes: ["tools:registry", "prompt:system"],
   },
 
@@ -60,7 +65,6 @@ const plugin: KaizenPlugin = {
 
     // Resolve prompt:system early so onChange can call bumpGeneration.
     const promptSystem = ctx.useService<SystemPromptService>("prompt:system");
-    let sectionHandle: { bumpGeneration(): void; unregister(): void } | undefined;
 
     const registry: SkillsRegistryServiceImpl = makeRegistry({
       projectRoot,
@@ -106,33 +110,21 @@ const plugin: KaizenPlugin = {
     });
 
     // Register load_skill into tools:registry if available.
-    let tools: ToolsRegistryService | undefined;
-    try {
-      tools = ctx.useService("tools:registry");
-    } catch {
-      tools = undefined;
-    }
-    let unregisterTool: (() => void) | undefined;
-    if (tools && typeof tools.registerWith === "function") {
-      const handler = makeLoadSkillHandler(registry, (event, payload) => ctx.emit(event, payload));
+    // useService returns undefined when the service is absent — no try/catch needed.
+    const tools = ctx.useService<ToolsRegistryService>("tools:registry");
+    if (tools) {
+      const handler = makeLoadSkillHandler(registry, async (event, payload) => { await ctx.emit(event, payload); });
       unregisterTool = tools.registerWith({ schema: LOAD_SKILL_SCHEMA, handler, source: { kind: "skill" } });
-    } else if (tools && typeof (tools as any).register === "function") {
-      const handler = makeLoadSkillHandler(registry, (event, payload) => ctx.emit(event, payload));
-      unregisterTool = (tools as any).register(LOAD_SKILL_SCHEMA, handler);
     } else {
       ctx.log("[llm-skills] tools:registry not available; load_skill not registered");
     }
-
-    // Optional teardown if the harness calls stop().
-    (plugin as any)._stop = () => {
-      unregisterTool?.();
-      sectionHandle?.unregister();
-    };
   },
 
   async stop() {
-    const fn = (plugin as any)._stop;
-    if (typeof fn === "function") fn();
+    try { unregisterTool?.(); } catch { /* idempotent */ }
+    try { sectionHandle?.unregister(); } catch { /* idempotent */ }
+    unregisterTool = undefined;
+    sectionHandle = undefined;
   },
 };
 

@@ -1,12 +1,15 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { SystemPromptService } from "llm-system-prompt/public";
+import type { SystemPromptService, RegisteredSection } from "llm-system-prompt/public";
 import { loadConfig, realDeps } from "./config.ts";
 import { resolveDirs, ensureDir, sweepStaleTempFiles } from "./paths.ts";
 import { makeMemoryStore } from "./service.ts";
 import { buildMemoryBlock } from "./injection.ts";
-import { registerTools } from "./tools.ts";
-import { maybeExtract } from "./extract.ts";
+import { registerTools, type ToolsRegistryLike } from "./tools.ts";
+import { maybeExtract, type RunConversationFn } from "./extract.ts";
 import type { MemoryStoreService } from "./public.d.ts";
+
+let sectionHandle: RegisteredSection | undefined;
+let toolsUnregister: (() => void) | undefined;
 
 const plugin: KaizenPlugin = {
   name: "llm-memory",
@@ -14,7 +17,9 @@ const plugin: KaizenPlugin = {
   permissions: { tier: "unscoped" },
   services: {
     provides: ["memory:store"],
-    consumes: ["llm-events:vocabulary", "tools:registry", "driver:run-conversation", "prompt:system"],
+    // All consumed services are optional — the plugin degrades cleanly when any are
+    // absent. Hard `consumes` is reserved for required services per AGENTS.md.
+    consumes: ["llm-events:vocabulary"],
   },
 
   async setup(ctx) {
@@ -27,16 +32,13 @@ const plugin: KaizenPlugin = {
     });
 
     await ensureDir(globalDir);
-    if (projectDir) {
-      // Project directory is created lazily on first put when the user opts in.
-      // Sweep stale temp files only if it already exists.
-    }
+    // Project directory is created lazily on first put when the user opts in;
+    // we only need to sweep stale temps if it already exists.
     await sweepStaleTempFiles(globalDir, config.staleTempMs);
     if (projectDir) await sweepStaleTempFiles(projectDir, config.staleTempMs);
 
     // Resolve prompt:system before creating the store so onChange can bump generation.
     const promptSystem = ctx.useService<SystemPromptService>("prompt:system");
-    let sectionHandle: { bumpGeneration(): void; unregister(): void } | undefined;
 
     const store = makeMemoryStore({
       globalDir,
@@ -47,12 +49,12 @@ const plugin: KaizenPlugin = {
     ctx.defineService("memory:store", { description: "File-backed persistent memory store." });
     ctx.provideService<MemoryStoreService>("memory:store", store);
 
-    // Register prompt:system section for saved memories.
-    // Approach A: no title field — the existing buildMemoryBlock returns a self-contained block
-    // with its own <system-reminder> wrapper and "# Persistent memory" heading. Adding a section
-    // title would produce redundant double headers ("## Saved memories\n# Persistent memory").
-    // We omit the title and pass the block verbatim; "" replaces null for an empty result so the
-    // registry drops this section cleanly when there is nothing to inject.
+    // Register a prompt:system section for saved memories.
+    //
+    // Approach A: no `title` field — `buildMemoryBlock` returns a self-contained block
+    // with its own `<system-reminder>` wrapper and `# Persistent memory` heading. Adding
+    // a section title would produce redundant double headers. The render contract returns
+    // `""` (not `null`) on empty so the registry drops the section cleanly for that call.
     if (promptSystem) {
       sectionHandle = promptSystem.register({
         id: "llm-memory:auto",
@@ -77,28 +79,43 @@ const plugin: KaizenPlugin = {
         },
       });
     } else {
-      void ctx.emit("harness:error", { message: "llm-memory: missing required service(s): prompt:system; saved-memories section disabled" });
+      // prompt:system is an optional consume; without it the saved-memories section
+      // simply cannot be injected. Emit a visible warning so harness operators notice
+      // the degraded state.
+      void ctx.emit("harness:error", {
+        message:
+          "llm-memory: prompt:system service unavailable; saved-memories section disabled",
+      });
     }
 
-    // Tools registration (best-effort; the tools registry may not exist in A-tier harnesses).
-    const registry = ctx.useService<any>("tools:registry");
+    // Tools registration (best-effort; tools:registry may not exist in A-tier harnesses).
+    const registry = ctx.useService<ToolsRegistryLike>("tools:registry");
     if (registry) {
-      registerTools(registry, store, { log, denyTypes: config.denyTypes });
+      const handle = registerTools(registry, store, { log, denyTypes: config.denyTypes });
+      toolsUnregister = handle.unregister;
     } else {
       log("llm-memory: tools:registry not available; memory_recall/memory_save not registered");
     }
 
     // Auto-extraction (off by default).
     if (config.autoExtract) {
-      ctx.on("turn:end", async (payload: { reason: string; lastUserMessage?: string; turnId?: string; sessionId?: string }) => {
-        if (!payload.lastUserMessage || !payload.turnId) return;
-        const driver = ctx.useService<{ runConversation: any }>("driver:run-conversation");
+      ctx.on("turn:end", async (payload: unknown) => {
+        const p = (payload ?? {}) as { reason?: string; lastUserMessage?: string; turnId?: string; sessionId?: string };
+        if (!p.reason || !p.lastUserMessage || !p.turnId) return;
+        const driver = ctx.useService<{ runConversation: RunConversationFn }>("driver:run-conversation");
         await maybeExtract(
-          { reason: payload.reason, lastUserMessage: payload.lastUserMessage, turnId: payload.turnId, sessionId: payload.sessionId },
+          { reason: p.reason, lastUserMessage: p.lastUserMessage, turnId: p.turnId, sessionId: p.sessionId },
           { config, runConversation: driver?.runConversation ?? null, log },
         );
       });
     }
+  },
+
+  async stop() {
+    try { toolsUnregister?.(); } catch { /* idempotent */ }
+    try { sectionHandle?.unregister(); } catch { /* idempotent */ }
+    toolsUnregister = undefined;
+    sectionHandle = undefined;
   },
 };
 
