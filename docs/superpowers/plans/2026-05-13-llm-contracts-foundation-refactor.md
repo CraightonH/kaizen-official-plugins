@@ -26,23 +26,27 @@ Every Phase 2 task instantiates this procedure with specific values. Read this o
 - `IMPL_PLUGIN` — directory under `plugins/` that owns the provider
 - `CONSUMERS` — list of plugin directories that consume the contract
 
+**Important: where plugin metadata lives.** Kaizen plugins have **no `plugin.json` file**. Plugin-level metadata is declared on the `KaizenPlugin` object literal exported as `default` from `index.ts` (or `index.tsx` for plugins with JSX). The fields are `name`, `apiVersion`, `permissions`, `services.provides`, and `services.consumes`. Wherever this plan says "update `services.provides`" or "update `services.consumes`", it means edit those fields on the `KaizenPlugin` object literal in the plugin's `index.ts` / `index.tsx`. The plugin's `package.json` is for npm/bun package metadata (name, version, exports, dependencies) only.
+
 **Procedure steps:**
 
 1. **Create the contracts module.** Write `plugins/llm-contracts/contracts/<CONTRACT_MODULE>` containing the relocated type declarations (copied verbatim from `<TYPE_SOURCE>`, with all imports adjusted to point inside `llm-contracts` or to upstream packages — never back to the implementation plugin).
 2. **Re-export from public.** Add `export type { <TYPE_NAMES> } from "./contracts/<bare-module-name>";` to `plugins/llm-contracts/public.d.ts`.
 3. **Register the contract.** In `plugins/llm-contracts/index.ts`, inside the plugin's `setup(ctx)`, add `ctx.defineService("<NEW_ID>", { description: "<DESCRIPTION>" });`.
 4. **Update the implementation plugin.**
-   - In `plugins/<IMPL_PLUGIN>/index.ts`: delete the `ctx.defineService("<OLD_ID>", ...)` line.
+   - In `plugins/<IMPL_PLUGIN>/index.ts` (or `index.tsx`): delete the `ctx.defineService("<OLD_ID>", ...)` line.
    - Change `ctx.provideService<X>("<OLD_ID>", impl)` → `ctx.provideService<X>("<NEW_ID>", impl)`.
    - Change the import of `<TYPE_NAMES>` from its current source to `import type { <TYPE_NAMES> } from "llm-contracts/public";`.
-   - Update `services.provides` array: replace `"<OLD_ID>"` with `"<NEW_ID>"`.
+   - In the same file, update the `KaizenPlugin` descriptor's `services.provides` array: replace `"<OLD_ID>"` with `"<NEW_ID>"`.
    - If the implementation plugin's `public.d.ts` re-exports the contract types, delete those re-exports (the canonical source is `llm-contracts/public` now). Update any internal imports in the plugin's own modules accordingly.
    - In `package.json`, add `"llm-contracts": "workspace:*"` to `dependencies` if not already present.
+   - **Preserve the plugin's non-contract public surface.** See "Reference: Non-contract public surface" below for the per-plugin list of types/values that must stay in the implementation plugin and not be moved to `llm-contracts`.
 5. **Update consumers.** For each plugin in `<CONSUMERS>`:
    - Change `ctx.consumeService("<OLD_ID>")` → `ctx.consumeService("<NEW_ID>")`.
    - Change every `ctx.useService<X>("<OLD_ID>")` → `ctx.useService<X>("<NEW_ID>")`.
+   - **Preserve deferred lookups.** If a consumer calls `useService` inside an `ctx.on("harness:start", ...)` callback (defer pattern used by `llm-tools-registry`, `llm-session-manager`, `llm-mcp-bridge` and others to side-step setup-order ambiguity), keep the lookup deferred — only the contract ID string changes. Do not promote the call out of the callback.
    - Change type imports for `<TYPE_NAMES>` to `import type { <TYPE_NAMES> } from "llm-contracts/public";`.
-   - Update `services.consumes` array entries: replace `"<OLD_ID>"` with `"<NEW_ID>"`.
+   - In the consumer's `index.ts`, update the `KaizenPlugin` descriptor's `services.consumes` array: replace `"<OLD_ID>"` with `"<NEW_ID>"`.
    - In `package.json`, add `"llm-contracts": "workspace:*"` to `dependencies` if not already present.
 6. **Build affected plugins.** From repo root: `bun install`, then `bun --filter '<IMPL_PLUGIN>' run typecheck` and the same for each consumer (use `bun run typecheck` directly inside each plugin dir if no workspace filter exists — see "Per-plugin build" below).
 7. **Run tests for affected plugins.** `cd plugins/<IMPL_PLUGIN> && bun test`; same for each consumer.
@@ -89,6 +93,27 @@ After completing a contract migration, prove substitutability minimally:
 
 The full acid test for every plugin runs in Phase 4 against a more rigorous test fixture.
 
+## Reference: Non-contract public surface
+
+When a contract migration moves types out of an implementation plugin into `llm-contracts/public`, the plugin's own `public.d.ts` should still export anything that is *not* part of the contract — utility types, error classes, runtime helpers, internal state types that callers happen to need. The list below is per-plugin and authoritative: anything not listed here can be assumed contract-only.
+
+| Plugin | Stays in plugin's `public.d.ts` (non-contract) | Notes |
+|---|---|---|
+| `llm-events` | `VOCAB` constant (runtime value) | `VOCAB` is the provided implementation; the `Vocab` type moves to `llm-contracts`. Keep `index.ts` exporting `VOCAB`. |
+| `llm-session-manager` | `EventLogEntry` type; `harnessKey()` function | Per-session execution-log entry shape and the harness-key utility are session-manager-private, not contract surface. |
+| `llm-tools-registry` | (nothing extra) | All public exports (`ToolsRegistryService`, `ToolHandler`, `ToolExecutionContext`, `CANCEL_TOOL`) are contract surface and move to `llm-contracts`. Internal types in `registry.ts` stay. |
+| `llm-slash-commands` | Error classes: `BareNamePluginError`, `ReentrantSlashEmitError`, `DuplicateRegistrationError`, `InvalidNameError` | These are concrete classes (runtime values) thrown by the implementation; consumers that catch them depend on the implementation, not the contract. Document the dependency in the plugin's README. |
+| `llm-mcp-bridge` | `ResolvedServerConfig` type (from `./config.ts`) | Implementation-internal config shape. The `McpBridgeService.reload(newConfig?)` parameter currently uses it — verify whether any consumer actually passes that argument (`grep -rn 'reload(' plugins/`). If no caller, drop the param from the contract surface and keep `ResolvedServerConfig` strictly internal. |
+| `llm-tui` | `TuiTheme` interface; `ToolCallStatus` type *(both move to llm-contracts as part of their owning contracts — see below)* | Verify after migration that no other type/value remains exported that is implementation-only. Internal Ink/render state types stay. |
+| `llm-skills` | (nothing extra) | Contract surface only. |
+| `llm-memory` | (nothing extra) | Contract surface only. |
+| `llm-agents` | (nothing extra) | Contract surface only. |
+| `llm-system-prompt` | (nothing extra) | Contract surface only. |
+| `llm-native-dispatch` | (nothing extra) | Contract surface only. |
+| `llm-driver` | (nothing extra) | After Tasks 12 and 18, every type in driver's `public.d.ts` becomes a re-export from `llm-contracts/public`. Driver internal types in `loop.ts`/`state.ts` stay private. |
+
+The `TuiTheme` and `ToolCallStatus` types listed in the `llm-tui` row are part of `ui:theme` and `ui:tool-renderer` contracts respectively; they move to `llm-contracts` with their owning contract module (Tasks 14 and 17), not to `llm-tui/public.d.ts` long-term.
+
 ---
 
 ## File Structure
@@ -107,10 +132,11 @@ plugins/llm-contracts/
     .gitkeep
 ```
 
-**New file (Phase 1 manifest update):**
+**Files modified in Phase 1:**
 
 ```
-harnesses/openai-compatible.json   # MODIFIED: prepend llm-contracts entry
+harnesses/openai-compatible.json   # MODIFIED: prepend llm-contracts entry to plugin array
+.kaizen/marketplace.json           # MODIFIED: add llm-contracts entry mapping name@0.1.0 to plugins/llm-contracts
 ```
 
 **Files modified per Phase 2 task** — listed individually in each task.
@@ -143,6 +169,7 @@ plugins/llm-contracts/README.md        # full pattern description
 - Create: `plugins/llm-contracts/CLAUDE.md`
 - Create: `plugins/llm-contracts/contracts/.gitkeep`
 - Modify: `harnesses/openai-compatible.json`
+- Modify: `.kaizen/marketplace.json`
 
 - [ ] **Step 1: Create the package.json.**
 
@@ -344,7 +371,33 @@ Edit `harnesses/openai-compatible.json` to prepend `llm-contracts` as the first 
 }
 ```
 
-- [ ] **Step 9: Run typecheck.**
+- [ ] **Step 9: Add `llm-contracts` to the marketplace catalog.**
+
+The harness manifest entry `official/llm-contracts@0.1.0` resolves through `.kaizen/marketplace.json`. Without a matching marketplace entry, the harness will not be able to locate the plugin source even though the harness file lists it.
+
+Edit `.kaizen/marketplace.json`. In the `entries` array, add a new plugin entry. Place it near the other foundation/event-related plugins for readability:
+
+```json
+{
+  "kind": "plugin",
+  "name": "llm-contracts",
+  "description": "Service contract definitions for the openai-compatible harness. Pure types + defineService; no runtime behavior.",
+  "categories": ["foundation", "contracts"],
+  "versions": [
+    { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-contracts" } }
+  ]
+}
+```
+
+If the user maintains a local marketplace mirror at `~/.kaizen/marketplaces/official/repo/` that the runtime reads (per the local-deploy notes in each plugin's `CLAUDE.md`), also copy the updated `marketplace.json` there:
+
+```bash
+cp .kaizen/marketplace.json ~/.kaizen/marketplaces/official/repo/.kaizen/marketplace.json 2>/dev/null || true
+```
+
+(Silent skip if no local mirror exists.)
+
+- [ ] **Step 10: Run typecheck.**
 
 ```bash
 cd plugins/llm-contracts && bun tsc --noEmit
@@ -352,7 +405,7 @@ cd plugins/llm-contracts && bun tsc --noEmit
 
 Expected: passes with no output.
 
-- [ ] **Step 10: Local-deploy the new plugin.**
+- [ ] **Step 11: Local-deploy the new plugin.**
 
 ```bash
 mkdir -p ~/.kaizen/marketplaces/official/plugins/llm-contracts@0.1.0
@@ -363,14 +416,14 @@ cp -R plugins/llm-contracts/. ~/.kaizen/marketplaces/official/plugins/llm-contra
 
 Expected: bundle created at `dist/index.js`.
 
-- [ ] **Step 11: Boot the harness to confirm no regression.**
+- [ ] **Step 12: Boot the harness to confirm no regression.**
 
 Launch the harness once via the user's normal entry. The plugin should load with no defines yet; behavior is unchanged from baseline.
 
-- [ ] **Step 12: Commit.**
+- [ ] **Step 13: Commit.**
 
 ```bash
-git add plugins/llm-contracts harnesses/openai-compatible.json
+git add plugins/llm-contracts harnesses/openai-compatible.json .kaizen/marketplace.json
 git commit -m "feat(llm-contracts): scaffold contract foundation plugin"
 ```
 

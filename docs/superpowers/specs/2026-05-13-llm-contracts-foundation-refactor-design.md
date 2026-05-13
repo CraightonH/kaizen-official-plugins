@@ -48,10 +48,10 @@ llm-contracts/
     mcp-bridge.ts        # mcp:bridge
     prompt-registry.ts   # prompt:registry
     driver.ts            # driver:run-conversation
-  index.ts               # imports each module, calls defineService
+  index.ts               # imports each module, calls defineService; exports the KaizenPlugin descriptor
   public.d.ts            # re-exports all contract types
-  plugin.json
   package.json
+  tsconfig.json
 ```
 
 Each `contracts/*.ts` module is self-contained: type, contract ID constant, description string. `index.ts` imports each and calls `defineService`. `public.d.ts` re-exports all types.
@@ -142,7 +142,15 @@ Mechanical change for each:
 1. Delete the `defineService` call.
 2. Update the `provideService` contract ID to its new name (if renamed).
 3. Replace local type definitions for the contract with imports from `llm-contracts/public`.
-4. Update `plugin.json` `services.provides` to the new ID.
+4. Update the `services.provides` array on the `KaizenPlugin` descriptor exported from `index.ts` to use the new ID.
+
+> **Note:** Kaizen plugins have **no `plugin.json` file**. Plugin-level metadata
+> (`name`, `apiVersion`, `permissions`, `services.provides`, `services.consumes`)
+> lives inline as fields on the `KaizenPlugin` object literal exported as
+> `default` from `index.ts`. Wherever this document says "`services.provides`"
+> or "`services.consumes`", read it as "that field on the `KaizenPlugin`
+> descriptor in `index.ts`". The plugin's `package.json` (which does exist) is
+> for npm/bun package metadata only.
 
 ### 3.2 Provider-only plugins
 
@@ -157,7 +165,7 @@ No `provideService` for any cross-plugin contract; only `consumeService` / `useS
 Mechanical change:
 
 1. Update contract IDs in `consumeService` / `useService` calls to renamed versions.
-2. Update `plugin.json` `services.consumes`.
+2. Update the `services.consumes` array on the `KaizenPlugin` descriptor in `index.ts`.
 3. Update type imports to `llm-contracts/public`.
 
 ### 3.4 Special cases
@@ -188,13 +196,29 @@ AGENTS.md mandates `consumeService` only for hard requirements; otherwise use gu
 - `llm-driver` → `dispatch:strategy` — optional (driver can fall back if no strategy is loaded; currently uses `safeUse`).
 - `llm-codemode` → `ui:tool-renderer` — optional (codemode currently uses optional pattern).
 
-This table is produced in Phase 3 and committed alongside the affected `plugin.json` changes.
+This table is produced in Phase 3 and committed alongside the affected `KaizenPlugin` descriptor changes in each plugin's `index.ts`.
 
-### 4.4 `plugin.json` and the `llm-contracts` dependency
+### 4.4 Marketplace catalog and the `llm-contracts` dependency
 
-Every plugin needs to depend on `llm-contracts` at the package level (TypeScript imports). The `services.consumes` array is for service-level dependencies, not plugin-level.
+Kaizen plugins have no `plugin.json` file. Plugin-level metadata is declared on the `KaizenPlugin` object literal exported from `index.ts` (fields: `name`, `apiVersion`, `permissions`, `services.provides`, `services.consumes`). Plugin-level *package* metadata — name, version, exports, npm dependencies — lives in `package.json`.
 
-Open: confirm whether the Kaizen harness has a separate plugin-level `dependencies` mechanism in `plugin.json`, or whether npm/bun package dependency is sufficient. Decided during implementation kickoff.
+The package-level dependency on `llm-contracts` is therefore expressed by adding `"llm-contracts": "workspace:*"` to each consumer/implementation plugin's `package.json` `dependencies`. There is no separate plugin-level dependency mechanism — the npm/bun workspace dependency is sufficient and is what TypeScript follows to resolve `import { ... } from "llm-contracts/public"`.
+
+The harness manifest (`harnesses/openai-compatible.json`) lists plugins by `<marketplace>/<name>@<version>`. Those refs resolve through the marketplace catalog at `.kaizen/marketplace.json`, which maps each `name`+`version` to a source path under `plugins/`. **Adding `llm-contracts` to the harness manifest is not sufficient on its own** — a corresponding entry must also be added to `.kaizen/marketplace.json`:
+
+```json
+{
+  "kind": "plugin",
+  "name": "llm-contracts",
+  "description": "Service contract definitions for the openai-compatible harness. Pure types + defineService; no runtime behavior.",
+  "categories": ["foundation", "contracts"],
+  "versions": [
+    { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-contracts" } }
+  ]
+}
+```
+
+This step is part of Phase 1 scaffolding.
 
 ### 4.5 Boot ordering
 
@@ -223,12 +247,12 @@ Decision: keep the name. Post-refactor it is a tiny provider plugin (~20 lines) 
 
 **Task: Create `llm-contracts` plugin scaffold.**
 
-- `plugin.json` with empty `services` arrays
-- `package.json`, `tsconfig.json`, `README.md`
+- `package.json`, `tsconfig.json`, `README.md`, `CLAUDE.md`
 - `public.d.ts` empty stub
-- `index.ts` with the `register(ctx)` shape but no `defineService` calls yet
+- `index.ts` exporting a `KaizenPlugin` descriptor with empty `services.provides` / `services.consumes` arrays and a `setup(ctx)` body containing no `defineService` calls yet
 - `contracts/` directory with no modules yet
 - Add `official/llm-contracts@0.1.0` as the first entry in `harnesses/openai-compatible.json`
+- Add a corresponding `llm-contracts` entry to `.kaizen/marketplace.json` (see §4.4)
 
 Plugin builds. Harness boots with no functional change.
 
@@ -242,7 +266,7 @@ Task shape (one per contract):
 > 2. Add `defineService("<new-id>", { description })` to `llm-contracts/index.ts`.
 > 3. In the implementation plugin: remove its local `defineService` call; update `provideService` to the new ID (if renamed); replace the local type definition with `import` from `llm-contracts/public`.
 > 4. In every consumer plugin: rename `consumeService` / `useService` calls to the new ID; replace the local type import with one from `llm-contracts/public`.
-> 5. Update `services.provides` / `services.consumes` arrays in every affected `plugin.json`.
+> 5. Update `services.provides` / `services.consumes` arrays on the `KaizenPlugin` descriptor in every affected plugin's `index.ts`.
 > 6. Run the substitutability acid test: temporarily stub-replace the provider, confirm the harness boots and consumers function or degrade as documented.
 > 7. Commit as a single atomic change.
 
@@ -291,7 +315,7 @@ For each implementation plugin, create a throwaway stub plugin in a test fixture
 - `claude-*` mirror harness refactor (future work).
 - New providers for any existing contract (the spec enables them, doesn't add them).
 - Cardinality-N service registry contracts (only mentioned as a future extension if a feature ever needs multiple simultaneous providers for one role).
-- Harness-level dependency declaration mechanism design (only investigated, not designed, in §4.4).
+- New plugin-level dependency mechanism (not needed — npm/bun workspace deps suffice; see §4.4).
 
 ## 7. Success criteria
 
@@ -299,7 +323,8 @@ For each implementation plugin, create a throwaway stub plugin in a test fixture
 - Every implementation plugin imports its contract types from `llm-contracts/public`.
 - Every implementation plugin's `provideService` call uses the new contract ID.
 - Every consumer plugin's `consumeService` / `useService` call uses the new contract ID.
-- Every affected `plugin.json` has `services.provides` / `services.consumes` arrays in lockstep with the code.
+- Every affected plugin's `KaizenPlugin` descriptor (in `index.ts`) has `services.provides` / `services.consumes` arrays in lockstep with the runtime `defineService` / `provideService` / `consumeService` calls.
+- `.kaizen/marketplace.json` contains an `llm-contracts` entry resolving to `plugins/llm-contracts`.
 - The substitutability acid test passes for every implementation plugin (verified in Phase 4).
 - `openai-compatible.json` lists `llm-contracts` first and boots cleanly.
 - AGENTS.md review checklist passes for each contract.
