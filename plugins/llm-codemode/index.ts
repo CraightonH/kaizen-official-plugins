@@ -1,5 +1,5 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { ToolSchema } from "llm-events/public";
+import type { ToolSchema } from "llm-contracts/public";
 import type { ToolExecutionContext, ToolHandler, ToolsRegistryService } from "llm-tools-registry/public";
 import { loadConfig, realDeps } from "./config.ts";
 import { renderSurface, surfaceHash } from "./assembler.ts";

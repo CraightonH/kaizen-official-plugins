@@ -59,9 +59,6 @@ const plugin: KaizenPlugin = {
   services: { provides: ["events:vocabulary"] },
 
   async setup(ctx) {
-    ctx.defineService("llm:complete", {
-      description: "Provider-neutral streaming LLM completion service.",
-    });
     ctx.provideService<Vocab>("events:vocabulary", VOCAB);
     for (const name of Object.values(VOCAB)) ctx.defineEvent(name);
   },

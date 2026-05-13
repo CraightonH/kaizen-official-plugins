@@ -1,6 +1,6 @@
 import type { McpBridgeService, ServerInfo } from "./public.d.ts";
 import type { ResolvedServerConfig } from "./config.ts";
-import type { ToolSchema } from "llm-events/public";
+import type { ToolSchema } from "llm-contracts/public";
 
 export interface ToolHandlerLike {
   (args: any, ctx: { signal: AbortSignal; callId: string; log: (m: string) => void }): Promise<unknown>;

@@ -1,4 +1,4 @@
-import type { LLMCompleteService, LLMRequest, LLMStreamEvent, ModelInfo } from "llm-events/public";
+import type { LLMCompleteService, LLMRequest, LLMStreamEvent, ModelInfo } from "llm-contracts/public";
 import { buildHeaders, buildChatBody } from "./http.ts";
 import { readSseFrames } from "./sse.ts";
 import { runStream } from "./stream.ts";

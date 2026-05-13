@@ -7,7 +7,7 @@ import * as globMod from "./tools/glob.ts";
 import * as grepMod from "./tools/grep.ts";
 import * as bashMod from "./tools/bash.ts";
 import * as webFetchMod from "./tools/web_fetch.ts";
-import type { ToolSchema } from "llm-events/public";
+import type { ToolSchema } from "llm-contracts/public";
 
 export interface ToolEntry {
   schema: ToolSchema;

@@ -2,7 +2,7 @@
 import { describe, it, expect, mock } from "bun:test";
 import { makeRegistry } from "llm-tools-registry/registry";
 import { makeStrategy } from "../strategy.ts";
-import type { LLMResponse, ToolCall } from "llm-events/public";
+import type { LLMResponse, ToolCall } from "llm-contracts/public";
 
 function tc(id: string, name: string, args: unknown): ToolCall { return { id, name, arguments: args }; }
 

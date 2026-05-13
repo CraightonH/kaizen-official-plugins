@@ -1,6 +1,6 @@
 // plugins/llm-local-tools/tools/bash.ts
 import { spawn, type ChildProcess } from "node:child_process";
-import type { ToolSchema } from "llm-events/public";
+import type { ToolSchema } from "llm-contracts/public";
 import { resolvePath, truncateMiddle, BASH_OUTPUT_CAP } from "../util.ts";
 
 export const schema: ToolSchema = {

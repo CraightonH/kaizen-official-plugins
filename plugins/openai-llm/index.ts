@@ -1,5 +1,5 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { LLMCompleteService } from "llm-events/public";
+import type { LLMCompleteService } from "llm-contracts/public";
 import { loadConfig, realDeps } from "./config.ts";
 import { makeService } from "./service.ts";
 

@@ -8,7 +8,7 @@ export type {
   ToolSchema,
   ToolCall,
   ChatMessage,
-} from "llm-events/public";
+} from "llm-contracts/public";
 
 export type {
   ToolsRegistryService,
@@ -16,7 +16,7 @@ export type {
   ToolExecutionContext,
 } from "./registry";
 
-import type { ToolSchema as _ToolSchema } from "llm-events/public";
+import type { ToolSchema as _ToolSchema } from "llm-contracts/public";
 import type { ToolHandler as _ToolHandler } from "./registry";
 
 // ToolSource is open-shaped. `kind` is a freeform string so that new

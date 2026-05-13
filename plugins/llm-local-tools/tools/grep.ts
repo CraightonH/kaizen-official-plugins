@@ -2,7 +2,7 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
-import type { ToolSchema } from "llm-events/public";
+import type { ToolSchema } from "llm-contracts/public";
 import { resolvePath, GREP_DEFAULT_MAX } from "../util.ts";
 
 export const schema: ToolSchema = {

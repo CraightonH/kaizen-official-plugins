@@ -1,5 +1,6 @@
 import type { KaizenPlugin } from "kaizen/types";
 import * as eventsContract from "./contracts/events";
+import * as llmCompleteContract from "./contracts/llm-complete";
 
 const plugin: KaizenPlugin = {
   name: "llm-contracts",
@@ -9,6 +10,7 @@ const plugin: KaizenPlugin = {
 
   async setup(ctx) {
     ctx.defineService(eventsContract.CONTRACT_ID, { description: eventsContract.DESCRIPTION });
+    ctx.defineService(llmCompleteContract.CONTRACT_ID, { description: llmCompleteContract.DESCRIPTION });
   },
 };
 

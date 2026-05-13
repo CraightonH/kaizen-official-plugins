@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { registerStatusTool, type ToolsRegistryLike, type ToolHandlerLike } from "../tool.ts";
 import type { StatusSnapshot } from "../snapshot.ts";
-import type { ToolSchema } from "llm-events/public";
+import type { ToolSchema } from "llm-contracts/public";
 
 interface Registered {
   schema: ToolSchema;

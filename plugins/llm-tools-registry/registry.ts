@@ -1,6 +1,6 @@
 import type {
   ToolSchema,
-} from "llm-events/public";
+} from "llm-contracts/public";
 import { CANCEL_TOOL } from "llm-events";
 
 import type { ToolSource, ToolRegistration } from "./public";

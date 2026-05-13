@@ -1,7 +1,7 @@
 // plugins/llm-driver/test/integration.test.ts
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "../index.ts";
-import type { ChatMessage } from "llm-events/public";
+import type { ChatMessage } from "llm-contracts/public";
 
 function makeSessions() {
   let next = 0;

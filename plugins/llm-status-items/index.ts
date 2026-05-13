@@ -1,5 +1,5 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { LLMCompleteService, ModelInfo, Vocab } from "llm-events/public";
+import type { LLMCompleteService, ModelInfo, Vocab } from "llm-contracts/public";
 import { applyEvent, initialState, type StatusState } from "./state.ts";
 import { formatDollars, loadRateTable, realCostDeps, tokensToCents, type CostDeps, type RateTable } from "./cost.ts";
 import { formatContextItem } from "./context.ts";

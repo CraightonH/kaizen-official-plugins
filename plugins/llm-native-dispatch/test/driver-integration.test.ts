@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import { runConversation, type RunConversationDeps } from "../../llm-driver/loop.ts";
 import { makeStrategy } from "../strategy.ts";
-import type { ChatMessage, ToolSchema } from "llm-events/public";
+import type { ChatMessage, ToolSchema } from "llm-contracts/public";
 
 function makeFakeServices() {
   const messages: ChatMessage[] = [];

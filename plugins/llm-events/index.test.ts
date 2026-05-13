@@ -153,7 +153,7 @@ describe("llm-events", () => {
       "TuiCompletionService",
     ];
 
-    expect(dts).toContain("export interface LLMCompleteService");
+    expect(dts).toContain("LLMCompleteService");
     for (const name of movedNames) {
       expect(dts).not.toMatch(new RegExp(`export\\s+(?:interface|type)\\s+${name}\\b`));
     }
@@ -185,7 +185,7 @@ describe("llm-events", () => {
   it("provides events:vocabulary and defines foundation services/events", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    expect(ctx.definedServices).toEqual(["llm:complete"]);
+    expect(ctx.definedServices).toEqual([]);
     expect(ctx.provided["events:vocabulary"]).toBe(VOCAB);
     expect(ctx.provided["llm:complete"]).toBeUndefined();
     for (const name of Object.values(VOCAB)) {

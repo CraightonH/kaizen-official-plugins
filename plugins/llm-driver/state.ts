@@ -1,4 +1,4 @@
-import type { LLMResponse } from "llm-events/public";
+import type { LLMResponse } from "llm-contracts/public";
 
 export interface CurrentTurn {
   id: string;

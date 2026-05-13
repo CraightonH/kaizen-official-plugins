@@ -1,5 +1,5 @@
 import { mkdirSync, rmSync } from "node:fs";
-import type { ChatMessage } from "llm-events/public";
+import type { ChatMessage } from "llm-contracts/public";
 import { openEventsLog, type EventLogEntry, type EventsLog } from "./events-log";
 import { indexFile, harnessRoot, sessionPaths } from "./paths";
 import { openIndex, type IndexEntry } from "./index-jsonl";

@@ -1,5 +1,5 @@
 import { compile } from "json-schema-to-typescript";
-import type { ToolSchema } from "llm-events/public";
+import type { ToolSchema } from "llm-contracts/public";
 
 const cache = new Map<string, string>();
 

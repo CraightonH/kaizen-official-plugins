@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { ChatMessage, LLMRequest, ToolSchema } from "llm-events/public";
+import type { ChatMessage, LLMRequest, ToolSchema } from "llm-contracts/public";
 import type { OpenAILLMConfig } from "./config.ts";
 
 function dumpRequest(req: LLMRequest, body: Record<string, unknown>): void {

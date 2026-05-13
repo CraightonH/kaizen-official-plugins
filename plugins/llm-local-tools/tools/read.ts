@@ -1,6 +1,6 @@
 // plugins/llm-local-tools/tools/read.ts
 import { stat, open } from "node:fs/promises";
-import type { ToolSchema } from "llm-events/public";
+import type { ToolSchema } from "llm-contracts/public";
 import {
   resolvePath,
   sniffBinary,
