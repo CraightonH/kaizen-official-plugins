@@ -1,5 +1,5 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { McpBridgeService, ServerInfo } from "./public.d.ts";
+import type { McpBridgeService, ServerInfo } from "llm-contracts/public";
 import type { ToolsRegistryService } from "llm-tools-registry/public";
 import pkg from "./package.json" with { type: "json" };
 import { loadConfig, realDeps } from "./config.ts";
@@ -21,8 +21,6 @@ const plugin: KaizenPlugin = {
     const cfgDeps = realDeps(log);
     const initial = await loadConfig(cfgDeps);
     for (const w of initial.warnings) log(`llm-mcp-bridge: ${w}`);
-
-    ctx.defineService("mcp:bridge", { description: "Owns MCP server lifecycles; surfaces their tools and resources." });
 
     const registry = ctx.useService<ToolsRegistryService>("tools:registry");
     if (!registry) {

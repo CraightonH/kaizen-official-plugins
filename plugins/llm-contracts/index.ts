@@ -8,6 +8,7 @@ import * as slashRegistryContract from "./contracts/slash-registry";
 import * as skillsRegistryContract from "./contracts/skills-registry";
 import * as memoryStoreContract from "./contracts/memory-store";
 import * as agentsRegistryContract from "./contracts/agents-registry";
+import * as mcpBridgeContract from "./contracts/mcp-bridge";
 
 const plugin: KaizenPlugin = {
   name: "llm-contracts",
@@ -25,6 +26,7 @@ const plugin: KaizenPlugin = {
     ctx.defineService(skillsRegistryContract.CONTRACT_ID, { description: skillsRegistryContract.DESCRIPTION });
     ctx.defineService(memoryStoreContract.CONTRACT_ID, { description: memoryStoreContract.DESCRIPTION });
     ctx.defineService(agentsRegistryContract.CONTRACT_ID, { description: agentsRegistryContract.DESCRIPTION });
+    ctx.defineService(mcpBridgeContract.CONTRACT_ID, { description: mcpBridgeContract.DESCRIPTION });
   },
 };
 

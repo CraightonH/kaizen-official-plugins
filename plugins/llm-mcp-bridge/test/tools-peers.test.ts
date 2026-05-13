@@ -1,6 +1,6 @@
 import { describe, it, expect, mock } from "bun:test";
 import { registerToolPeers, type ToolsRegistryLike } from "../tools-peers.ts";
-import type { McpBridgeService, ServerInfo } from "../public.d.ts";
+import type { McpBridgeService, ServerInfo } from "llm-contracts/public";
 
 interface RegisteredTool {
   schema: { name: string; description: string; parameters: any };

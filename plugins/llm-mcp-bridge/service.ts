@@ -2,7 +2,7 @@ import type { ResolvedServerConfig } from "./config.ts";
 import type { McpClientLike, CreateClientResult } from "./client.ts";
 import { ServerLifecycle, type LifecycleDeps, type RegistryLike } from "./lifecycle.ts";
 import { makeReadMcpResourceTool, makeListMcpResourcesTool, type NamedClient } from "./registration.ts";
-import type { ServerInfo, McpBridgeService } from "./public.d.ts";
+import type { ServerInfo, McpBridgeService } from "llm-contracts/public";
 import { detectConflicts } from "./names.ts";
 
 export interface BridgeDeps {
@@ -19,7 +19,7 @@ export interface BridgeDeps {
 
 export interface InternalBridge extends McpBridgeService {
   shutdownAll(): Promise<void>;
-  reload(newConfig: Map<string, ResolvedServerConfig>): Promise<{ added: string[]; removed: string[]; updated: string[] }>;
+  reload(newConfig?: Map<string, ResolvedServerConfig>): Promise<{ added: string[]; removed: string[]; updated: string[] }>;
 }
 
 export function makeBridgeService(deps: BridgeDeps): InternalBridge {
@@ -87,7 +87,7 @@ export function makeBridgeService(deps: BridgeDeps): InternalBridge {
       if (!lc) throw new Error(`unknown server: ${name}`);
       await lc.forceReconnect();
     },
-    async reload(newConfig: Map<string, ResolvedServerConfig>) {
+    async reload(newConfig: Map<string, ResolvedServerConfig> = new Map()) {
       const added: string[] = []; const removed: string[] = []; const updated: string[] = [];
       // remove
       for (const [name, lc] of [...lifecycles]) {
