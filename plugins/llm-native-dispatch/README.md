@@ -21,7 +21,7 @@ Native OpenAI tool-calling dispatch strategy. Turns an LLM response containing s
 
 ### Provides
 
-**Service** — `tool-dispatch:strategy`
+**Service** — `dispatch:strategy`
 
 ```typescript
 interface ToolDispatchStrategy {
@@ -39,12 +39,12 @@ interface ToolDispatchStrategy {
 }
 ```
 
-`ToolDispatchStrategy` and `ToolDispatchRegistry` are owned by `llm-driver/public`. Foundational LLM message/schema types come from `llm-events/public`; tool execution context details come from `llm-tools-registry/public`.
+`ToolDispatchStrategy` and `ToolDispatchRegistry` are defined in `llm-contracts/public`. Foundational LLM message/schema types come from `llm-contracts/public`; tool execution context details come from `llm-tools-registry/public`.
 
 ### Consumes
 
 - **Service** — `tools:registry`. Required at runtime: `handleResponse` calls `registry.invoke(name, args, ctx)` for every tool call. The strategy never calls handlers directly, so all `tool:*` events flow uniformly through the registry.
-- **VOCAB** — `llm-events:vocabulary`. Source of shared event names.
+- **VOCAB** — `events:vocabulary`. Source of shared event names.
 
 ### Events emitted
 

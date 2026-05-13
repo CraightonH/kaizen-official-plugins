@@ -6,8 +6,9 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 
 ```
 index.ts          Plugin lifecycle: builds registry, registers built-ins, loads file commands,
-                  defines/provides slash:registry, subscribes input:submit at priority 100,
-                  optionally registers an llm-tui:completion source. Only file that touches `ctx`.
+                  provides slash:registry (defineService is in llm-contracts), subscribes
+                  input:submit at priority 100, optionally registers a ui:completion-source.
+                  Only file that touches `ctx`.
 registry.ts       createRegistry() → SlashRegistryService. Pure logic. In-memory Map keyed by
                   name. Validates name shape and the bare-name-vs-plugin rule on every register.
 parser.ts         parse(text) → { name, args } | null. Pure function. Single regex; treats a
@@ -92,12 +93,16 @@ Tests use `bun:test` only. Each module has a focused test file; `integration.tes
 
 ## Local deploy
 
-The Kaizen runtime prefers the bundled `dist/index.js` over source. After editing, the plugin must be re-bundled into the install dir:
+Build from the source directory (where workspace deps resolve), then sync into the install dir:
 
 ```bash
-cp -R plugins/llm-slash-commands/. ~/.kaizen/marketplaces/official/plugins/llm-slash-commands@0.2.1/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-slash-commands@0.2.1 \
-  && bun build --target=bun --outfile=dist/index.js index.ts)
+PLUGIN=llm-slash-commands
+VERSION=$(jq -r .version plugins/$PLUGIN/package.json)
+INSTALL_DIR=~/.kaizen/marketplaces/official/plugins/${PLUGIN}@${VERSION}
+(cd plugins/$PLUGIN && bun build --target=bun --outfile=dist/index.js index.ts)
+mkdir -p "$INSTALL_DIR/dist"
+cp plugins/$PLUGIN/dist/index.js "$INSTALL_DIR/dist/index.js"
+rsync -a --exclude='node_modules' --exclude='dist' plugins/$PLUGIN/ "$INSTALL_DIR/"
 ```
 
 If you also need the harness manifest to pick up changes, sync the local marketplace repo (`~/.kaizen/marketplaces/official/repo/`) — it tracks upstream `main` and `kaizen marketplace update` will overwrite local edits.

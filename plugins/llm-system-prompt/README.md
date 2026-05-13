@@ -18,7 +18,7 @@ Owns construction of the assistant's system prompt. Other plugins contribute nam
 
 ### Provides
 
-**Service** — `prompt:system`
+**Service** — `prompt:registry`
 
 ```typescript
 interface SystemPromptSection {
@@ -50,7 +50,7 @@ Semantics:
 
 ### Consumes
 
-**Service** — `llm-events:vocabulary` (required). Owns the `PROMPT_REBUILT`
+**Service** — `events:vocabulary` (required). Owns the `PROMPT_REBUILT`
 and `PROMPT_RELOAD` event names and defines them before this plugin emits.
 
 **Service** — `slash:registry` (optional). When already provided at setup, the plugin registers four diagnostic slash commands:

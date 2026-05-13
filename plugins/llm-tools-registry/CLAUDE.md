@@ -5,19 +5,20 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 ## Module map
 
 ```
-index.ts        Plugin lifecycle: defines the service, wires emit, hands the registry instance
-                to provideService. The only file that touches `ctx`.
+index.ts        Plugin lifecycle: provides the tools:registry service (defineService is in
+                llm-contracts), wires emit, hands the registry instance to provideService.
+                The only file that touches `ctx`.
 registry.ts     makeRegistry(emit) → ToolsRegistryService. Pure logic. Owns the
                 Map<name, { schema, handler }> and the invoke() event sequencing.
-                Exports ToolsRegistryService, ToolHandler, ToolExecutionContext.
-public.d.ts     Re-exports only. ToolSchema/ToolCall/ChatMessage/CANCEL_TOOL come from
-                llm-events; ToolsRegistryService/ToolHandler/ToolExecutionContext come from
-                ./registry. Treat this file as the canonical public surface.
+public.d.ts     Re-exports contract types from llm-contracts/public only. All public
+                types (ToolsRegistryService, ToolHandler, ToolExecutionContext,
+                ToolSchema, ToolCall, ChatMessage, CANCEL_TOOL) live in
+                llm-contracts/public; this file re-exports them for convenience.
 ```
 
 Boundaries:
 - `registry.ts` is the only stateful module. It takes `emit` as a constructor argument; it never imports `kaizen/types` and never sees `ctx`.
-- Only `index.ts` imports `kaizen/types`, calls `defineService`, or touches `ctx`.
+- Only `index.ts` imports `kaizen/types` or touches `ctx`. `defineService` is in `llm-contracts/index.ts`, not here.
 - The cancellation sentinel is `Symbol.for("kaizen.cancel")` — a well-known key. Do not switch to a local `Symbol()` or subscribers in other plugins will break.
 - Tests live alongside under `test/` and run with `bun test`. No external mocking framework.
 
@@ -59,7 +60,7 @@ Use a namespaced `name` (`plugin-name:tool-name`) to avoid collisions. Plugins M
 ## Cancelling a call from a subscriber
 
 ```typescript
-import { CANCEL_TOOL } from "llm-tools-registry/public";
+import { CANCEL_TOOL } from "llm-contracts/public";
 
 ctx.on("tool:before-execute", (payload) => {
   if (payload.name === "dangerous:thing") {
@@ -92,12 +93,16 @@ When adding behavior, prefer extending `registry.test.ts` — `index.test.ts` sh
 
 ## Local deploy
 
-The Kaizen runtime prefers the bundled `dist/index.js` over source. After editing, the plugin must be re-bundled into the install dir:
+Build from the source directory (where workspace deps resolve), then sync into the install dir:
 
 ```bash
-cp -R plugins/llm-tools-registry/. ~/.kaizen/marketplaces/official/plugins/llm-tools-registry@0.3.0/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-tools-registry@0.3.0 \
-  && bun build --target=bun --outfile=dist/index.js index.ts)
+PLUGIN=llm-tools-registry
+VERSION=$(jq -r .version plugins/$PLUGIN/package.json)
+INSTALL_DIR=~/.kaizen/marketplaces/official/plugins/${PLUGIN}@${VERSION}
+(cd plugins/$PLUGIN && bun build --target=bun --outfile=dist/index.js index.ts)
+mkdir -p "$INSTALL_DIR/dist"
+cp plugins/$PLUGIN/dist/index.js "$INSTALL_DIR/dist/index.js"
+rsync -a --exclude='node_modules' --exclude='dist' plugins/$PLUGIN/ "$INSTALL_DIR/"
 ```
 
 If you also need the harness manifest to pick up changes, sync the local marketplace repo (`~/.kaizen/marketplaces/official/repo/`) — it tracks upstream `main` and `kaizen marketplace update` will overwrite local edits.

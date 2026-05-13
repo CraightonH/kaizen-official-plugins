@@ -5,11 +5,11 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 ## Module map
 
 ```
-index.ts     Plugin lifecycle: consumes llm-events:vocabulary, loads config, groups
+index.ts     Plugin lifecycle: consumes events:vocabulary, loads config, groups
              entries by event, registers one ctx.on(event) listener per event that
              runs all matching hooks sequentially. The only file that touches `ctx`.
              Imports the cancellation sentinels (`CANCEL_TOOL`, `CODEMODE_CANCEL_SENTINEL`)
-             from `llm-events` (owner) and applies them in the per-event blocking dispatch.
+             from `llm-contracts/public` and applies them in the per-event blocking dispatch.
 config.ts    loadHookConfigs(deps, vocab) → { entries, warnings }. Pure logic.
              Reads home + project hooks.json, merges (home first), validates each
              entry's event against vocab (throws on unknown), warns on
@@ -70,12 +70,16 @@ Fixtures live under `test/fixtures/`.
 
 ## Local deploy
 
-The Kaizen runtime prefers the bundled `dist/index.js` over source. After editing, the plugin must be re-bundled into the install dir:
+Build from the source directory (where workspace deps resolve), then sync into the install dir:
 
 ```bash
-cp -R plugins/llm-hooks-shell/. ~/.kaizen/marketplaces/official/plugins/llm-hooks-shell@0.1.1/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-hooks-shell@0.1.1 \
-  && bun build --target=bun --outfile=dist/index.js index.ts)
+PLUGIN=llm-hooks-shell
+VERSION=$(jq -r .version plugins/$PLUGIN/package.json)
+INSTALL_DIR=~/.kaizen/marketplaces/official/plugins/${PLUGIN}@${VERSION}
+(cd plugins/$PLUGIN && bun build --target=bun --outfile=dist/index.js index.ts)
+mkdir -p "$INSTALL_DIR/dist"
+cp plugins/$PLUGIN/dist/index.js "$INSTALL_DIR/dist/index.js"
+rsync -a --exclude='node_modules' --exclude='dist' plugins/$PLUGIN/ "$INSTALL_DIR/"
 ```
 
 If you also need the harness manifest to pick up changes, sync the local marketplace repo (`~/.kaizen/marketplaces/official/repo/`) — it tracks upstream `main` and `kaizen marketplace update` will overwrite local edits.

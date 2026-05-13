@@ -5,7 +5,7 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 ## Module map
 
 ```
-index.ts             Plugin lifecycle: defines and provides the tool-dispatch:strategy service.
+index.ts             Plugin lifecycle: defines and provides the dispatch:strategy service.
                      The only file that touches `ctx`.
 strategy.ts          makeStrategy() → ToolDispatchStrategy. Pure logic. Owns prepareRequest
                      pass-through and the sequential handleResponse loop (per-call invoke +
@@ -16,13 +16,13 @@ args-validation.ts   isValidToolArgs(value) and malformedArgsMessage(raw). Pure 
                      Treats anything that isn't a plain object/array/null (or is an Error)
                      as malformed; produces the JSON `{ error, raw }` payload.
 public.d.ts          Re-exports `ToolDispatchStrategy` only. Underlying contract lives in
-                     llm-driver/public; do not re-declare it here.
+                     llm-contracts/public; do not re-declare it here.
 ```
 
 Boundaries:
 - `strategy.ts`, `serialize.ts`, and `args-validation.ts` are pure — no `ctx`, no I/O, no module-level state.
 - Only `index.ts` imports `kaizen/types` or touches `ctx`.
-- `ToolDispatchStrategy` is imported from `llm-driver/public`. Foundational LLM types come from `llm-events/public`; tool execution context details come from `llm-tools-registry/public`. Do not redeclare owner-public contracts here.
+- `ToolDispatchStrategy` is imported from `llm-contracts/public`. Foundational LLM types come from `llm-contracts/public`; tool execution context details come from `llm-tools-registry/public`. Do not redeclare owner-public contracts here.
 
 ## Invariants
 
@@ -40,7 +40,7 @@ This plugin is intentionally minimal. If you find yourself wanting:
 
 - Per-call permission prompts → write a peer plugin that subscribes to `tool:before-execute` and uses `CANCEL_TOOL` (`Symbol.for("kaizen.cancel")`).
 - Tool result truncation → belongs in the tool implementation (e.g. `llm-local-tools`), not here.
-- Code-mode dispatch → a separate plugin providing `tool-dispatch:strategy`. The driver picks one strategy per setup.
+- Code-mode dispatch → a separate plugin providing `dispatch:strategy`. The driver picks one strategy per setup.
 - Parallel execution → spec change required; see the "Open questions" section of the design spec.
 
 Do not bolt these onto `strategy.ts`.

@@ -57,7 +57,7 @@ interface ToolsRegistryService {
 }
 ```
 
-`ToolSchema`, `ToolCall`, and `ChatMessage` are re-exported from `llm-events` (Spec 0 owns them). `ToolsRegistryService`, `ToolHandler`, `ToolExecutionContext`, `ToolSource`, and `ToolRegistration` are owned by this plugin and exported from `llm-tools-registry/public`. The cancellation sentinel `CANCEL_TOOL` is owned by `llm-events` — import it from there. Its value is `Symbol.for("kaizen.cancel")`, so subscribers in unrelated plugins can also produce it inline without importing.
+`ToolSchema`, `ToolCall`, `ChatMessage`, `ToolsRegistryService`, `ToolHandler`, `ToolExecutionContext`, `ToolSource`, `ToolRegistration`, and `CANCEL_TOOL` are all part of the `tools:registry` contract and live in `llm-contracts/public`. Import from there. `CANCEL_TOOL`'s value is `Symbol.for("kaizen.cancel")`, so subscribers in unrelated plugins can also produce it inline without importing.
 
 Semantics:
 - `register()` claims a name. Re-registering a live name throws — call the returned `unregister()` first.
@@ -77,7 +77,7 @@ Slash registration is deferred to `harness:start` so the optional `slash:registr
 
 ### Consumes
 
-**VOCAB** — `llm-events:vocabulary`. Provides the canonical event names and the `ToolSchema` / `ToolCall` / `ChatMessage` types plus the runtime `CANCEL_TOOL` sentinel. This plugin emits the events declared there but does not define them.
+**VOCAB** — `events:vocabulary`. Provides the canonical event names. This plugin emits the events declared there but does not define them. Contract types (`ToolSchema`, `ToolCall`, `ChatMessage`, `CANCEL_TOOL`) come from `llm-contracts/public`.
 
 ### Events emitted
 

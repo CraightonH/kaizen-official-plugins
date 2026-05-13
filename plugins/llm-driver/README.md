@@ -13,8 +13,8 @@ Coordination plugin for the openai-compatible harness. Owns the assistant turn l
   - `harness:exit-requested` — flips a flag; the next loop iteration breaks out and ends the harness.
   - `session:active-changed` — updates the active session after `/clear`, `/session:new`, `/session:resume`, or active-session deletion.
   - `conversation:system-message` — bridges `{ message: { content } }` payloads to the UI's `writeNotice()` so slash-command output is visible.
-- A-tier graceful degradation: if `tools:registry` and/or `tool-dispatch:strategy` are absent, the loop runs a single LLM call and stops. With both present, runs the strategy/tool loop until `handleResponse()` returns no new messages.
-- System-prompt resolution: when `prompt:system` is bound, every LLM call's `systemPrompt` comes from `assemble()` with a generation-keyed cache (re-checked per turn). Otherwise it falls back to `input.systemPrompt` plus the strategy's `systemPromptAppend`.
+- A-tier graceful degradation: if `tools:registry` and/or `dispatch:strategy` are absent, the loop runs a single LLM call and stops. With both present, runs the strategy/tool loop until `handleResponse()` returns no new messages.
+- System-prompt resolution: when `prompt:registry` is bound, every LLM call's `systemPrompt` comes from `assemble()` with a generation-keyed cache (re-checked per turn). Otherwise it falls back to `input.systemPrompt` plus the strategy's `systemPromptAppend`.
 - Exposes a recursive entry point via the `driver:run-conversation` service so other plugins can spawn nested/agent turns. Nested calls (when `externalTurnId` is supplied by the caller) do not own the outer `turn:start`/`turn:end`.
 - After each interactive turn, posts a duration notice (`✻ <verb> for Ns`) using a randomized verb pool.
 
@@ -59,7 +59,7 @@ interface DriverService {
 }
 ```
 
-`llm-driver/public` also owns the `ToolDispatchStrategy` and `ToolDispatchRegistry` contracts for the optional `tool-dispatch:strategy` extension point. Dispatch plugins implement the strategy; registry plugins provide the invoke surface the driver passes into the strategy.
+`llm-driver/public` re-exports `ToolDispatchStrategy` and `ToolDispatchRegistry` from `llm-contracts/public` for the optional `dispatch:strategy` extension point. Dispatch plugins implement the strategy; registry plugins provide the invoke surface the driver passes into the strategy.
 
 Semantics:
 - The driver does not select a model. If `input.model` is omitted, the LLM provider behind `llm:complete` substitutes its own default.
@@ -70,8 +70,8 @@ Semantics:
 
 ### Required Services
 
-- **Service** — `llm-events:vocabulary` (required). Event vocabulary plugin; the driver participates in the shared event names.
-- **Service** — `llm-tui:channel` (required). UI channel with `readInput()`, `setBusy()`, `writeOutput()`, `writeNotice()`, and optional `writeUser()`. Drives the interactive loop.
+- **Service** — `events:vocabulary` (required). Event vocabulary plugin; the driver participates in the shared event names.
+- **Service** — `ui:channel` (required). UI channel with `readInput()`, `setBusy()`, `writeOutput()`, `writeNotice()`, and optional `writeUser()`. Drives the interactive loop.
 - **Service** — `llm:complete` (required). The provider that yields `LLMStreamEvent`s (`token`, `reasoning`, `tool-call`, `done`, `error`).
 - **Service** — `sessions:store` (required). Persistent session store used for active transcripts and turn handles.
 
@@ -80,8 +80,8 @@ Semantics:
 These are discovered at runtime with safe `useService()` lookups rather than declared as hard `services.consumes` edges, so a smaller harness can omit them.
 
 - **Service** — `tools:registry` (optional). When present, listed tools are advertised to the strategy via `prepareRequest({ availableTools })`.
-- **Service** — `tool-dispatch:strategy` (optional). When present together with `tools:registry`, drives the multi-step tool loop. `prepareRequest()` may return `tools` and a `systemPromptAppend`; `handleResponse()` returns messages to append before the next LLM call (empty array → end of turn).
-- **Service** — `prompt:system` (optional). When bound, supersedes both `input.systemPrompt` and `strategy.systemPromptAppend` for every LLM call. Cache is keyed on `generation()`; no `prompt:rebuilt` subscription is needed.
+- **Service** — `dispatch:strategy` (optional). When present together with `tools:registry`, drives the multi-step tool loop. `prepareRequest()` may return `tools` and a `systemPromptAppend`; `handleResponse()` returns messages to append before the next LLM call (empty array → end of turn).
+- **Service** — `prompt:registry` (optional). When bound, supersedes both `input.systemPrompt` and `strategy.systemPromptAppend` for every LLM call. Cache is keyed on `generation()`; no `prompt:rebuilt` subscription is needed.
 
 ### Events emitted
 
@@ -117,7 +117,7 @@ Plugin config (read at `start()`):
 
 | Key | Effect |
 |-----|--------|
-| `defaultSystemPrompt` | Used as the systemPrompt for the interactive loop when `prompt:system` is not bound. Default: `""`. |
+| `defaultSystemPrompt` | Used as the systemPrompt for the interactive loop when `prompt:registry` is not bound. Default: `""`. |
 
 ## Permissions
 

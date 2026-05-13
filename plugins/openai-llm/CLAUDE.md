@@ -6,11 +6,11 @@ from this plugin.
 
 ## Ownership
 
-- Provides `llm:complete`; `llm-events` defines the service slot.
-- Consumes `llm-events:vocabulary` to force foundation setup before provider
+- Provides `llm:complete`; `llm-contracts` defines the service slot.
+- Consumes `events:vocabulary` to force foundation setup before provider
   binding.
 - Uses `LLMCompleteService`, `LLMRequest`, `LLMStreamEvent`, and `ModelInfo` from
-  `llm-events/public`.
+  `llm-contracts/public`.
 - OpenAI wire-protocol details belong here: request body mapping, SSE parsing,
   tool-call accumulation, retry, timeout, and model-list enrichment.
 

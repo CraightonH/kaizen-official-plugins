@@ -1,13 +1,13 @@
 # llm-memory
 
-File-backed persistent memory for the openai-compatible harness. Reads and writes Claude-Code-compatible markdown memories under `<project>/.kaizen/memory/` and `~/.kaizen/memory/`, contributes a `prompt:system` section that injects the merged `MEMORY.md` blocks plus an entry catalog on every LLM request, and exposes a service plus two tools for reading and writing memory.
+File-backed persistent memory for the openai-compatible harness. Reads and writes Claude-Code-compatible markdown memories under `<project>/.kaizen/memory/` and `~/.kaizen/memory/`, contributes a `prompt:registry` section that injects the merged `MEMORY.md` blocks plus an entry catalog on every LLM request, and exposes a service plus two tools for reading and writing memory.
 
 ## What it does
 
 - Maintains two memory layers on disk:
   - **Project:** `<cwd>/.kaizen/memory/` (created lazily; can be disabled via config).
   - **Global:** `~/.kaizen/memory/` (always on).
-- Registers a `prompt:system` section (id `"llm-memory:auto"`, priority `170`, no title — the block is self-titled with a `# Persistent memory` heading inside a `<system-reminder>` wrapper) that contributes on every LLM call. Generation is bumped on every store mutation so the rendered block stays current. The section contributes:
+- Registers a `prompt:registry` section (id `"llm-memory:auto"`, priority `170`, no title — the block is self-titled with a `# Persistent memory` heading inside a `<system-reminder>` wrapper) that contributes on every LLM call. Generation is bumped on every store mutation so the rendered block stays current. The section contributes:
   - The user-authored prelude of each layer's `MEMORY.md`.
   - A catalog of available entries (`scope:name — description`) loadable on demand via tool.
   - Truncates per-layer index bodies and the catalog (oldest-first) to a configurable byte cap.
@@ -64,14 +64,14 @@ If `tools:registry` is absent, the service still works; the tools are simply not
 ### Consumes
 
 All consumed services are optional — the plugin degrades cleanly when any are
-absent. Only `llm-events:vocabulary` is declared in `services.consumes`
+absent. Only `events:vocabulary` is declared in `services.consumes`
 (foundation vocabulary); the rest are resolved lazily with `ctx.useService`.
 
-- **Service** — `prompt:system` (optional). Contributes the memory block via a registered section (id `"llm-memory:auto"`, priority `170`). Generation is bumped via `onChange` on every `store.put` and `store.remove` so the rendered block stays current. Skipped (returns `""`) when both layers are empty, causing the registry to drop the section for that call. When the service is missing, the plugin emits `harness:error` and the section is disabled (entries still readable via `memory:store` and `memory_recall`).
+- **Service** — `prompt:registry` (optional). Contributes the memory block via a registered section (id `"llm-memory:auto"`, priority `170`). Generation is bumped via `onChange` on every `store.put` and `store.remove` so the rendered block stays current. Skipped (returns `""`) when both layers are empty, causing the registry to drop the section for that call. When the service is missing, the plugin emits `harness:error` and the section is disabled (entries still readable via `memory:store` and `memory_recall`).
 - **Service** — `tools:registry` (optional). When present, registers `memory_recall` and `memory_save`. When absent, the plugin logs and skips registration.
 - **Service** — `driver:run-conversation` (optional, only when `autoExtract: true`). Used to issue a tool-gated side conversation for extraction; missing service logs and skips.
 - **Event** — `turn:end` (only when `autoExtract: true`). Reads `{ reason, lastUserMessage, turnId, sessionId }`; runs the trigger heuristic and, on hit, issues the side conversation.
-- **Vocabulary** — `llm-events:vocabulary` (event payload types).
+- **Vocabulary** — `events:vocabulary` (event payload types).
 
 The plugin emits no events of its own. Tool invocations flow through `tools:registry` (which emits its own `tool:before-execute` / `tool:result`).
 
@@ -139,5 +139,5 @@ If the markers are missing on first plugin write, they are appended at the end; 
 
 ## Lifecycle
 
-- `setup()` is the only file that touches `ctx`. It loads config, resolves dirs, sweeps stale temp files, registers the `memory:store` service, registers the `prompt:system` section (when available), registers `memory_recall`/`memory_save` into `tools:registry` (when available), and subscribes to `turn:end` only when `autoExtract: true`.
+- `setup()` is the only file that touches `ctx`. It loads config, resolves dirs, sweeps stale temp files, registers the `memory:store` service, registers the `prompt:registry` section (when available), registers `memory_recall`/`memory_save` into `tools:registry` (when available), and subscribes to `turn:end` only when `autoExtract: true`.
 - `stop()` is idempotent: unregisters the prompt section and the two tools. Plugin reload is clean.

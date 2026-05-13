@@ -54,7 +54,7 @@ registry.list({ tags: ["local"] }) // all eight
 
 **Service** — `tools:registry` (required). Used to `register(schema, handler)` each tool. If the service is unavailable at setup, the plugin throws.
 
-**VOCAB** — `llm-events:vocabulary` (declared as a consumed service so the plugin loads after the events vocabulary is published). Tool result/error shaping is owned by the registry and the active dispatch strategy; this plugin only throws native `Error`s on failure and the registry surfaces them as `tool:error`.
+**VOCAB** — `events:vocabulary` (declared as a consumed service so the plugin loads after the events vocabulary is published). Tool result/error shaping is owned by the registry and the active dispatch strategy; this plugin only throws native `Error`s on failure and the registry surfaces them as `tool:error`.
 
 ### Events emitted
 

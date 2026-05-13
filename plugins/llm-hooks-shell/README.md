@@ -78,7 +78,7 @@ Nothing. This plugin is a pure event consumer — it registers no services.
 
 ### Consumes
 
-**Service** — `llm-events:vocabulary` (required). Used at setup time to validate the `event` field of every config entry. The plugin throws on unknown event names.
+**Service** — `events:vocabulary` (required). Used at setup time to validate the `event` field of every config entry. The plugin throws on unknown event names.
 
 ### Events subscribed
 
