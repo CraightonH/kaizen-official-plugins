@@ -17,11 +17,11 @@ function fakeSlash(): { svc: SlashRegistryLike; commands: RegisteredCommand[] } 
 
 function fakeCommands(overrides: Partial<CommandsApi> = {}): CommandsApi {
   return {
-    clearSession: mock(async () => ({ from: null, to: "new", alias: null })),
+    clearSession: mock(async () => ({ from: null, to: "new", alias: null, seeded: false })),
     listSessions: mock(async () => []),
-    resumeSession: mock(async (opts) => ({ id: opts.id_or_alias, alias: null })),
-    renameActiveSession: mock(async (opts) => ({ id: "active", alias: opts.name })),
-    deleteSession: mock(async (opts) => ({ deleted: opts.id })),
+    resumeSession: mock(async (opts: { id_or_alias: string }) => ({ id: opts.id_or_alias, alias: null })),
+    renameActiveSession: mock(async (opts: { name: string }) => ({ id: "active", alias: opts.name })),
+    deleteSession: mock(async (opts: { id: string; cascade?: boolean }) => ({ deleted: opts.id })),
     ...overrides,
   };
 }
@@ -47,7 +47,7 @@ describe("session slash commands", () => {
 
   it("/clear and /session:new both call clearSession and print active session id", async () => {
     const cmds = fakeCommands({
-      clearSession: mock(async () => ({ from: "old", to: "new-id", alias: "owl" })),
+      clearSession: mock(async () => ({ from: "old", to: "new-id", alias: "owl", seeded: false })),
     });
     const { svc, commands } = fakeSlash();
     registerSlashCommands(svc, cmds);

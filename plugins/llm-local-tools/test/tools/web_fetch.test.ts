@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { schema, handler } from "../../tools/web_fetch.ts";
 
-function makeResp(body: BodyInit, init: { status?: number; headers?: Record<string, string> } = {}) {
+function makeResp(body: string | ArrayBuffer | Uint8Array, init: { status?: number; headers?: Record<string, string> } = {}) {
   return new Response(body, {
     status: init.status ?? 200,
     headers: init.headers ?? { "content-type": "text/plain" },

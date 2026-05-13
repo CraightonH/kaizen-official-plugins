@@ -1,6 +1,6 @@
 {
   "name": "llm-session-manager",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Persistent session store and per-session execution trace for the openai-compatible harness.",
   "type": "module",
   "exports": {

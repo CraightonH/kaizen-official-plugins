@@ -17,11 +17,11 @@ function fakeRegistry(): { svc: ToolsRegistryLike; tools: RegisteredTool[] } {
 
 function fakeCommands(overrides: Partial<CommandsApi> = {}): CommandsApi {
   return {
-    clearSession: mock(async () => ({ from: null, to: "new", alias: null })),
+    clearSession: mock(async () => ({ from: null, to: "new", alias: null, seeded: false })),
     listSessions: mock(async () => []),
     resumeSession: mock(async () => ({ id: "x", alias: null })),
-    renameActiveSession: mock(async (opts) => ({ id: "active", alias: opts.name })),
-    deleteSession: mock(async (opts) => ({ deleted: opts.id })),
+    renameActiveSession: mock(async (opts: { name: string }) => ({ id: "active", alias: opts.name })),
+    deleteSession: mock(async (opts: { id: string; cascade?: boolean }) => ({ deleted: opts.id })),
     ...overrides,
   };
 }
@@ -42,11 +42,11 @@ describe("session tool peers", () => {
   });
 
   it("session:new returns the clearSession result verbatim", async () => {
-    const cmds = fakeCommands({ clearSession: mock(async () => ({ from: "a", to: "b", alias: "owl" })) });
+    const cmds = fakeCommands({ clearSession: mock(async () => ({ from: "a", to: "b", alias: "owl", seeded: false })) });
     const { svc, tools } = fakeRegistry();
     registerToolCommands(svc, cmds);
     const out = await tools.find((t) => t.schema.name === "session:new")!.handler({}, callCtx());
-    expect(out).toEqual({ from: "a", to: "b", alias: "owl" });
+    expect(out).toEqual({ from: "a", to: "b", alias: "owl", seeded: false });
   });
 
   it("session:list passes includeChildren and returns rows", async () => {
@@ -101,7 +101,7 @@ describe("session tool peers", () => {
   });
 
   it("session:new tool omits keys when args are missing/wrong-typed", async () => {
-    const clear = mock(async (_opts: any) => ({ from: null, to: "x", alias: null }));
+    const clear = mock(async (_opts: any) => ({ from: null, to: "x", alias: null, seeded: false }));
     const { svc, tools } = fakeRegistry();
     registerToolCommands(svc, fakeCommands({ clearSession: clear as any }));
     const t = tools.find((tt) => tt.schema.name === "session:new")!;

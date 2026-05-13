@@ -74,11 +74,12 @@ describe("llm-local-tools integration", () => {
     }
   });
 
-  it("teardown removes every tool", async () => {
+  it("stop() removes every tool", async () => {
     const reg = makeFakeRegistry();
-    const result = await plugin.setup!(makeCtx(reg)) as { teardown: () => Promise<void> };
+    const ctx = makeCtx(reg);
+    await plugin.setup!(ctx);
     expect(reg.list()).toHaveLength(8);
-    await result.teardown();
+    await plugin.stop!(ctx);
     expect(reg.list()).toHaveLength(0);
   });
 

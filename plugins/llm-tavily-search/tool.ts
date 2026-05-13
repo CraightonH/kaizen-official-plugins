@@ -1,5 +1,5 @@
 // plugins/llm-tavily-search/tool.ts
-import type { ToolSchema } from "llm-events/public";
+import type { ToolExecutionContext, ToolSchema } from "llm-tools-registry/public";
 import type { TavilyConfig } from "./config.ts";
 
 export const schema: ToolSchema = {
@@ -58,8 +58,8 @@ export interface HandlerDeps {
 }
 
 export function makeHandler(deps: HandlerDeps) {
-  return async function handler(rawArgs: unknown, ctx: any): Promise<SearchResult> {
-    const args = rawArgs as SearchArgs;
+  return async function handler(rawArgs: unknown, ctx: ToolExecutionContext): Promise<SearchResult> {
+    const args = (rawArgs ?? {}) as SearchArgs;
     if (!args.query || typeof args.query !== "string") {
       throw new Error("web_search: query is required");
     }
@@ -81,10 +81,9 @@ export function makeHandler(deps: HandlerDeps) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(new Error("timeout")), deps.config.requestTimeoutMs);
     const onAbort = () => controller.abort(new Error("cancelled"));
-    if (ctx?.signal) {
-      if (ctx.signal.aborted) controller.abort();
-      else ctx.signal.addEventListener("abort", onAbort, { once: true });
-    }
+    const outer = ctx.signal;
+    if (outer.aborted) controller.abort(new Error("cancelled"));
+    else outer.addEventListener("abort", onAbort, { once: true });
 
     const start = Date.now();
     try {
@@ -111,16 +110,17 @@ export function makeHandler(deps: HandlerDeps) {
         })),
         response_time_ms: Date.now() - start,
       };
-    } catch (err: any) {
-      if (err?.name === "AbortError" || controller.signal.aborted) {
+    } catch (err) {
+      const e = err as { name?: string; message?: string };
+      if (e?.name === "AbortError" || controller.signal.aborted) {
         const reason = controller.signal.reason instanceof Error ? controller.signal.reason.message : "aborted";
         throw new Error(`web_search: ${reason}`);
       }
-      if (err?.message?.startsWith?.("web_search:")) throw err;
-      throw new Error(`web_search: ${err?.message ?? String(err)}`);
+      if (typeof e?.message === "string" && e.message.startsWith("web_search:")) throw err;
+      throw new Error(`web_search: ${e?.message ?? String(err)}`);
     } finally {
       clearTimeout(timer);
-      if (ctx?.signal) ctx.signal.removeEventListener?.("abort", onAbort as any);
+      outer.removeEventListener("abort", onAbort);
     }
   };
 }

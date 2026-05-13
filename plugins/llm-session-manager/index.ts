@@ -2,6 +2,7 @@ import type { KaizenPlugin } from "kaizen/types";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import pkg from "./package.json" with { type: "json" };
 import { harnessKey } from "./harness-key";
 import { makeStore, type SessionsStoreService } from "./store";
 import { makeTraceSubscriber } from "./trace-subscriber";
@@ -32,7 +33,9 @@ const TRACE_EVENTS = [
   "codemode:error",
 ];
 
-const LIFECYCLE_EVENTS = ["harness:start", "session:active-changed"];
+// Events subscribed for lifecycle bookkeeping (active-session tracking +
+// deferred slash/tool adapter registration).
+const LIFECYCLE_EVENTS = ["harness:start", "session:active-changed"] as const;
 
 const plugin: KaizenPlugin = {
   name: "llm-session-manager",
@@ -51,11 +54,12 @@ const plugin: KaizenPlugin = {
     ctx.consumeService("llm-events:vocabulary");
     const config = (ctx.config ?? {}) as SessionManagerConfig;
     const sessionsBase = config.sessionsBase ?? join(homedir(), ".kaizen", "sessions");
-    const key = harnessKey(ctx.harness ?? {});
+    // ctx.harness is a Kaizen runtime extension not yet on PluginContext.
+    const key = harnessKey((ctx as { harness?: import("./harness-key").HarnessIdentity }).harness ?? {});
     const store = makeStore({
       sessionsBase,
       harnessKey: key,
-      pluginFingerprint: ["llm-session-manager@0.1.0"],
+      pluginFingerprint: [`${pkg.name}@${pkg.version}`],
       now: () => Date.now(),
       newUuid: () => randomUUID(),
       log: ctx.log.bind(ctx),
@@ -68,7 +72,7 @@ const plugin: KaizenPlugin = {
     ctx.provideService<SessionsStoreService>("sessions:store", store);
 
     let activeSessionId: string | null = null;
-    ctx.on("session:active-changed", (payload: any) => {
+    ctx.on("session:active-changed", async (payload: any) => {
       if (typeof payload?.to === "string") activeSessionId = payload.to;
     });
 
@@ -85,7 +89,7 @@ const plugin: KaizenPlugin = {
 
     // Register slash + tool adapters on harness:start so consumed registries
     // are guaranteed to be provided. Both are soft dependencies.
-    ctx.on("harness:start", () => {
+    ctx.on("harness:start", async () => {
       const cmds = makeCommands({ store, emit: ctx.emit.bind(ctx), getActiveSessionId: () => activeSessionId });
       try {
         const slash = ctx.useService<SlashRegistryLike>("slash:registry");

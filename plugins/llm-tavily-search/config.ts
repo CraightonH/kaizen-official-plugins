@@ -51,8 +51,9 @@ export async function loadConfig(deps: ConfigDeps): Promise<TavilyConfig> {
   let raw: string | null = null;
   try {
     raw = await deps.readFile(path);
-  } catch (err: any) {
-    if (err?.code === "ENOENT") {
+  } catch (err) {
+    const code = (err as { code?: string })?.code;
+    if (code === "ENOENT") {
       if (override) deps.log(`llm-tavily-search: KAIZEN_TAVILY_CONFIG=${path} not found; using defaults`);
       const merged = { ...DEFAULT_CONFIG };
       if (merged.apiKeyEnv) {

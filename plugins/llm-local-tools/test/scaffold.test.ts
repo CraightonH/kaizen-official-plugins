@@ -45,11 +45,12 @@ describe("llm-local-tools plugin", () => {
     );
   });
 
-  it("teardown unregisters everything", async () => {
+  it("stop() unregisters everything", async () => {
     const registry = makeRegistry();
     const ctx = makeCtx(registry);
-    const result = await plugin.setup!(ctx) as { teardown: () => Promise<void> };
-    await result.teardown();
+    await plugin.setup!(ctx);
+    expect(registry.registered.length).toBe(8);
+    await plugin.stop!(ctx);
     expect(registry.registered).toEqual([]);
   });
 

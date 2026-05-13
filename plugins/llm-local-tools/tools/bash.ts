@@ -1,5 +1,5 @@
 // plugins/llm-local-tools/tools/bash.ts
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import type { ToolSchema } from "llm-events/public";
 import { resolvePath, truncateMiddle, BASH_OUTPUT_CAP } from "../util.ts";
 
@@ -51,7 +51,7 @@ export async function handler(args: BashArgs, ctx: any): Promise<BashResult> {
 
   return new Promise<BashResult>((resolve) => {
     // detached: true creates a new process group so we can kill the whole group
-    const child = spawn(args.command, { cwd, shell: true, detached: true });
+    const child: ChildProcess = spawn(args.command, { cwd, shell: true, detached: true });
     const chunks: Buffer[] = [];
     let killedByTimeout = false;
     let killedBySignal = false;
@@ -85,7 +85,7 @@ export async function handler(args: BashArgs, ctx: any): Promise<BashResult> {
       else ctx.signal.addEventListener("abort", onAbort, { once: true });
     }
 
-    child.on("close", (code, signal) => {
+    child.on("close", (code: number | null, signal: NodeJS.Signals | null) => {
       clearTimeout(timer);
       if (killTimer != null) clearTimeout(killTimer);
       if (ctx?.signal) ctx.signal.removeEventListener?.("abort", onAbort as any);

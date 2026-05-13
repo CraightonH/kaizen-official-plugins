@@ -118,7 +118,7 @@ describe("store", () => {
     h.append({
       role: "assistant",
       content: "",
-      toolCalls: [{ id: "call_1", type: "function", function: { name: "glob", arguments: "{}" } }],
+      toolCalls: [{ id: "call_1", name: "glob", arguments: {} }],
     });
     await h.partialCommit();
     expect(await store.getMessages(session.id)).toEqual([{ role: "user", content: "list files" }]);
@@ -132,7 +132,7 @@ describe("store", () => {
     h.append({
       role: "assistant",
       content: "",
-      toolCalls: [{ id: "call_1", type: "function", function: { name: "glob", arguments: "{}" } }],
+      toolCalls: [{ id: "call_1", name: "glob", arguments: {} }],
     });
     h.append({ role: "tool", content: "a.txt\nb.txt", toolCallId: "call_1" });
     h.append({ role: "tool", content: "", toolCallId: "call_1" }); // second tool result is fine; algorithm only checks last msg
@@ -150,13 +150,13 @@ describe("store", () => {
     h.append({
       role: "assistant",
       content: "",
-      toolCalls: [{ id: "call_1", type: "function", function: { name: "glob", arguments: "{}" } }],
+      toolCalls: [{ id: "call_1", name: "glob", arguments: {} }],
     });
     h.append({ role: "tool", content: "a.txt", toolCallId: "call_1" });
     h.append({
       role: "assistant",
       content: "",
-      toolCalls: [{ id: "call_2", type: "function", function: { name: "read", arguments: "{}" } }],
+      toolCalls: [{ id: "call_2", name: "read", arguments: {} }],
     });
     await h.partialCommit();
     const msgs = await store.getMessages(session.id);

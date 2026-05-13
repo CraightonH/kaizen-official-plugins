@@ -27,6 +27,8 @@ function makeCtx(registry: any) {
     emit: mock(async () => []),
     defineService: mock(() => {}),
     provideService: mock(() => {}),
+    consumeService: mock(() => {}),
+    secrets: { get: async () => undefined },
   } as any;
 }
 
@@ -34,6 +36,7 @@ describe("llm-tavily-search plugin", () => {
   it("metadata", () => {
     expect(plugin.name).toBe("llm-tavily-search");
     expect(plugin.apiVersion).toBe("3.0.0");
+    expect(plugin.permissions?.tier).toBe("trusted");
     expect(plugin.services?.consumes).toContain("tools:registry");
   });
 
@@ -42,13 +45,24 @@ describe("llm-tavily-search plugin", () => {
     const ctx = makeCtx(registry);
     await plugin.setup!(ctx);
     expect(registry.registered).toEqual(["web_search"]);
+    await plugin.stop?.(ctx);
   });
 
-  it("teardown unregisters", async () => {
+  it("stop() unregisters", async () => {
     const registry = makeRegistry();
     const ctx = makeCtx(registry);
-    const result = await plugin.setup!(ctx) as { teardown: () => Promise<void> };
-    await result.teardown();
+    await plugin.setup!(ctx);
+    await plugin.stop!(ctx);
+    expect(registry.registered).toEqual([]);
+  });
+
+  it("stop() is idempotent", async () => {
+    const registry = makeRegistry();
+    const ctx = makeCtx(registry);
+    await plugin.setup!(ctx);
+    await plugin.stop!(ctx);
+    // Second stop must not throw or double-unregister.
+    await expect(plugin.stop!(ctx)).resolves.toBeUndefined();
     expect(registry.registered).toEqual([]);
   });
 

@@ -1,7 +1,7 @@
 // plugins/llm-local-tools/tools/grep.ts
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import type { ToolSchema } from "llm-events/public";
 import { resolvePath, GREP_DEFAULT_MAX } from "../util.ts";
 
@@ -77,13 +77,83 @@ async function walkFiles(root: string, out: string[]): Promise<void> {
 }
 
 export function makeHandler(opts: { rgPath: string | null }) {
-  return async function handler(args: GrepArgs, _ctx: any): Promise<string> {
+  return async function handler(args: GrepArgs, ctx: any): Promise<string> {
     const rg = opts.rgPath !== undefined ? opts.rgPath : probeRgOnce();
-    return runJsFallback(args, rg);
+    if (rg) return runRipgrep(args, rg, ctx);
+    return runJsFallback(args);
   };
 }
 
-async function runJsFallback(args: GrepArgs, _rg: string | null): Promise<string> {
+function runRipgrep(args: GrepArgs, rgPath: string, ctx: any): Promise<string> {
+  const root = resolvePath(args.path ?? ".");
+  const mode = args.output_mode ?? "content";
+  const maxResults = Math.max(1, args.max_results ?? GREP_DEFAULT_MAX);
+  const ctxLines = Math.max(0, args.context ?? 0);
+
+  const argv: string[] = [
+    "--no-config",
+    "--color", "never",
+    "--no-heading",
+    "--with-filename",
+    "--line-number",
+  ];
+  if (args.case_insensitive) argv.push("--ignore-case");
+  if (args.glob) argv.push("--glob", args.glob);
+  if (mode === "content") {
+    if (ctxLines > 0) argv.push("--context", String(ctxLines));
+    // ripgrep prints one line per match (with optional context); cap rough match output via -m per-file
+    // and we'll also cap total in-process. Use --max-count for per-file safety.
+    argv.push("--max-count", String(maxResults));
+  } else if (mode === "files_with_matches") {
+    argv.push("--files-with-matches");
+  } else if (mode === "count") {
+    argv.push("--count");
+  }
+  argv.push("--", args.pattern, root);
+
+  return new Promise<string>((resolve) => {
+    const child = spawn(rgPath, argv);
+    const chunks: Buffer[] = [];
+    let totalBytes = 0;
+    let killed = false;
+    const onAbort = () => {
+      killed = true;
+      try { child.kill("SIGTERM"); } catch { /* ignore */ }
+    };
+    if (ctx?.signal) {
+      if (ctx.signal.aborted) onAbort();
+      else ctx.signal.addEventListener("abort", onAbort, { once: true });
+    }
+    child.stdout?.on("data", (b: Buffer) => { chunks.push(b); totalBytes += b.length; });
+    child.stderr?.on("data", () => { /* swallow rg stderr; surface via exit handling */ });
+    child.on("close", () => {
+      if (ctx?.signal) ctx.signal.removeEventListener?.("abort", onAbort as any);
+      if (killed) {
+        resolve("");
+        return;
+      }
+      const raw = Buffer.concat(chunks).toString("utf8");
+      // Apply a total-results cap on content mode (ripgrep's --max-count is per-file).
+      if (mode === "content") {
+        const lines = raw.split("\n");
+        // Strip trailing empty line from final newline
+        if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+        if (lines.length > maxResults) {
+          const head = lines.slice(0, maxResults).join("\n");
+          resolve(`${head}\n... [truncated: max_results=${maxResults} reached]`);
+          return;
+        }
+        resolve(lines.join("\n"));
+        return;
+      }
+      // files_with_matches / count: trim trailing newline only.
+      resolve(raw.endsWith("\n") ? raw.slice(0, -1) : raw);
+    });
+    child.on("error", () => resolve(""));
+  });
+}
+
+async function runJsFallback(args: GrepArgs): Promise<string> {
   const root = resolvePath(args.path ?? ".");
   const flags = args.case_insensitive ? "i" : "";
   const re = new RegExp(args.pattern, flags);
@@ -147,5 +217,5 @@ async function runJsFallback(args: GrepArgs, _rg: string | null): Promise<string
   return out.join("\n");
 }
 
-// Default handler — probes rg lazily.
+// Default handler — probes rg lazily and uses it when available.
 export const handler = makeHandler({ rgPath: undefined as any });

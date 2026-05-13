@@ -1,5 +1,14 @@
 import { basename, dirname } from "node:path";
-import type { HarnessIdentity } from "kaizen/types";
+
+/**
+ * Narrow shape of `ctx.harness` consumed by this plugin. Either field may be
+ * present depending on how the harness was loaded (marketplace ref vs local
+ * JSON). Both absent is valid and resolves to a stable "default" key.
+ */
+export interface HarnessIdentity {
+  ref?: string;
+  jsonPath?: string;
+}
 
 function sanitize(s: string): string {
   return s.replace(/[^A-Za-z0-9_.-]/g, "_");

@@ -1,10 +1,10 @@
 {
   "plugins": [
     "official/llm-events@0.7.0",
-    "official/llm-session-manager@0.1.0",
+    "official/llm-session-manager@0.1.1",
     "official/openai-llm@0.1.0",
     "official/llm-tools-registry@0.3.0",
-    "official/llm-local-tools@0.1.0",
+    "official/llm-local-tools@0.2.0",
     "official/llm-tavily-search@0.1.0",
     "official/llm-mcp-bridge@0.1.1",
     "official/llm-skills@0.1.1",

@@ -8,3 +8,6 @@
 - session target: llm-tools-registry
 - session target: llm-tools-registry (ToolSource open-shape refactor — bumped to 0.3.0; llm-codemode bumped to 0.2.0)
 - session target: llm-codemode (bumped to 0.3.0; dropped dead `maxBlocksPerResponse` and `public.d.ts`; narrowed `services.consumes`; extracted shared `kaizen-tree.ts` helper to lock host/worker grouping shape)
+- session target: llm-session-manager (bumped to 0.1.1; canonical tsconfig; fingerprint from package.json; async EventHandler signatures; local HarnessIdentity since kaizen pkg no longer exports it; canonical ToolCall shape in tests; root smoke test)
+- session target: llm-local-tools (bumped to 0.2.0; setup→stop() canonical lifecycle [was returning {teardown}, never invoked — actual bug]; wired ripgrep shell-out path that README claimed but never ran; bash/grep type fixes; canonical tsconfig; README/CLAUDE.md corrected — edit schema, web_fetch section, 7→8 tool count; contract-change doc filed)
+- session target: llm-tavily-search (no version bump; lifecycle moved to canonical stop(); ToolSchema/ToolExecutionContext imported from llm-tools-registry/public — narrowest stable contract owner; listener leak fix on abort; canonical tsconfig; README Services/Config/Permissions/Errors sections added)

@@ -1,6 +1,6 @@
 {
   "name": "llm-local-tools",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Built-in local-development toolset (filesystem + shell) for the openai-compatible harness.",
   "type": "module",
   "exports": {
@@ -15,6 +15,7 @@
   "devDependencies": {
     "@types/bun": "latest",
     "@types/json-schema": "^7.0.15",
+    "@types/node": "^20.0.0",
     "typescript": "^5.4.0"
   }
 }

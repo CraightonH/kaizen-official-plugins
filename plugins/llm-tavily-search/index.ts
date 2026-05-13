@@ -6,6 +6,8 @@ import { schema, makeHandler } from "./tool.ts";
 
 export const TOOL_NAMES = ["web_search"] as const;
 
+let unregisterTool: (() => void) | undefined;
+
 const plugin: KaizenPlugin = {
   name: "llm-tavily-search",
   apiVersion: "3.0.0",
@@ -18,17 +20,19 @@ const plugin: KaizenPlugin = {
 
     const config = await loadConfig(realDeps((m) => ctx.log(m)));
     if (!config.apiKey) {
-      ctx.log("llm-tavily-search: no API key found; web_search will error on call. Set TAVILY_API_KEY or ~/.kaizen/plugins/llm-tavily-search/config.json");
+      ctx.log(
+        "llm-tavily-search: no API key found; web_search will error on call. " +
+          "Set TAVILY_API_KEY or ~/.kaizen/plugins/llm-tavily-search/config.json",
+      );
     }
 
     const handler = makeHandler({ config, fetch, log: (m) => ctx.log(m) });
-    const unregister = registry.register(schema, handler);
+    unregisterTool = registry.register(schema, handler);
+  },
 
-    return {
-      async teardown() {
-        try { unregister(); } catch { /* idempotent */ }
-      },
-    };
+  async stop() {
+    try { unregisterTool?.(); } catch { /* idempotent */ }
+    unregisterTool = undefined;
   },
 };
 

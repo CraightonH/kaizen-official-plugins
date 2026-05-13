@@ -51,7 +51,10 @@
       "name": "llm-session-manager",
       "description": "Persistent session store and per-session execution trace for openai-compatible harnesses.",
       "categories": ["sessions", "persistence", "llm"],
-      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-session-manager" } }]
+      "versions": [
+        { "version": "0.1.1", "source": { "type": "file", "path": "plugins/llm-session-manager" } },
+        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-session-manager" } }
+      ]
     },
     {
       "kind": "plugin",
@@ -104,9 +107,9 @@
     {
       "kind": "plugin",
       "name": "llm-local-tools",
-      "description": "Built-in local-development toolset (read/write/create/edit/glob/grep/bash) for the openai-compatible harness. NOT sandboxed.",
+      "description": "Built-in local-development toolset (read/write/create/edit/glob/grep/bash/web_fetch) for the openai-compatible harness. NOT sandboxed.",
       "categories": ["tools", "local"],
-      "versions": [{ "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-local-tools" } }]
+      "versions": [{ "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-local-tools" } }]
     },
     {
       "kind": "plugin",

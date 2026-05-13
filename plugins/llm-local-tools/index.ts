@@ -3,7 +3,9 @@ import type { KaizenPlugin } from "kaizen/types";
 import type { ToolsRegistryService } from "llm-tools-registry/public";
 import { ALL_TOOLS } from "./tools.ts";
 
-export const TOOL_NAMES = ["read", "write", "create", "edit", "glob", "grep", "bash", "web_fetch"] as const;
+export const TOOL_NAMES = [
+  "read", "write", "create", "edit", "glob", "grep", "bash", "web_fetch",
+] as const;
 
 const plugin: KaizenPlugin = {
   name: "llm-local-tools",
@@ -20,13 +22,16 @@ const plugin: KaizenPlugin = {
       unregisters.push(registry.register(tool.schema, tool.handler));
     }
 
-    return {
-      async teardown() {
-        for (const u of unregisters) {
-          try { u(); } catch { /* idempotent */ }
-        }
-      },
+    (plugin as any)._stop = () => {
+      for (const u of unregisters.splice(0)) {
+        try { u(); } catch { /* idempotent */ }
+      }
     };
+  },
+
+  async stop() {
+    const fn = (plugin as any)._stop;
+    if (typeof fn === "function") fn();
   },
 };
 

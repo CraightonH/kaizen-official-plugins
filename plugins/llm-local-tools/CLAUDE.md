@@ -6,7 +6,8 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 
 ```
 index.ts          Plugin lifecycle. Resolves tools:registry, registers every entry from ALL_TOOLS,
-                  collects unregister fns, returns a teardown that runs them. The only file that touches `ctx`.
+                  collects unregister fns, and assigns a closure to `plugin._stop` that runs them
+                  on `stop()`. The only file that touches `ctx`.
 tools.ts          ALL_TOOLS array. Re-exports {schema, handler} from each per-tool module.
                   Add a new tool by appending here.
 public.d.ts       Re-exports ToolSchema/ToolCall from llm-events/public and the TOOL_NAMES tuple.
@@ -16,12 +17,16 @@ util.ts           Pure helpers shared by every tool: resolvePath, truncateBytes,
 tools/read.ts     Line-numbered file read with offset/limit, binary sniff, 50 MB hard refusal.
 tools/write.ts    Overwrite-only writer; refuses if path does not exist.
 tools/create.ts   Create-only writer; refuses if path already exists.
-tools/edit.ts     Exact-string replacement. Counts occurrences; rejects 0, >1 (without replace_all),
-                  and no-op edits.
+tools/edit.ts     Two commands behind one tool. `str_replace` does exact-string replacement (counts
+                  occurrences; rejects 0, >1 without replace_all, and no-op edits). `insert` uses
+                  1-based AT semantics (`insert_line: N` makes the inserted text the new line N;
+                  `1` prepends, `total_lines+1` appends).
 tools/glob.ts     Bun.Glob (or fs-walker fallback). mtime-desc sort. .gitignore honored when
                   a .git dir exists at-or-above cwd. Cap 1000.
-tools/grep.ts     `rg` shell-out when on PATH; JS fallback otherwise. detectRgPath() runs once at
-                  module load and caches the result. Supports content/files_with_matches/count.
+tools/grep.ts     `rg` shell-out when on PATH (preferred — Rust regex, ripgrep's own gitignore
+                  handling, faster); JS fallback otherwise. detectRgPath() probes `which rg` lazily
+                  and caches the result. Supports content/files_with_matches/count. Honors
+                  ctx.signal — SIGTERMs the rg child on abort.
 tools/bash.ts     Spawns via the shell (process group) so SIGTERM/SIGKILL kill children too.
                   Middle-truncation past 256 KB. Wires registry's AbortSignal to SIGTERM.
                   Rejects run_in_background: true.
@@ -52,7 +57,7 @@ Boundaries:
 - **`bash` cancellation.** The registry's `ToolExecutionContext.signal` must SIGTERM the spawned process group. `turn:cancel` relies on this.
 - **`run_in_background: true` is rejected, not ignored.** Throw a clear error so the LLM doesn't silently lose its long-running job.
 - **Ripgrep probe runs once.** `detectRgPath()` is called at module load in `grep.ts`. Don't move it inside the handler — would add a `which` spawn per call.
-- **Tag tuples are exact.** `["local", "fs"]` for filesystem tools, `["local", "shell"]` for `bash`. Capability plugins (notably the agents capability) filter on these strings.
+- **Tag tuples are exact.** `["local", "fs"]` for filesystem tools, `["local", "shell"]` for `bash`, `["local", "web"]` for `web_fetch`. Capability plugins (notably the agents capability) filter on these strings.
 
 ## Adding a new tool
 
@@ -80,8 +85,8 @@ Tests use `bun:test` only — no external mocking framework. Each tool test crea
 The Kaizen runtime prefers the bundled `dist/index.js` over source. After editing, the plugin must be re-bundled into the install dir:
 
 ```bash
-cp -R plugins/llm-local-tools/. ~/.kaizen/marketplaces/official/plugins/llm-local-tools@0.1.0/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-local-tools@0.1.0 \
+cp -R plugins/llm-local-tools/. ~/.kaizen/marketplaces/official/plugins/llm-local-tools@0.2.0/
+(cd ~/.kaizen/marketplaces/official/plugins/llm-local-tools@0.2.0 \
   && bun build --target=bun --outfile=dist/index.js index.ts)
 ```
 
