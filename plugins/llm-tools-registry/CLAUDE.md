@@ -95,8 +95,8 @@ When adding behavior, prefer extending `registry.test.ts` — `index.test.ts` sh
 The Kaizen runtime prefers the bundled `dist/index.js` over source. After editing, the plugin must be re-bundled into the install dir:
 
 ```bash
-cp -R plugins/llm-tools-registry/. ~/.kaizen/marketplaces/official/plugins/llm-tools-registry@0.1.0/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-tools-registry@0.1.0 \
+cp -R plugins/llm-tools-registry/. ~/.kaizen/marketplaces/official/plugins/llm-tools-registry@0.3.0/
+(cd ~/.kaizen/marketplaces/official/plugins/llm-tools-registry@0.3.0 \
   && bun build --target=bun --outfile=dist/index.js index.ts)
 ```
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, mock } from "bun:test";
-import plugin from "../index.ts";
-import type { ToolsRegistryService } from "../registry.ts";
+import plugin from "./index.ts";
+import type { ToolsRegistryService } from "./registry.ts";
 
 function makeCtx() {
   const provided: Record<string, unknown> = {};

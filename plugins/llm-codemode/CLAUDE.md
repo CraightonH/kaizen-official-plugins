@@ -26,9 +26,16 @@ dts-render.ts       renderDts(tools) → string. Used to build the tool descript
 serialize.ts        formatToolResult(...) → string. Produces the `tool` role
                     message content. NOTE: no `[code execution result]` prefix —
                     the role label is the signal.
-assembler.ts        renderSurface / surfaceHash / normalizeServerName helpers
-                    used to build the grouped kaizen global and the rendered
-                    .d.ts surface in the tool description.
+assembler.ts        renderSurface / surfaceHash helpers used to build the
+                    rendered .d.ts surface in the tool description. Drives
+                    grouping through bucketFor() (re-exports normalizeServerName
+                    for tests + sandbox-host backcompat).
+buckets.ts          Codemode-owned presentation policy. Maps the open
+                    ToolSource from llm-tools-registry into the closed set of
+                    kaizen namespaces (tools, mcp, agents, skills, memory).
+                    Unknown source kinds fall through to the `tools` bucket.
+                    Loaded both from the host and from the sandbox worker —
+                    keep runtime-dependency-free.
 rpc-types.ts        Host↔worker message shapes.
 tui-renderer.tsx    `codemodeRenderer: TuiToolRenderer`. Exported for the TUI to
                     register via `llm-tui:tool-renderer`.
@@ -45,8 +52,8 @@ tui-renderer.tsx    `codemodeRenderer: TuiToolRenderer`. Exported for the TUI to
 ## Local deploy
 
 ```bash
-cp -R plugins/llm-codemode/. ~/.kaizen/marketplaces/official/plugins/llm-codemode@0.1.0/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-codemode@0.1.0 \
+cp -R plugins/llm-codemode/. ~/.kaizen/marketplaces/official/plugins/llm-codemode@0.2.0/
+(cd ~/.kaizen/marketplaces/official/plugins/llm-codemode@0.2.0 \
   && bun build --target=bun --outfile=dist/index.js index.ts)
 ```
 

@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
-import type { ToolRegistration, ToolSource } from "llm-tools-registry/public";
+import type { ToolRegistration } from "llm-tools-registry/public";
 import { renderToolsDts } from "./dts-render.ts";
+import { bucketFor, normalizeServerName } from "./buckets.ts";
+
+export { normalizeServerName };
 
 const PREAMBLE =
   "You have access to a sandboxed TypeScript runtime. To use a tool, write a single ```typescript code block. " +
@@ -10,12 +13,6 @@ const PREAMBLE =
   "final answer to the user.\n\n" +
   "After you emit a code block, you will see a message from the user starting with `[code execution result]`. " +
   "Treat it as the runtime's response, not a new request from the human.";
-
-export function normalizeServerName(name: string): string {
-  let n = name.replace(/[^A-Za-z0-9_]/g, "_");
-  if (/^[0-9]/.test(n)) n = `_${n}`;
-  return n;
-}
 
 export interface SurfaceGroups {
   local: ToolRegistration[];
@@ -38,23 +35,26 @@ export function groupBySource(regs: ReadonlyArray<ToolRegistration>): SurfaceGro
   const normalizedToRaw = new Map<string, Set<string>>();
 
   for (const r of regs) {
-    const s = r.source as ToolSource;
-    switch (s.kind) {
-      case "local":
+    const bucket = bucketFor(r.source);
+    switch (bucket.kind) {
+      case "tools":
         groups.local.push(r);
         break;
       case "mcp": {
-        const norm = normalizeServerName(s.server);
+        const norm = bucket.server;
         if (!groups.mcp[norm]) groups.mcp[norm] = [];
         groups.mcp[norm]!.push(r);
+        const raw = typeof (r.source as { server?: unknown }).server === "string"
+          ? (r.source as { server: string }).server
+          : norm;
         if (!normalizedToRaw.has(norm)) normalizedToRaw.set(norm, new Set());
-        normalizedToRaw.get(norm)!.add(s.server);
+        normalizedToRaw.get(norm)!.add(raw);
         break;
       }
-      case "agent":
+      case "agents":
         groups.agents.push(r);
         break;
-      case "skill":
+      case "skills":
         groups.skills.push(r);
         break;
       case "memory":

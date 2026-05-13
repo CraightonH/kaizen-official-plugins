@@ -19,12 +19,24 @@ export type {
 import type { ToolSchema as _ToolSchema } from "llm-events/public";
 import type { ToolHandler as _ToolHandler } from "./registry";
 
-export type ToolSource =
-  | { kind: "local" }
-  | { kind: "mcp"; server: string }
-  | { kind: "agent" }
-  | { kind: "skill" }
-  | { kind: "memory" };
+// ToolSource is open-shaped. `kind` is a freeform string so that new
+// provenance kinds can be introduced without editing this file. Well-known
+// kinds and their structured metadata:
+//
+//   { kind: "local" }                       — registered directly by a plugin
+//   { kind: "mcp"; server: string }         — brokered from an MCP server
+//   { kind: "agent" }                       — agent dispatch tool
+//   { kind: "skill" }                       — skill dispatch tool
+//   { kind: "memory" }                      — memory recall/save tool
+//
+// Consumers that bucket tools for presentation (e.g. llm-codemode) should
+// define their own closed bucket type and a mapping function with a
+// well-defined fallback for unknown kinds. The registry itself stores
+// `source` opaquely and does not pattern-match on `kind`.
+export interface ToolSource {
+  kind: string;
+  [k: string]: unknown;
+}
 
 export interface ToolRegistration {
   schema: _ToolSchema;

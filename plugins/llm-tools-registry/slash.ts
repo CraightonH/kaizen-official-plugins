@@ -1,5 +1,5 @@
 import type { ToolsRegistryService } from "./registry.ts";
-import type { ToolSource, ToolRegistration } from "./public.d.ts";
+import type { ToolSource, ToolRegistration } from "./public";
 
 export interface SlashCommandManifestLike {
   name: string;

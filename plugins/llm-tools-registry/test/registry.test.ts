@@ -260,6 +260,20 @@ describe("registry — provenance", () => {
     expect(emit).toHaveBeenCalledWith("tools:unregistered", { name: "t", source: { kind: "skill" } });
   });
 
+  it("accepts an unknown source kind (open ToolSource shape)", () => {
+    const r = makeRegistry(mock(async () => []) as any);
+    r.registerWith({
+      schema: { name: "t", description: "", parameters: { type: "object" } as any },
+      handler: async () => "ok",
+      source: { kind: "workflow", workflowId: "wf-1" } as any,
+    });
+    const reg = r.listRegistrations()[0]!;
+    expect(reg.source.kind).toBe("workflow");
+    expect((reg.source as any).workflowId).toBe("wf-1");
+    // filter by the custom kind
+    expect(r.list({ sources: ["workflow"] }).map((s) => s.name)).toEqual(["t"]);
+  });
+
   it("list(filter.sources) restricts by kind", () => {
     const r = makeRegistry(mock(async () => []) as any);
     r.registerWith({

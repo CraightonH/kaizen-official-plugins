@@ -7,7 +7,7 @@ import type { CodeModeConfig } from "./config.ts";
 import type { HostToWorker, WorkerToHost, InitMsg, ToolResultMsg, RegistrationMeta } from "./rpc-types.ts";
 import { wrapCode } from "./wrapper.ts";
 import { truncate } from "./serialize.ts";
-import { normalizeServerName } from "./assembler.ts";
+import { bucketFor } from "./buckets.ts";
 
 /**
  * Build the `kaizen` global object exposed inside the sandbox.
@@ -44,22 +44,21 @@ export function buildKaizenGlobal(args: BuildKaizenGlobalArgs): {
 
   for (const r of registrations) {
     const name = r.schema.name;
-    const s = r.source;
-    switch (s.kind) {
-      case "local":
+    const bucket = bucketFor(r.source);
+    switch (bucket.kind) {
+      case "tools":
         ensure("tools")[name] = fn(name);
         break;
       case "mcp": {
-        const server = normalizeServerName(s.server);
         const ns = ensure("mcp");
-        if (!ns[server]) ns[server] = {};
-        (ns[server] as Record<string, unknown>)[name] = fn(name);
+        if (!ns[bucket.server]) ns[bucket.server] = {};
+        (ns[bucket.server] as Record<string, unknown>)[name] = fn(name);
         break;
       }
-      case "agent":
+      case "agents":
         ensure("agents")[name] = fn(name);
         break;
-      case "skill":
+      case "skills":
         ensure("skills")[name] = fn(name);
         break;
       case "memory":

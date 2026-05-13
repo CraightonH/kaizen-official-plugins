@@ -1,11 +1,6 @@
 /// <reference lib="webworker" />
 import type { HostToWorker, ToolInvokeMsg, ToolResultMsg, StdoutMsg, DoneMsg, ErrorMsg, RegistrationMeta } from "./rpc-types.ts";
-
-function normalizeServerName(name: string): string {
-  let n = name.replace(/[^A-Za-z0-9_]/g, "_");
-  if (/^[0-9]/.test(n)) n = `_${n}`;
-  return n;
-}
+import { bucketFor } from "./buckets.ts";
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -105,22 +100,21 @@ function makeKaizen(registrations: RegistrationMeta[] | undefined): unknown {
   };
   for (const r of registrations) {
     const name = r.name;
-    const s = r.source;
-    switch (s.kind) {
-      case "local":
+    const bucket = bucketFor(r.source);
+    switch (bucket.kind) {
+      case "tools":
         ensure("tools")[name] = invokeFn(name);
         break;
       case "mcp": {
-        const server = normalizeServerName(s.server);
         const ns = ensure("mcp");
-        if (!ns[server]) ns[server] = {};
-        (ns[server] as Record<string, unknown>)[name] = invokeFn(name);
+        if (!ns[bucket.server]) ns[bucket.server] = {};
+        (ns[bucket.server] as Record<string, unknown>)[name] = invokeFn(name);
         break;
       }
-      case "agent":
+      case "agents":
         ensure("agents")[name] = invokeFn(name);
         break;
-      case "skill":
+      case "skills":
         ensure("skills")[name] = invokeFn(name);
         break;
       case "memory":

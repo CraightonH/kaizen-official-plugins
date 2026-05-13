@@ -1,14 +1,11 @@
 // Messages exchanged between sandbox-host (in main process) and sandbox-entry (in Bun Worker).
 // Serializable subset of ToolRegistration for postMessage transport.
 // (Handlers/functions can't cross the worker boundary.)
+import type { ToolSource } from "llm-tools-registry/public";
+
 export interface RegistrationMeta {
   name: string;
-  source:
-    | { kind: "local" }
-    | { kind: "mcp"; server: string }
-    | { kind: "agent" }
-    | { kind: "skill" }
-    | { kind: "memory" };
+  source: ToolSource;
 }
 
 // host → worker
