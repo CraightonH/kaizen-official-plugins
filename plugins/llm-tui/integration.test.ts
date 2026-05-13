@@ -69,7 +69,7 @@ describe("llm-tui integration (non-TTY)", () => {
     await prog({ callId: "c1", delta: "127.0.0.1 localhost\n" });
     await res({ callId: "c1", result: "127.0.0.1 localhost\n" });
     // The TUI plugin's tool-renderer service was provided.
-    expect(ctx.provided["llm-tui:tool-renderer"]).toBeDefined();
+    expect(ctx.provided["ui:tool-renderer"]).toBeDefined();
   });
 
   it("store lifecycle: appendLiveToolCall → updateLiveToolCall → finalizeLiveToolCall accumulates stdout into transcript", () => {

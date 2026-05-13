@@ -36,7 +36,7 @@ describe("llm-tui plugin", () => {
     expect(ctx.provided["ui:completion-source"]).toBeDefined();
     expect(ctx.provided["ui:status"]).toBeDefined();
     expect(ctx.provided["ui:theme"]).toBeDefined();
-    expect(ctx.provided["llm-tui:tool-renderer"]).toBeDefined();
+    expect(ctx.provided["ui:tool-renderer"]).toBeDefined();
   });
 
   it("subscribes to status:item-update and status:item-clear", async () => {

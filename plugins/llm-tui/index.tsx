@@ -1,11 +1,10 @@
 import React from "react";
 import { render } from "ink";
 import type { KaizenPlugin } from "kaizen/types";
-import type { UiChannelService, UiTheme, UiThemeService, UiStatusService, UiCompletionService } from "llm-contracts/public";
+import type { UiChannelService, UiTheme, UiThemeService, UiStatusService, UiCompletionService, UiToolRendererService } from "llm-contracts/public";
 import { TuiStore } from "./state/store.ts";
 import { makeCompletionRegistry } from "./completion/registry.ts";
 import { makeToolRendererRegistry } from "./tool-renderers/registry.ts";
-import type { TuiToolRendererService } from "./tool-renderers/registry.ts";
 import { defaultRenderers } from "./tool-renderers/defaults.tsx";
 import { loadTheme, realThemeDeps } from "./theme/loader.ts";
 import { App } from "./ui/App.tsx";
@@ -16,7 +15,7 @@ const plugin: KaizenPlugin = {
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
   services: {
-    provides: ["ui:channel", "ui:completion-source", "ui:status", "ui:theme", "llm-tui:tool-renderer"],
+    provides: ["ui:channel", "ui:completion-source", "ui:status", "ui:theme", "ui:tool-renderer"],
     consumes: ["events:vocabulary"],
   },
 
@@ -31,7 +30,7 @@ const plugin: KaizenPlugin = {
     // ui:completion-source is defined on llm-contracts; this plugin provides the implementation.
     // ui:status is defined on llm-contracts; this plugin provides the implementation.
     // ui:theme is defined on llm-contracts; this plugin provides the implementation.
-    ctx.defineService("llm-tui:tool-renderer", { description: "Per-tool TUI rendering registry." });
+    // ui:tool-renderer is defined on llm-contracts; this plugin provides the implementation.
 
     // Theme: harness defaults from plugin config, user override from config file.
     const harnessDefaults = (ctx.config as any)?.theme as Partial<UiTheme> | undefined;
@@ -48,7 +47,7 @@ const plugin: KaizenPlugin = {
     const registry = makeCompletionRegistry();
     ctx.provideService<UiCompletionService>("ui:completion-source", registry.service);
     const toolRenderers = makeToolRendererRegistry();
-    ctx.provideService<TuiToolRendererService>("llm-tui:tool-renderer", toolRenderers.service);
+    ctx.provideService<UiToolRendererService>("ui:tool-renderer", toolRenderers.service);
     // Built-in opt-in renderers for common local tools (edit, write, create,
     // bash). Each provides a verbose result view rendered inline below the
     // one-line summary. External tools can override by registering their own

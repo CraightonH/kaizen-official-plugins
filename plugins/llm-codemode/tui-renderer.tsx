@@ -1,13 +1,13 @@
 import React from "react";
 import { Box, Text } from "ink";
-import type { TuiToolRenderer } from "llm-tui/public";
+import type { UiToolRenderer } from "llm-contracts/public";
 
 function lineCount(code: string): number {
   if (!code) return 0;
   return code.split("\n").length;
 }
 
-export const codemodeRenderer: TuiToolRenderer = {
+export const codemodeRenderer: UiToolRenderer = {
   toolName: "execute_typescript",
   collapsedSummary(args) {
     const n = lineCount(((args as any)?.code as string) ?? "");

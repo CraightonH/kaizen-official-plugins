@@ -94,7 +94,7 @@ const plugin: KaizenPlugin = {
     // Register TUI renderer if the service is available (lazy import to avoid
     // pulling React/Ink in non-TUI environments). Optional dependency: no
     // hard consume edge — the plugin degrades to no inline renderer.
-    const tuiRenderers = ctx.useService?.("llm-tui:tool-renderer") as
+    const tuiRenderers = ctx.useService?.("ui:tool-renderer") as
       | { register: (r: any) => () => void }
       | undefined;
     if (tuiRenderers) {

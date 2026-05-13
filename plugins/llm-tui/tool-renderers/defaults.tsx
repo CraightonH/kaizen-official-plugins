@@ -1,6 +1,6 @@
 import React from "react";
 import { Text } from "ink";
-import type { TuiToolRenderer } from "./registry.ts";
+import type { UiToolRenderer } from "llm-contracts/public";
 import type { TuiTheme } from "../theme/loader.ts";
 import { extractPrimaryString, PRIMARY_RESULT_KEYS } from "./util.ts";
 
@@ -55,7 +55,7 @@ function renderLines(
   );
 }
 
-export function defaultRenderers(theme: TuiTheme): TuiToolRenderer[] {
+export function defaultRenderers(theme: TuiTheme): UiToolRenderer[] {
   return [
     // edit: show a unified-ish diff. str_replace command only; insert handled below.
     {
