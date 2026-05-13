@@ -4,8 +4,8 @@ import type { KaizenPlugin, PluginContext } from "kaizen/types";
 import { createRegistry, type SystemPromptServiceImpl } from "./registry.ts";
 import { resolveIdentity } from "./identity.ts";
 import { makePromptSlashHandlers } from "./slash.ts";
-import type { SystemPromptService } from "./public";
-import type { SlashRegistryService } from "llm-slash-commands/public";
+import type { SystemPromptService } from "llm-contracts/public";
+import type { SlashRegistryService } from "llm-contracts/public";
 
 interface PromptEventVocabulary {
   PROMPT_REBUILT: string;
@@ -51,14 +51,14 @@ const plugin: KaizenPlugin = {
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
   services: {
-    provides: ["prompt:system"],
-    consumes: ["llm-events:vocabulary"],
+    provides: ["prompt:registry"],
+    consumes: ["events:vocabulary"],
   },
 
   async setup(ctx) {
     const runtime = ctx as PluginContext & RuntimeHints;
-    ctx.consumeService("llm-events:vocabulary");
-    const vocab = ctx.useService<PromptEventVocabulary>("llm-events:vocabulary");
+    ctx.consumeService("events:vocabulary");
+    const vocab = ctx.useService<PromptEventVocabulary>("events:vocabulary");
     // prompt:rebuilt / prompt:reload are defined by llm-events (canonical VOCAB owner).
 
     const registry: SystemPromptServiceImpl = createRegistry({
@@ -68,10 +68,7 @@ const plugin: KaizenPlugin = {
       },
     });
 
-    ctx.defineService("prompt:system", {
-      description: "Assembles the assistant's system prompt from registered sections.",
-    });
-    ctx.provideService<SystemPromptService>("prompt:system", registry);
+    ctx.provideService<SystemPromptService>("prompt:registry", registry);
 
     const identity = resolveIdentity({
       globalPath: resolveGlobalPath(runtime),

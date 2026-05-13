@@ -1,5 +1,5 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { ToolSchema } from "llm-events/public";
+import type { ToolSchema } from "llm-contracts/public";
 import type { ToolExecutionContext, ToolHandler, ToolsRegistryService } from "llm-tools-registry/public";
 import { loadConfig, realDeps } from "./config.ts";
 import { renderSurface, surfaceHash } from "./assembler.ts";
@@ -94,7 +94,7 @@ const plugin: KaizenPlugin = {
     // Register TUI renderer if the service is available (lazy import to avoid
     // pulling React/Ink in non-TUI environments). Optional dependency: no
     // hard consume edge — the plugin degrades to no inline renderer.
-    const tuiRenderers = ctx.useService?.("llm-tui:tool-renderer") as
+    const tuiRenderers = ctx.useService?.("ui:tool-renderer") as
       | { register: (r: any) => () => void }
       | undefined;
     if (tuiRenderers) {

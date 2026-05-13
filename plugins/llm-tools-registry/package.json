@@ -5,7 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./index.ts",
-    "./public": "./public.d.ts",
+    "./public": "./public.ts",
     "./registry": "./registry.ts"
   },
   "keywords": [
@@ -17,6 +17,7 @@
     "typescript": "^5.4.0"
   },
   "dependencies": {
+    "llm-contracts": "workspace:*",
     "llm-events": "workspace:*"
   }
 }

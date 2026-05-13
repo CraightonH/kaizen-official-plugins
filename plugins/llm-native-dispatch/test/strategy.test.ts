@@ -2,7 +2,7 @@
 import { describe, it, expect, mock } from "bun:test";
 import { makeStrategy } from "../strategy.ts";
 import type { ToolDispatchRegistry } from "llm-driver/public";
-import type { ToolCall, LLMResponse, ToolSchema } from "llm-events/public";
+import type { ToolCall, LLMResponse, ToolSchema } from "llm-contracts/public";
 
 function fakeRegistry(handlers: Record<string, (args: unknown) => Promise<unknown> | unknown>): ToolDispatchRegistry {
   return {

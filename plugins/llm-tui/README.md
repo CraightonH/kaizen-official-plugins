@@ -18,10 +18,10 @@ Generic Ink+React chat TUI for non-claude-wrapper LLM harnesses. Renders a strea
 
 ### Provides
 
-**Service** — `llm-tui:channel`
+**Service** — `ui:channel`
 
 ```typescript
-interface TuiChannelService {
+interface UiChannelService {
   writeOutput(chunk: string): void;
   writeNotice(text: string): void;
   writeUser(text: string): void;
@@ -47,7 +47,7 @@ Semantics:
 - `setInputDraft(text)` replaces the editable input buffer and places the cursor at the end. In non-TTY fallback mode it is a no-op.
 - The TUI does NOT emit `input:submit` itself — submitted lines are handed to the consumer via `readInput()`. The consumer owns the event emission (this avoids a double-dispatch race against reentrant slash handlers).
 
-**Service** — `llm-tui:completion`
+**Service** — `ui:completion-source`
 
 ```typescript
 interface CompletionItem {
@@ -63,7 +63,7 @@ interface CompletionSource {
   list(query: string): CompletionItem[] | Promise<CompletionItem[]>;
 }
 
-interface TuiCompletionService {
+interface UiCompletionService {
   register(source: CompletionSource): () => void;
 }
 ```
@@ -77,18 +77,18 @@ Semantics:
 - Sources may register/unregister at any time. The active session refreshes on the next debounce tick.
 - A source's `list()` throwing is swallowed; that source contributes zero items for that query.
 
-**Service** — `llm-tui:status`
+**Service** — `ui:status`
 
 Marker only — no methods. Consumers may declare a dependency on the service name to assert the status bar is wired up. The bar is updated by event subscriptions (see "Consumes").
 
 ```typescript
-interface TuiStatusService {}
+interface UiStatusService {}
 ```
 
-**Service** — `llm-tui:theme`
+**Service** — `ui:theme`
 
 ```typescript
-interface TuiTheme {
+interface UiTheme {
   promptLabel: string;
   promptColor: string;
   outputColor: string;
@@ -97,19 +97,19 @@ interface TuiTheme {
   statusBarColor: string;
 }
 
-interface TuiThemeService {
-  current(): TuiTheme;
+interface UiThemeService {
+  current(): UiTheme;
 }
 ```
 
 Read once at mount. No hot reload — restart picks up config changes. Colour fields accept named Ink colours or `#rrggbb` hex.
 
-**Service** — `llm-tui:tool-renderer`
+**Service** — `ui:tool-renderer`
 
 ```typescript
 type ToolCallStatus = "running" | "done" | "error";
 
-interface TuiToolRenderer {
+interface UiToolRenderer {
   toolName: string;
   collapsedSummary(args: unknown): string;
   expandedView?(
@@ -120,8 +120,8 @@ interface TuiToolRenderer {
   ): React.ReactNode | null;
 }
 
-interface TuiToolRendererService {
-  register(renderer: TuiToolRenderer): () => void;
+interface UiToolRendererService {
+  register(renderer: UiToolRenderer): () => void;
 }
 ```
 
@@ -134,7 +134,7 @@ Semantics:
 
 ### Consumes
 
-**Service** — `llm-events:vocabulary`. The vocabulary is a hard dependency: it owns the event names this plugin subscribes to and the names consumers should use to drive the channel.
+**Service** — `events:vocabulary`. The vocabulary is a hard dependency: it owns the event names this plugin subscribes to and the names consumers should use to drive the channel.
 
 **Events subscribed:**
 - `status:item-update` — `{ key, value }` → upserts the bar entry.

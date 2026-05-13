@@ -12,8 +12,12 @@ describe("llm-memory metadata", () => {
   it("provides memory:store", () => {
     expect(plugin.services?.provides).toContain("memory:store");
   });
-  it("only hard-consumes llm-events:vocabulary (other services degrade gracefully)", () => {
-    expect(plugin.services?.consumes).toEqual(["llm-events:vocabulary"]);
+  it("has no hard consumes (all integrations degrade gracefully; events use hardcoded names)", () => {
+    // events:vocabulary removed from consumes: llm-memory never calls
+    // useService("events:vocabulary") and emits events with hardcoded names.
+    // All other services (prompt:registry, tools:registry, driver:run-conversation)
+    // are optional and degrade cleanly.
+    expect(plugin.services?.consumes).toBeUndefined();
   });
 });
 
@@ -40,7 +44,7 @@ function makePromptSystem() {
 function makeCtx(promptSystemSvc?: any, env: Record<string, string | undefined> = {}) {
   const services: Record<string, unknown> = {};
   const handlers: Record<string, Function[]> = {};
-  if (promptSystemSvc) services["prompt:system"] = promptSystemSvc;
+  if (promptSystemSvc) services["prompt:registry"] = promptSystemSvc;
   return {
     log: mock(() => {}),
     defineService: mock(() => {}),
@@ -112,7 +116,7 @@ describe("llm-memory setup wiring", () => {
       const calls: any[] = (ctx.emit as any).mock.calls;
       const errorCall = calls.find(([evt]: [string]) => evt === "harness:error");
       expect(errorCall).toBeTruthy();
-      expect(errorCall[1].message).toMatch(/prompt:system/);
+      expect(errorCall[1].message).toMatch(/prompt:registry/);
       expect(errorCall[1].message).toMatch(/saved-memories section disabled/);
     } finally {
       if (orig !== undefined) process.env.HOME = orig;

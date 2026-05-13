@@ -1,4 +1,4 @@
-import type { ToolSchema } from "llm-events/public";
+import type { ToolSchema } from "llm-contracts/public";
 import type { SkillsRegistryService } from "./public";
 import { estimateTokens } from "./tokens.ts";
 

@@ -8,12 +8,12 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 index.tsx              Plugin lifecycle. Defines the four services, loads theme, builds the
                        store + completion registry, wires event subscriptions, mounts Ink (or
                        falls back to readline), provides the channel. Only file that touches `ctx`.
-fallback.ts            createFallbackChannel() → TuiChannelService for non-TTY environments
+fallback.ts            createFallbackChannel() → UiChannelService for non-TTY environments
                        (writes to stdout/stderr, reads lines via readline). Pure; no React.
-public.d.ts            Exported types — TuiChannelService, TuiCompletionService,
-                       TuiStatusService, TuiThemeService, TuiToolRendererService,
-                       TuiToolRenderer, ToolCallStatus, CompletionItem, CompletionSource.
-                       Canonical service contracts. Re-exports TuiTheme from theme/loader.
+public.d.ts            Plugin-internal types — ToolCallStatus, CompletionItem, CompletionSource.
+                       Contract types (UiChannelService, UiCompletionService, UiStatusService,
+                       UiThemeService, UiTheme, UiToolRendererService, UiToolRenderer) now
+                       live in llm-contracts/public.
 state/store.ts         TuiStore class. Single source of truth: transcript, busy, input,
                        popup, status map, history, live thinking. Subscriber pattern; produces
                        immutable snapshots. Owns the readInput() queue/pending-resolver pair.
@@ -21,7 +21,7 @@ state/store.ts         TuiStore class. Single source of truth: transcript, busy,
 completion/registry.ts makeCompletionRegistry({ debounceMs? }) → { service, query }. Stateful
                        closure: source map by id, debounce timer, monotonic token for async
                        cancellation. Pure logic; no React, no ctx.
-theme/loader.ts        loadTheme(deps) → TuiTheme. DI-friendly (deps inject readFile/env/log).
+theme/loader.ts        loadTheme(deps) → UiTheme. DI-friendly (deps inject readFile/env/log).
                        realThemeDeps(log, harnessDefaults) supplies the real ones at mount.
                        DEFAULT_THEME is the baked-in floor.
 ui/App.tsx             Root component. Subscribes to TuiStore via useSyncExternalStore.
@@ -54,14 +54,14 @@ Boundaries:
 - **Trigger detection is naive.** Inside-word / inside-quotes / inside-backticks suppression is a linear scan from line start. Edge cases bias toward "open" rather than "skip" — keep it that way; full lexing is out of scope.
 - **Source `list()` errors are swallowed per-source.** Other sources for the same trigger still contribute. Don't surface these as notices.
 - **Theme is read-once.** No hot reload. If you add a watcher, keep `current()` returning a stable reference between mutations so consumers can cache.
-- **Fallback channel matches TTY channel shape.** Adding a method to `TuiChannelService` requires adding a (possibly no-op) implementation to `fallback.ts` in the same change.
+- **Fallback channel matches TTY channel shape.** Adding a method to `UiChannelService` requires adding a (possibly no-op) implementation to `fallback.ts` in the same change.
 - **Status bar has no public mutator.** All updates go through `status:item-update` / `status:item-clear`. Adding a method bypassing the event bus breaks the decoupling guarantee.
 - **Reasoning lifecycle is tri-state.** `llm:reasoning` deltas accumulate; `llm:done` finalizes into a Thoughts block; `turn:end` clears unfinalized buffers. All three handlers must remain symmetric or the thinking box leaks across turns.
 
 ## Adding a completion source from another plugin
 
 ```typescript
-const completion = ctx.useService<TuiCompletionService>("llm-tui:completion");
+const completion = ctx.useService<UiCompletionService>("ui:completion-source");
 const off = completion.register({
   id: "my-plugin:my-source",     // unique; reuse the namespace `<plugin>:<source>`
   trigger: "/",                  // single character; word-start to open popup
@@ -81,7 +81,7 @@ Use a namespaced `id` to avoid collisions; the registry indexes by id and a re-r
 ## Driving the channel from a harness
 
 ```typescript
-const tui = ctx.useService<TuiChannelService>("llm-tui:channel");
+const tui = ctx.useService<UiChannelService>("ui:channel");
 
 // Interactive loop:
 for (;;) {

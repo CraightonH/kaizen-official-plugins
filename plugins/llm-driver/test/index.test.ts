@@ -1,7 +1,7 @@
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "../index.ts";
-import type { ChatMessage, LLMStreamEvent } from "llm-events/public";
-import type { SessionsStoreService, TurnHandle } from "llm-session-manager/public";
+import type { ChatMessage, LLMStreamEvent } from "llm-contracts/public";
+import type { SessionsStoreService, TurnHandle } from "llm-contracts/public";
 
 function makeUi(lines: string[]) {
   const out: string[] = [];
@@ -79,7 +79,7 @@ function makeCtx(deps: { ui: any; llm: any; cleared?: () => Promise<void>; cfg?:
     consumeService: mock(() => {}),
     defineEvent: mock(() => {}),
     useService: (name: string) => {
-      if (name === "llm-tui:channel") return deps.ui;
+      if (name === "ui:channel") return deps.ui;
       if (name === "llm:complete") return deps.llm;
       if (name === "sessions:store") return sessions;
       throw new Error(`useService: no provider for '${name}'`);
@@ -109,8 +109,8 @@ describe("llm-driver index", () => {
       properties: { defaultSystemPrompt: { type: "string" } },
     });
     expect(plugin.services?.consumes).toEqual([
-      "llm-events:vocabulary",
-      "llm-tui:channel",
+      "events:vocabulary",
+      "ui:channel",
       "llm:complete",
       "sessions:store",
     ]);

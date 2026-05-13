@@ -1,8 +1,8 @@
 import { describe, it, expect, mock } from "bun:test";
 import { runConversation, type RunConversationDeps, type ToolsRegistryService } from "../loop.ts";
 import { makeIdGen } from "../ids.ts";
-import type { ChatMessage, LLMCompleteService, LLMStreamEvent } from "llm-events/public";
-import type { SessionsStoreService, TurnHandle } from "llm-session-manager/public";
+import type { ChatMessage, LLMCompleteService, LLMStreamEvent } from "llm-contracts/public";
+import type { SessionsStoreService, TurnHandle } from "llm-contracts/public";
 import type { ToolDispatchStrategy } from "../public";
 
 function makeLlm(events: LLMStreamEvent[][]): LLMCompleteService & { calls: any[] } {

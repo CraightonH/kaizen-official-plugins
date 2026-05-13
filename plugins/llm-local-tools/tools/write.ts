@@ -1,6 +1,6 @@
 // plugins/llm-local-tools/tools/write.ts
 import { writeFile, stat } from "node:fs/promises";
-import type { ToolSchema } from "llm-events/public";
+import type { ToolSchema } from "llm-contracts/public";
 import { resolvePath, ensureParentExists } from "../util.ts";
 
 export const schema: ToolSchema = {

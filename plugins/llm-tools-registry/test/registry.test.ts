@@ -1,7 +1,7 @@
 import { describe, it, expect, mock } from "bun:test";
 import { makeRegistry } from "../registry.ts";
 import { CANCEL_TOOL } from "llm-events";
-import type { ToolSchema } from "llm-events/public";
+import type { ToolSchema } from "llm-contracts/public";
 
 const SCHEMA = (name: string, tags?: string[]): ToolSchema => ({
   name,

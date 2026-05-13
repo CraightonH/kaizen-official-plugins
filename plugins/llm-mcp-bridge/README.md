@@ -85,9 +85,9 @@ The bridge declares `source.kind = "mcp"` (with `server: string`) only for tools
 ### Consumes
 
 **Services**
-- `tools:registry` — **hard.** Without it the bridge installs a no-op `mcp:bridge` and registers nothing.
-- `llm-events:vocabulary` — for the shared event names emitted/listened to.
-- `slash:registry` — **soft.** If absent, the `/mcp:*` commands are not registered; tool surfacing still works.
+- `tools:registry` — **optional.** Without it the bridge installs a no-op `mcp:bridge` and registers nothing.
+- `events:vocabulary` — consumed for boot-order guarantee (optional, no useService call).
+- `slash:registry` — **optional.** If absent, the `/mcp:*` commands are not registered; tool surfacing still works.
 
 **Events listened to**
 - `harness:end` — runs graceful shutdown for every server (cancel timers, close transports, unregister tools, force-kill stdio after 5s).

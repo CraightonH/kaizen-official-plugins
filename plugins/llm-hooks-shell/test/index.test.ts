@@ -33,7 +33,7 @@ function makeCtx(opts: {
     provideService: mock(() => {}),
     consumeService: mock(() => {}),
     useService: mock((name: string) => {
-      if (name === "llm-events:vocabulary") {
+      if (name === "events:vocabulary") {
         const obj: Record<string, string> = {};
         for (const v of vocab) obj[v.toUpperCase().replace(/[:\-]/g, "_")] = v;
         return Object.freeze(obj);

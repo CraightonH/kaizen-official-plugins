@@ -7,6 +7,6 @@ describe("llm-agents manifest smoke", () => {
     expect(plugin.apiVersion).toBe("3.0.0");
     expect(plugin.permissions?.tier).toBe("unscoped");
     expect(plugin.services?.provides).toContain("agents:registry");
-    expect(plugin.services?.consumes).toContain("llm-events:vocabulary");
+    expect(plugin.services?.consumes).toContain("events:vocabulary");
   });
 });

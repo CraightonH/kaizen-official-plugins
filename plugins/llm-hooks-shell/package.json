@@ -10,6 +10,7 @@
     "kaizen-plugin"
   ],
   "dependencies": {
+    "llm-contracts": "workspace:*",
     "llm-events": "workspace:*"
   },
   "devDependencies": {

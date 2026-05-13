@@ -32,11 +32,11 @@ describe("llm-tui plugin", () => {
   it("provides all five services in non-TTY mode", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    expect(ctx.provided["llm-tui:channel"]).toBeDefined();
-    expect(ctx.provided["llm-tui:completion"]).toBeDefined();
-    expect(ctx.provided["llm-tui:status"]).toBeDefined();
-    expect(ctx.provided["llm-tui:theme"]).toBeDefined();
-    expect(ctx.provided["llm-tui:tool-renderer"]).toBeDefined();
+    expect(ctx.provided["ui:channel"]).toBeDefined();
+    expect(ctx.provided["ui:completion-source"]).toBeDefined();
+    expect(ctx.provided["ui:status"]).toBeDefined();
+    expect(ctx.provided["ui:theme"]).toBeDefined();
+    expect(ctx.provided["ui:tool-renderer"]).toBeDefined();
   });
 
   it("subscribes to status:item-update and status:item-clear", async () => {
@@ -46,10 +46,10 @@ describe("llm-tui plugin", () => {
     expect(ctx.subs["status:item-clear"]?.length).toBe(1);
   });
 
-  it("channel exposes the four TuiChannelService methods", async () => {
+  it("channel exposes the four UiChannelService methods", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    const ch = ctx.provided["llm-tui:channel"] as any;
+    const ch = ctx.provided["ui:channel"] as any;
     expect(typeof ch.readInput).toBe("function");
     expect(typeof ch.writeOutput).toBe("function");
     expect(typeof ch.writeNotice).toBe("function");
@@ -59,17 +59,17 @@ describe("llm-tui plugin", () => {
   it("completion service exposes register()", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    const cs = ctx.provided["llm-tui:completion"] as any;
+    const cs = ctx.provided["ui:completion-source"] as any;
     expect(typeof cs.register).toBe("function");
     const off = cs.register({ id: "x", trigger: "/", list: () => [] });
     expect(typeof off).toBe("function");
     off();
   });
 
-  it("theme service current() returns a TuiTheme with default values", async () => {
+  it("theme service current() returns a UiTheme with default values", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    const t = (ctx.provided["llm-tui:theme"] as any).current();
+    const t = (ctx.provided["ui:theme"] as any).current();
     expect(t.promptLabel).toBe("kaizen");
     expect(t.promptColor).toBe("magenta");
   });
@@ -102,7 +102,7 @@ describe("llm-tui plugin", () => {
   it("channel exposes setInputDraft", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    const ch = ctx.provided["llm-tui:channel"] as any;
+    const ch = ctx.provided["ui:channel"] as any;
     expect(typeof ch.setInputDraft).toBe("function");
     // Non-TTY mode provides the fallback channel; setInputDraft is a no-op there.
     expect(() => ch.setInputDraft("draft")).not.toThrow();
@@ -111,7 +111,7 @@ describe("llm-tui plugin", () => {
   it("accepts harness-provided default theme via plugin config", async () => {
     const ctx = makeCtx({ config: { theme: { promptLabel: "kaizen" } } });
     await plugin.setup(ctx);
-    const t = (ctx.provided["llm-tui:theme"] as any).current();
+    const t = (ctx.provided["ui:theme"] as any).current();
     expect(t.promptLabel).toBe("kaizen");
   });
 });

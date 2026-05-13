@@ -20,7 +20,7 @@ function makeBusCtx(opts: { hooks: any[]; exec: (bin: string, args: string[], op
     provideService: () => {},
     consumeService: () => {},
     useService: (name: string) => {
-      if (name === "llm-events:vocabulary") {
+      if (name === "events:vocabulary") {
         return Object.freeze({ TOOL_BEFORE_EXECUTE: "tool:before-execute", TOOL_ERROR: "tool:error", TOOL_RESULT: "tool:result" });
       }
       return undefined;
@@ -72,7 +72,7 @@ describe("llm-hooks-shell integration", () => {
     });
     // Add turn:start to the vocab so config validation passes.
     ctx.useService = (name: string) => {
-      if (name === "llm-events:vocabulary") return Object.freeze({ TURN_START: "turn:start" });
+      if (name === "events:vocabulary") return Object.freeze({ TURN_START: "turn:start" });
       return undefined;
     };
     await plugin.setup(ctx);

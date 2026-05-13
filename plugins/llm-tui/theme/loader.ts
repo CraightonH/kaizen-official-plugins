@@ -1,15 +1,11 @@
 import { readFile as fsReadFile } from "node:fs/promises";
+import type { UiTheme } from "llm-contracts/public";
 
-export interface TuiTheme {
-  promptLabel: string;
-  promptColor: string;
-  outputColor: string;
-  noticeColor: string;
-  busyColor: string;
-  statusBarColor: string;
-}
+export type { UiTheme };
+/** @deprecated Use UiTheme from llm-contracts/public */
+export type TuiTheme = UiTheme;
 
-export const DEFAULT_THEME: TuiTheme = Object.freeze({
+export const DEFAULT_THEME: UiTheme = Object.freeze({
   promptLabel: "kaizen",
   promptColor: "magenta",
   outputColor: "white",
@@ -23,7 +19,7 @@ export interface ThemeDeps {
   env: Record<string, string | undefined>;
   readFile: (path: string) => Promise<string>;
   log: (msg: string) => void;
-  harnessDefaults?: Partial<TuiTheme>;
+  harnessDefaults?: Partial<UiTheme>;
 }
 
 export function defaultThemeConfigPath(home: string): string {
@@ -46,9 +42,9 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-function pickValid(input: Record<string, unknown> | undefined, fallback: TuiTheme): TuiTheme {
+function pickValid(input: Record<string, unknown> | undefined, fallback: UiTheme): UiTheme {
   if (!input) return { ...fallback };
-  const out: TuiTheme = { ...fallback };
+  const out: UiTheme = { ...fallback };
   if (typeof input.promptLabel === "string") out.promptLabel = input.promptLabel;
   if (isValidColor(input.promptColor)) out.promptColor = input.promptColor;
   if (isValidColor(input.outputColor)) out.outputColor = input.outputColor;
@@ -58,7 +54,7 @@ function pickValid(input: Record<string, unknown> | undefined, fallback: TuiThem
   return out;
 }
 
-export async function loadTheme(deps: ThemeDeps): Promise<TuiTheme> {
+export async function loadTheme(deps: ThemeDeps): Promise<UiTheme> {
   const path = deps.env.KAIZEN_LLM_TUI_CONFIG ?? defaultThemeConfigPath(deps.home);
   const withHarness = pickValid(deps.harnessDefaults as Record<string, unknown> | undefined, DEFAULT_THEME);
 
@@ -84,7 +80,7 @@ export async function loadTheme(deps: ThemeDeps): Promise<TuiTheme> {
   return pickValid(themeInput, withHarness);
 }
 
-export function realThemeDeps(log: (msg: string) => void, harnessDefaults?: Partial<TuiTheme>): ThemeDeps {
+export function realThemeDeps(log: (msg: string) => void, harnessDefaults?: Partial<UiTheme>): ThemeDeps {
   return {
     home: process.env.HOME ?? "/",
     env: process.env as Record<string, string | undefined>,

@@ -11,12 +11,12 @@ const plugin: KaizenPlugin = {
     tier: "unscoped",
     exec: { binaries: ["sh"] },
   },
-  services: { consumes: ["llm-events:vocabulary"] },
+  services: { consumes: ["events:vocabulary"] },
 
   async setup(ctx) {
-    ctx.consumeService("llm-events:vocabulary");
+    ctx.consumeService("events:vocabulary");
 
-    const vocabObj = ctx.useService<Record<string, string>>("llm-events:vocabulary") ?? {};
+    const vocabObj = ctx.useService<Record<string, string>>("events:vocabulary") ?? {};
     const vocab = new Set(Object.values(vocabObj));
 
     const configDeps: ConfigDeps = (ctx as any)._testHookDeps ?? realConfigDeps();

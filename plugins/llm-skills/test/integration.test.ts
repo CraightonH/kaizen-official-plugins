@@ -80,7 +80,7 @@ describe("integration — llm-skills against a fake tools:registry", () => {
       consumeService: () => {},
       useService: (name: string) => {
         if (name === "tools:registry") return tools;
-        if (name === "prompt:system") return ps.service;
+        if (name === "prompt:registry") return ps.service;
         return undefined;
       },
       secrets: { get: async () => undefined, refresh: async () => undefined },
@@ -138,7 +138,7 @@ describe("integration — llm-skills against a fake tools:registry", () => {
       consumeService: () => {},
       useService: (name: string) => {
         if (name === "tools:registry") return tools;
-        if (name === "prompt:system") return ps.service;
+        if (name === "prompt:registry") return ps.service;
         return undefined;
       },
       secrets: { get: async () => undefined, refresh: async () => undefined },

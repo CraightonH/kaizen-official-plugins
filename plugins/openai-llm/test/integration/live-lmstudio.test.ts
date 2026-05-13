@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import plugin from "../../index.ts";
-import type { LLMCompleteService } from "llm-events/public";
+import type { LLMCompleteService } from "llm-contracts/public";
 
 const RUN = process.env.KAIZEN_INTEGRATION === "1";
 

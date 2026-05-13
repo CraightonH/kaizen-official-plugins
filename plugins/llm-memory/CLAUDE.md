@@ -6,7 +6,7 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 
 ```
 index.ts        Plugin lifecycle: loads config, resolves dirs, ensures global dir + sweeps stale temps,
-                wires `memory:store`, registers a `prompt:system` section that injects the memory block
+                wires `memory:store`, registers a `prompt:registry` section that injects the memory block
                 (id `llm-memory:auto`, priority 170), registers `memory_recall`/`memory_save` into
                 `tools:registry` (optional), and (if autoExtract) subscribes to `turn:end`.
                 The only file that touches `ctx`. Module-scope handles (`sectionHandle`, `toolsUnregister`)
@@ -46,7 +46,7 @@ Boundaries:
 - **Catalog is ground truth, derived.** `regenerateIndex` reads all entry frontmatter and rewrites the block between markers; user content above is preserved byte-for-byte. Do not cache catalog state in memory.
 - **Markers are appended, never injected mid-document.** Hand-authored `MEMORY.md` without markers gets the catalog block appended at the end on first write. Do not move existing content around.
 - **`created` is preserved across overwrites; `updated` is refreshed on every put.** `store.put` reads the existing file first to recover `created`. Tests rely on this — don't simplify.
-- **Memory contributes via `prompt:system`.** The section renders the existing self-contained block (with `<system-reminder>` wrapper and `# Persistent memory` heading); no system-prompt mutation occurs in the plugin. Empty render (both layers empty) returns `""` and the registry drops the section for that call. Never mutate `request.systemPrompt` directly or touch `messages[]`.
+- **Memory contributes via `prompt:registry`.** The section renders the existing self-contained block (with `<system-reminder>` wrapper and `# Persistent memory` heading); no system-prompt mutation occurs in the plugin. Empty render (both layers empty) returns `""` and the registry drops the section for that call. Never mutate `request.systemPrompt` directly or touch `messages[]`.
 - **No-op when empty.** If both layers have no `MEMORY.md` and no entries, `buildMemoryBlock` returns `null` and the listener makes no mutation. No empty `<system-reminder>` blocks.
 - **`denyTypes` filters both injection AND `memory_recall` results.** Keep the two paths in sync. Tests assert this.
 - **Project shadows global on collision** in `get()` with no scope and in `memory_recall({ names })`. Don't reorder the scope-walk.
@@ -74,7 +74,7 @@ Names must match `[a-z0-9_-]{1,64}`. Use `description` (max 200 chars) — that 
 
 ## Editing injection
 
-`injection.ts` is intentionally narrow — header text, per-layer body cap, catalog truncation order. Don't add features here; if a peer plugin needs different behavior, it should write its own block (today via direct system-prompt manipulation; eventually through `prompt:system` once that lands in the harness).
+`injection.ts` is intentionally narrow — header text, per-layer body cap, catalog truncation order. Don't add features here; if a peer plugin needs different behavior, it should write its own block via `prompt:registry`.
 
 The header text and the `(use the memory_recall tool to load any of these)` hint are user-visible — treat changes as documentation-affecting.
 

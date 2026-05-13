@@ -1,5 +1,6 @@
 {
   "plugins": [
+    "official/llm-contracts@0.1.0",
     "official/llm-events@0.7.0",
     "official/llm-session-manager@0.1.1",
     "official/openai-llm@0.1.0",

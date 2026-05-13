@@ -1,0 +1,33 @@
+export interface SlashCommandContext {
+  args: string;
+  raw: string;
+  signal: AbortSignal;
+  emit: (event: string, payload: unknown) => Promise<void>;
+  print: (text: string) => Promise<void>;
+}
+
+export type SlashCommandHandler = (ctx: SlashCommandContext) => Promise<void>;
+
+export interface SlashCommandManifest {
+  name: string;
+  description: string;
+  usage?: string;
+  source: "builtin" | "plugin" | "file";
+  filePath?: string;
+}
+
+export interface SlashRegistryEntry {
+  manifest: SlashCommandManifest;
+  handler: SlashCommandHandler;
+}
+
+export type RegistryEntry = SlashRegistryEntry;
+
+export interface SlashRegistryService {
+  register(manifest: SlashCommandManifest, handler: SlashCommandHandler): () => void;
+  get(name: string): SlashRegistryEntry | undefined;
+  list(): SlashCommandManifest[];
+}
+
+export const CONTRACT_ID = "slash:registry" as const;
+export const DESCRIPTION = "Slash-command registry — register, list, and dispatch user-typed slash commands.";

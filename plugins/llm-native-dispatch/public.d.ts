@@ -1,4 +1,4 @@
 // llm-native-dispatch public surface.
-// The driver owns the strategy contract; this plugin implements it.
+// The strategy contract lives in llm-contracts; this plugin implements it.
 
-export type { ToolDispatchStrategy } from "llm-driver/public";
+export type { ToolDispatchStrategy } from "llm-contracts/public";

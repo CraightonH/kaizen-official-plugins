@@ -1,7 +1,7 @@
 // plugins/llm-local-tools/tools/glob.ts
 import { readdir, stat, readFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
-import type { ToolSchema } from "llm-events/public";
+import type { ToolSchema } from "llm-contracts/public";
 import { resolvePath, hasGitRoot, GLOB_CAP } from "../util.ts";
 
 export const schema: ToolSchema = {

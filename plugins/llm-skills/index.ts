@@ -1,7 +1,7 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { SkillsRegistryService } from "./public";
+import type { SkillsRegistryService } from "llm-contracts/public";
 import type { ToolsRegistryService } from "llm-tools-registry/public";
-import type { SystemPromptService } from "llm-system-prompt/public";
+import type { SystemPromptService } from "llm-contracts/public";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { makeRegistry, type SkillsRegistryServiceImpl } from "./registry.ts";
@@ -53,9 +53,12 @@ const plugin: KaizenPlugin = {
     // if it's present), but it's listed here so kaizen's topo-sort orders
     // this plugin AFTER the registry's provider when one exists. Without
     // this edge, useService("tools:registry") may run before the registry
-    // is provided and silently miss load_skill registration. prompt:system
-    // is a hard requirement for the Available-skills section.
-    consumes: ["tools:registry", "prompt:system"],
+    // is provided and silently miss load_skill registration. This is an
+    // acknowledged AGENTS.md edge case: the entry is a topo-sort hint, not
+    // a hard boot requirement (no consumeService call backs it up).
+    // prompt:registry is optional — the available-skills section is disabled
+    // when absent (harness:error emitted), but the plugin otherwise runs fine.
+    consumes: ["tools:registry"],
   },
 
   async setup(ctx) {
@@ -63,8 +66,8 @@ const plugin: KaizenPlugin = {
     const userRoot = resolveUserRoot(ctx);
     const interval = rescanIntervalMs(ctx);
 
-    // Resolve prompt:system early so onChange can call bumpGeneration.
-    const promptSystem = ctx.useService<SystemPromptService>("prompt:system");
+    // Resolve prompt:registry early so onChange can call bumpGeneration.
+    const promptSystem = ctx.useService<SystemPromptService>("prompt:registry");
 
     const registry: SkillsRegistryServiceImpl = makeRegistry({
       projectRoot,
@@ -77,7 +80,6 @@ const plugin: KaizenPlugin = {
     // Initial scan.
     const initial = await registry.rescan();
 
-    ctx.defineService("skills:registry", { description: "Skill discovery + on-demand loading." });
     ctx.provideService<SkillsRegistryService>("skills:registry", registry);
 
     void ctx.emit("skill:available-changed", { count: initial.count });
@@ -93,7 +95,7 @@ const plugin: KaizenPlugin = {
       // Bump after initial scan so generation is fresh.
       sectionHandle.bumpGeneration();
     } else {
-      void ctx.emit("harness:error", { message: "llm-skills: missing required service(s): prompt:system; available-skills section disabled" });
+      void ctx.emit("harness:error", { message: "llm-skills: missing required service(s): prompt:registry; available-skills section disabled" });
     }
 
     // Throttled rescan on turn:start.

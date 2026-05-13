@@ -1,9 +1,9 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { AgentsRegistryService } from "./public";
+import type { AgentsRegistryService } from "llm-contracts/public";
 import type { ToolsRegistryService } from "llm-tools-registry/public";
-import type { DriverService } from "llm-driver/public";
-import type { SessionsStoreService } from "llm-session-manager/public";
-import type { SystemPromptService } from "llm-system-prompt/public";
+import type { DriverService } from "llm-contracts/public";
+import type { SessionsStoreService } from "llm-contracts/public";
+import type { SystemPromptService } from "llm-contracts/public";
 import { loadConfig, realDeps } from "./config.ts";
 import { loadFromDirs } from "./loader.ts";
 import { makeRegistry, makeRegistryHandle } from "./registry.ts";
@@ -26,10 +26,11 @@ const plugin: KaizenPlugin = {
     // All other integrations (tools:registry, driver:run-conversation,
     // sessions:store, prompt:system, skills:registry) are looked up via
     // useService and degrade with a harness:error when absent.
-    consumes: ["llm-events:vocabulary"],
+    consumes: ["events:vocabulary"],
   },
 
   async setup(ctx) {
+    ctx.consumeService("events:vocabulary");
     const log = (m: string) => ctx.log(m);
     const config = await loadConfig(realDeps(log));
 
@@ -46,7 +47,6 @@ const plugin: KaizenPlugin = {
 
     let ready = false;
 
-    ctx.defineService("agents:registry", { description: "Agent manifest registry." });
     ctx.provideService<AgentsRegistryService>("agents:registry", handle.service);
 
     const tracker = makeTurnTracker();
@@ -81,8 +81,8 @@ const plugin: KaizenPlugin = {
       toolUnregister = tools.registerWith({ schema: dispatch.schema, handler: guardedHandler, source: { kind: "agent" } });
     }
 
-    // Register prompt:system section for available agents.
-    const promptSystem = ctx.useService<SystemPromptService>("prompt:system");
+    // Register prompt:registry section for available agents.
+    const promptSystem = ctx.useService<SystemPromptService>("prompt:registry");
     if (promptSystem) {
       sectionHandle = promptSystem.register({
         id: "llm-agents:available",
@@ -91,7 +91,7 @@ const plugin: KaizenPlugin = {
         render: () => buildAgentsBlock(handle.service.list()),
       });
     } else {
-      void ctx.emit("harness:error", { message: "llm-agents: missing optional service prompt:system; available-agents section disabled" });
+      void ctx.emit("harness:error", { message: "llm-agents: missing optional service prompt:registry; available-agents section disabled" });
     }
 
     // Discovery in a microtask — does not block setup().

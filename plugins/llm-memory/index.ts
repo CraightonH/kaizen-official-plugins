@@ -1,12 +1,12 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { SystemPromptService, RegisteredSection } from "llm-system-prompt/public";
+import type { SystemPromptService, RegisteredSection } from "llm-contracts/public";
 import { loadConfig, realDeps } from "./config.ts";
 import { resolveDirs, ensureDir, sweepStaleTempFiles } from "./paths.ts";
 import { makeMemoryStore } from "./service.ts";
 import { buildMemoryBlock } from "./injection.ts";
 import { registerTools, type ToolsRegistryLike } from "./tools.ts";
 import { maybeExtract, type RunConversationFn } from "./extract.ts";
-import type { MemoryStoreService } from "./public.d.ts";
+import type { MemoryStoreService } from "llm-contracts/public";
 
 let sectionHandle: RegisteredSection | undefined;
 let toolsUnregister: (() => void) | undefined;
@@ -17,9 +17,10 @@ const plugin: KaizenPlugin = {
   permissions: { tier: "unscoped" },
   services: {
     provides: ["memory:store"],
-    // All consumed services are optional — the plugin degrades cleanly when any are
-    // absent. Hard `consumes` is reserved for required services per AGENTS.md.
-    consumes: ["llm-events:vocabulary"],
+    // No hard consume edges: all integrations (prompt:registry, tools:registry,
+    // driver:run-conversation) are optional and degrade cleanly when absent.
+    // events:vocabulary is not used directly by this plugin (events are emitted
+    // with hardcoded names), so it is not listed here.
   },
 
   async setup(ctx) {
@@ -37,8 +38,8 @@ const plugin: KaizenPlugin = {
     await sweepStaleTempFiles(globalDir, config.staleTempMs);
     if (projectDir) await sweepStaleTempFiles(projectDir, config.staleTempMs);
 
-    // Resolve prompt:system before creating the store so onChange can bump generation.
-    const promptSystem = ctx.useService<SystemPromptService>("prompt:system");
+    // Resolve prompt:registry before creating the store so onChange can bump generation.
+    const promptSystem = ctx.useService<SystemPromptService>("prompt:registry");
 
     const store = makeMemoryStore({
       globalDir,
@@ -46,7 +47,6 @@ const plugin: KaizenPlugin = {
       log,
       onChange: () => { sectionHandle?.bumpGeneration(); },
     });
-    ctx.defineService("memory:store", { description: "File-backed persistent memory store." });
     ctx.provideService<MemoryStoreService>("memory:store", store);
 
     // Register a prompt:system section for saved memories.
@@ -84,7 +84,7 @@ const plugin: KaizenPlugin = {
       // the degraded state.
       void ctx.emit("harness:error", {
         message:
-          "llm-memory: prompt:system service unavailable; saved-memories section disabled",
+          "llm-memory: prompt:registry service unavailable; saved-memories section disabled",
       });
     }
 

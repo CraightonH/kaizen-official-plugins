@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import { runInSandbox } from "../sandbox-host.ts";
 import { DEFAULT_CONFIG } from "../config.ts";
-import type { ToolSchema } from "llm-events/public";
+import type { ToolSchema } from "llm-contracts/public";
 import type { ToolsRegistryService } from "llm-tools-registry/public";
 
 const makeFakeRegistry = (): ToolsRegistryService => ({

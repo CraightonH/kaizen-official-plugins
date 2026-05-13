@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname } from "node:path";
-import type { ChatMessage } from "llm-events/public";
+import type { ChatMessage } from "llm-contracts/public";
 
 export interface Snapshot {
   schemaVersion: 1;

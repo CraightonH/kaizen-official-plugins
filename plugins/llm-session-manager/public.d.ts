@@ -1,7 +1,2 @@
-export type {
-  SessionRecord,
-  SessionsStoreService,
-  TurnHandle,
-} from "./store";
-export type { EventLogEntry } from "./events-log";
+export type { SessionsStoreService, SessionRecord, TurnHandle, EventLogEntry } from "llm-contracts/public";
 export { harnessKey } from "./harness-key";

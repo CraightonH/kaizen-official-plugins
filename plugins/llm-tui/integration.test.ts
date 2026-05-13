@@ -1,6 +1,6 @@
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "./index.tsx";
-import type { TuiCompletionService } from "./public.d.ts";
+import type { UiCompletionService } from "llm-contracts/public";
 import { TuiStore } from "./state/store.ts";
 
 function makeCtx() {
@@ -28,7 +28,7 @@ describe("llm-tui integration (non-TTY)", () => {
   it("public completion service registers and unregisters cleanly", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    const cs = ctx.provided["llm-tui:completion"] as TuiCompletionService;
+    const cs = ctx.provided["ui:completion-source"] as UiCompletionService;
     const off = cs.register({
       id: "test", trigger: "/",
       list: () => [{ label: "/help", insertText: "/help " }],
@@ -49,7 +49,7 @@ describe("llm-tui integration (non-TTY)", () => {
   it("channel.writeOutput + writeNotice + setBusy + readInput respect the contract", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    const ch = ctx.provided["llm-tui:channel"] as any;
+    const ch = ctx.provided["ui:channel"] as any;
     // Non-TTY path uses the fallback channel: writeOutput goes to stdout.
     // We just exercise the methods to verify they don't throw.
     ch.writeOutput("hi");
@@ -69,7 +69,7 @@ describe("llm-tui integration (non-TTY)", () => {
     await prog({ callId: "c1", delta: "127.0.0.1 localhost\n" });
     await res({ callId: "c1", result: "127.0.0.1 localhost\n" });
     // The TUI plugin's tool-renderer service was provided.
-    expect(ctx.provided["llm-tui:tool-renderer"]).toBeDefined();
+    expect(ctx.provided["ui:tool-renderer"]).toBeDefined();
   });
 
   it("store lifecycle: appendLiveToolCall → updateLiveToolCall → finalizeLiveToolCall accumulates stdout into transcript", () => {
@@ -87,7 +87,7 @@ describe("llm-tui integration (non-TTY)", () => {
   it("theme.current() reflects theme defaults", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    const theme = (ctx.provided["llm-tui:theme"] as any).current();
+    const theme = (ctx.provided["ui:theme"] as any).current();
     expect(theme.promptLabel).toBe("kaizen");
     expect(theme.outputColor).toBe("white");
   });

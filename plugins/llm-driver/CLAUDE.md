@@ -11,7 +11,7 @@ index.ts            Plugin lifecycle. Defines plugin-scoped state, registers sub
 loop.ts             runConversation(input, deps) — pure (deps-injected). Owns session-backed
                     message reads, the LLM call, A-tier single-call path, multi-step
                     strategy/tool loop, and the per-deps WeakMap assemblyCache for
-                    prompt:system. Emits all `llm:*` events and emits `turn:*` lifecycle
+                    prompt:registry. Emits all `llm:*` events and emits `turn:*` lifecycle
                     events only in owned-turn mode.
 state.ts            CurrentTurn type and aggregateUsage(). Pure.
 cancel.ts           wireCancel(ctx, getCurrent) → unsubscribe. Subscribes to turn:cancel and
@@ -20,8 +20,9 @@ ids.ts              newTurnId() (uuid-prefixed), makeIdGen(seq) for deterministi
 busy-messages.ts    Random "thinking…" pool for ui.setBusy().
 done-messages.ts    Random verb pool for the post-turn duration notice.
 public.d.ts         DriverService / RunConversationInput / RunConversationOutput, plus
-                    ToolDispatchStrategy / ToolDispatchRegistry for the dispatch extension
-                    point. Re-exports the chat/llm types from llm-events/public so
+                    ToolDispatchStrategy / ToolDispatchRegistry re-exported from
+                    llm-contracts/public for the dispatch:strategy extension point.
+                    Re-exports chat/llm foundation types from llm-contracts/public so
                     consumers have one import.
 ```
 
@@ -37,10 +38,10 @@ Boundaries:
 - **Turn ownership.** `runConversation` emits `turn:start`/`turn:end` only in owned-turn mode (`userMessage`). The interactive loop in `index.ts` owns the outer turn and passes `externalTurnId` plus a `turnHandle` so loop.ts does not double-emit or commit.
 - **Cancellation partially commits.** Message writes go through a `TurnHandle`. On AbortError, call `partialCommit()` — this preserves the user message and any completed assistant/tool roundtrips, dropping a trailing assistant message whose `toolCalls` have no matching tool results. Emit `turn:end { reason: "cancelled" }`. Non-abort errors still call `rollback()` (full discard) and emit `turn:end { reason: "error" }`.
 - **Deps bag is memoized.** `buildDeps()` returns the same object every call. The `assemblyCache` WeakMap is keyed on the deps bag — a fresh object every call would defeat the cache.
-- **Generation-keyed prompt cache.** `resolveSystemPrompt` checks `promptSystem.generation()` per turn against the cached entry. Do not add a `prompt:rebuilt` subscription — generation is the source of truth and re-checking is cheap.
+- **Generation-keyed prompt cache.** `resolveSystemPrompt` checks `promptRegistry.generation()` per turn against the cached entry. Do not add a `prompt:rebuilt` subscription — generation is the source of truth and re-checking is cheap.
 - **`llm:request` payloads are frozen.** The request object emitted on `llm:request` is a deep-frozen `structuredClone` of the live request. Subscribers can read but not mutate.
 - **`llm:before-call` is mutable + cancellable.** Subscribers may mutate the request. Setting `request.cancelled = true` ends the turn cleanly with `reason: "complete"` and the most recent message as `finalMessage`.
-- **A-tier degradation.** Missing `tools:registry` or `tool-dispatch:strategy` → single LLM call, no loop. Don't add code paths that assume both are present without an explicit guard.
+- **A-tier degradation.** Missing `tools:registry` or `dispatch:strategy` → single LLM call, no loop. Don't add code paths that assume both are present without an explicit guard.
 
 ## Adding a new lifecycle event
 

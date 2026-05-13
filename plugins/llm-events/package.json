@@ -8,6 +8,9 @@
     "./public": "./public.d.ts"
   },
   "keywords": ["kaizen-plugin"],
+  "dependencies": {
+    "llm-contracts": "workspace:*"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/json-schema": "^7.0.15",

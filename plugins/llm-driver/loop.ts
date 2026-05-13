@@ -4,14 +4,16 @@ import type {
   LLMRequest,
   LLMResponse,
   ToolSchema,
-} from "llm-events/public";
-import type { SessionsStoreService } from "llm-session-manager/public";
+  SessionsStoreService,
+} from "llm-contracts/public";
 import type {
   RunConversationInput,
   RunConversationOutput,
+} from "llm-contracts/public";
+import type {
   ToolDispatchRegistry,
   ToolDispatchStrategy,
-} from "./public";
+} from "llm-contracts/public";
 import { aggregateUsage } from "./state.ts";
 
 export interface ToolsRegistryService extends ToolDispatchRegistry {

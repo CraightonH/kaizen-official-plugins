@@ -1,18 +1,12 @@
 import React from "react";
 import { render } from "ink";
 import type { KaizenPlugin } from "kaizen/types";
-import type {
-  TuiChannelService,
-  TuiCompletionService,
-  TuiStatusService,
-  TuiThemeService,
-} from "./public.d.ts";
+import type { UiChannelService, UiTheme, UiThemeService, UiStatusService, UiCompletionService, UiToolRendererService } from "llm-contracts/public";
 import { TuiStore } from "./state/store.ts";
 import { makeCompletionRegistry } from "./completion/registry.ts";
 import { makeToolRendererRegistry } from "./tool-renderers/registry.ts";
-import type { TuiToolRendererService } from "./tool-renderers/registry.ts";
 import { defaultRenderers } from "./tool-renderers/defaults.tsx";
-import { loadTheme, realThemeDeps, type TuiTheme } from "./theme/loader.ts";
+import { loadTheme, realThemeDeps } from "./theme/loader.ts";
 import { App } from "./ui/App.tsx";
 import { createFallbackChannel } from "./fallback.ts";
 
@@ -21,39 +15,39 @@ const plugin: KaizenPlugin = {
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
   services: {
-    provides: ["llm-tui:channel", "llm-tui:completion", "llm-tui:status", "llm-tui:theme", "llm-tui:tool-renderer"],
-    consumes: ["llm-events:vocabulary"],
+    provides: ["ui:channel", "ui:completion-source", "ui:status", "ui:theme", "ui:tool-renderer"],
+    consumes: ["events:vocabulary"],
   },
 
   async setup(ctx) {
-    ctx.consumeService("llm-events:vocabulary");
+    ctx.consumeService("events:vocabulary");
 
     // Plugin-private control events (not in the shared VOCAB; owned by this
     // plugin per llm-events convention). Peers emit these to drive TUI state.
     ctx.defineEvent("tui:enter-history");
 
-    ctx.defineService("llm-tui:channel", { description: "Pull-style chat I/O channel." });
-    ctx.defineService("llm-tui:completion", { description: "Registry of completion sources for the input popup." });
-    ctx.defineService("llm-tui:status", { description: "Marker service: subscribes to status:item-* and renders the bar." });
-    ctx.defineService("llm-tui:theme", { description: "Read-only theme tokens." });
-    ctx.defineService("llm-tui:tool-renderer", { description: "Per-tool TUI rendering registry." });
+    // ui:channel is defined on llm-contracts; this plugin provides the implementation.
+    // ui:completion-source is defined on llm-contracts; this plugin provides the implementation.
+    // ui:status is defined on llm-contracts; this plugin provides the implementation.
+    // ui:theme is defined on llm-contracts; this plugin provides the implementation.
+    // ui:tool-renderer is defined on llm-contracts; this plugin provides the implementation.
 
     // Theme: harness defaults from plugin config, user override from config file.
-    const harnessDefaults = (ctx.config as any)?.theme as Partial<TuiTheme> | undefined;
+    const harnessDefaults = (ctx.config as any)?.theme as Partial<UiTheme> | undefined;
     const theme = await loadTheme(realThemeDeps(ctx.log, harnessDefaults));
-    const themeService: TuiThemeService = { current: () => theme };
-    ctx.provideService<TuiThemeService>("llm-tui:theme", themeService);
+    const themeService: UiThemeService = { current: () => theme };
+    ctx.provideService<UiThemeService>("ui:theme", themeService);
 
     // Status bar: marker service, but also publish the empty value so consumers can wire dependencies.
-    const statusService: TuiStatusService = {};
-    ctx.provideService<TuiStatusService>("llm-tui:status", statusService);
+    const statusService: UiStatusService = {};
+    ctx.provideService<UiStatusService>("ui:status", statusService);
 
     // Store + completion registry are shared between the channel + UI.
     const store = new TuiStore();
     const registry = makeCompletionRegistry();
-    ctx.provideService<TuiCompletionService>("llm-tui:completion", registry.service);
+    ctx.provideService<UiCompletionService>("ui:completion-source", registry.service);
     const toolRenderers = makeToolRendererRegistry();
-    ctx.provideService<TuiToolRendererService>("llm-tui:tool-renderer", toolRenderers.service);
+    ctx.provideService<UiToolRendererService>("ui:tool-renderer", toolRenderers.service);
     // Built-in opt-in renderers for common local tools (edit, write, create,
     // bash). Each provides a verbose result view rendered inline below the
     // one-line summary. External tools can override by registering their own
@@ -186,7 +180,7 @@ const plugin: KaizenPlugin = {
 
     if (!isTTY) {
       const channel = createFallbackChannel();
-      ctx.provideService<TuiChannelService>("llm-tui:channel", channel);
+      ctx.provideService<UiChannelService>("ui:channel", channel);
       return;
     }
 
@@ -228,7 +222,7 @@ const plugin: KaizenPlugin = {
       { exitOnCtrlC: false },
     );
 
-    const channel: TuiChannelService = {
+    const channel: UiChannelService = {
       readInput: () => store.awaitInput(),
       writeOutput: (chunk: string) => store.appendOutput(chunk),
       writeNotice: (text: string) => store.appendNotice(text),
@@ -242,7 +236,7 @@ const plugin: KaizenPlugin = {
       clearLiveThinking: () => store.clearLiveThinking(),
       setInputDraft: (text: string) => store.setInput(text, text.length),
     };
-    ctx.provideService<TuiChannelService>("llm-tui:channel", channel);
+    ctx.provideService<UiChannelService>("ui:channel", channel);
 
     (plugin as any).__ink = inkApp;
   },

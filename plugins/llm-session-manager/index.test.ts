@@ -9,6 +9,6 @@ describe("llm-session-manager manifest", () => {
     expect(plugin.name).toBe("llm-session-manager");
     expect(plugin.permissions?.tier).toBe("scoped");
     expect(plugin.services?.provides).toContain("sessions:store");
-    expect(plugin.services?.consumes).toContain("llm-events:vocabulary");
+    expect(plugin.services?.consumes).toContain("events:vocabulary");
   });
 });

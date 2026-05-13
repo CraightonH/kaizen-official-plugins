@@ -1,4 +1,4 @@
-import type { SessionsStoreService, SessionRecord } from "./store.ts";
+import type { SessionsStoreService, SessionRecord } from "llm-contracts/public";
 
 export interface CommandsDeps {
   store: SessionsStoreService;

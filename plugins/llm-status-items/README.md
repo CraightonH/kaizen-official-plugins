@@ -29,7 +29,7 @@ Other behaviors:
 
 ### Consumes
 
-**VOCAB** — `llm-events:vocabulary` (required).
+**VOCAB** — `events:vocabulary` (required).
 Provides the event names and `ChatMessage` / `LLMRequest` / `LLMResponse` / `status:item-*` payload shapes the plugin subscribes to and emits.
 
 Subscribed events:

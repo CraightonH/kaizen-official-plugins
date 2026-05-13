@@ -2,7 +2,7 @@ import { describe, it, expect, mock } from "bun:test";
 import { registerSlashCommands } from "../slash.ts";
 import { registerToolCommands } from "../tools.ts";
 import { makeCommands } from "../commands.ts";
-import type { SessionsStoreService, SessionRecord } from "../store.ts";
+import type { SessionsStoreService, SessionRecord } from "llm-contracts/public";
 
 function fakeStore(rec: SessionRecord): SessionsStoreService {
   return {

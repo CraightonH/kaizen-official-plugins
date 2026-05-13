@@ -1,4 +1,4 @@
-import type { ToolsRegistryService } from "./registry.ts";
+import type { ToolsRegistryService } from "llm-contracts/public";
 import type { ToolSource, ToolRegistration } from "./public";
 
 export interface SlashCommandManifestLike {

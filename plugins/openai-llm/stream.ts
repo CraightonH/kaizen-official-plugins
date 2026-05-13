@@ -1,4 +1,4 @@
-import type { LLMStreamEvent, ToolCall, LLMResponse } from "llm-events/public";
+import type { LLMStreamEvent, ToolCall, LLMResponse } from "llm-contracts/public";
 import { parseChunk } from "./parser.ts";
 
 interface ToolState { id?: string; name: string; argsJson: string; }

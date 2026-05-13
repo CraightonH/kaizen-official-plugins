@@ -10,7 +10,7 @@ index.ts          Plugin lifecycle. Resolves tools:registry, registers every ent
                   on `stop()`. The only file that touches `ctx`.
 tools.ts          ALL_TOOLS array. Re-exports {schema, handler} from each per-tool module.
                   Add a new tool by appending here.
-public.d.ts       Re-exports ToolSchema/ToolCall from llm-events/public and the TOOL_NAMES tuple.
+public.d.ts       Re-exports ToolSchema/ToolCall from llm-contracts/public and the TOOL_NAMES tuple.
 util.ts           Pure helpers shared by every tool: resolvePath, truncateBytes, truncateMiddle,
                   sniffBinary, ensureParentExists, hasGitRoot, formatLineNumbered, plus the
                   size-cap constants. No I/O state, no globals beyond constants.
@@ -61,7 +61,7 @@ Boundaries:
 
 ## Adding a new tool
 
-1. Create `tools/<name>.ts` exporting `{ schema, handler }`. The schema is a `ToolSchema` (re-exported from `llm-events/public`); the handler is `(args: any, ctx: any) => Promise<unknown>`.
+1. Create `tools/<name>.ts` exporting `{ schema, handler }`. The schema is a `ToolSchema` (from `llm-contracts/public`); the handler is `(args: any, ctx: any) => Promise<unknown>`.
 2. Resolve paths via `resolvePath`. Use the size-cap constants from `util.ts`. Throw native `Error` on failure with informative messages.
 3. Tag it: `tags: ["local", "<category>"]`. Reuse `fs` / `shell` if it fits; introduce a new secondary tag only if a capability plugin needs to filter on it.
 4. Append `{ schema, handler }` to `ALL_TOOLS` in `tools.ts`.
@@ -82,12 +82,16 @@ Tests use `bun:test` only — no external mocking framework. Each tool test crea
 
 ## Local deploy
 
-The Kaizen runtime prefers the bundled `dist/index.js` over source. After editing, the plugin must be re-bundled into the install dir:
+Build from the source directory (where workspace deps resolve), then sync into the install dir:
 
 ```bash
-cp -R plugins/llm-local-tools/. ~/.kaizen/marketplaces/official/plugins/llm-local-tools@0.2.0/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-local-tools@0.2.0 \
-  && bun build --target=bun --outfile=dist/index.js index.ts)
+PLUGIN=llm-local-tools
+VERSION=$(jq -r .version plugins/$PLUGIN/package.json)
+INSTALL_DIR=~/.kaizen/marketplaces/official/plugins/${PLUGIN}@${VERSION}
+(cd plugins/$PLUGIN && bun build --target=bun --outfile=dist/index.js index.ts)
+mkdir -p "$INSTALL_DIR/dist"
+cp plugins/$PLUGIN/dist/index.js "$INSTALL_DIR/dist/index.js"
+rsync -a --exclude='node_modules' --exclude='dist' plugins/$PLUGIN/ "$INSTALL_DIR/"
 ```
 
 If you also need the harness manifest to pick up changes, sync the local marketplace repo (`~/.kaizen/marketplaces/official/repo/`) — it tracks upstream `main` and `kaizen marketplace update` will overwrite local edits.

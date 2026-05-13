@@ -5,7 +5,7 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 ## Module map
 
 ```
-index.ts        Plugin lifecycle: consumes llm-events vocabulary, wires service, registers identity at p=10,
+index.ts        Plugin lifecycle: consumes events:vocabulary, wires service, registers identity at p=10,
                 and registers slash commands when slash:registry is present.
                 The only file that touches `ctx`.
 registry.ts     createRegistry({ emit }) → SystemPromptServiceImpl. Pure logic. Owns generation counter
@@ -34,7 +34,7 @@ Boundaries:
 ## Adding a section from another plugin
 
 ```typescript
-const promptSystem = ctx.useService<SystemPromptService>("prompt:system");
+const promptSystem = ctx.useService<SystemPromptService>("prompt:registry");
 const handle = promptSystem.register({
   id: "my-plugin:my-section",
   priority: 200,            // 10 = identity, higher = later in prompt

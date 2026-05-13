@@ -3,37 +3,23 @@ import {
   DuplicateRegistrationError,
   InvalidNameError,
 } from "./errors.ts";
+import type {
+  SlashCommandContext,
+  SlashCommandHandler,
+  SlashCommandManifest,
+  SlashRegistryEntry,
+  RegistryEntry,
+  SlashRegistryService,
+} from "llm-contracts/public";
 
-export interface SlashCommandContext {
-  args: string;
-  raw: string;
-  signal: AbortSignal;
-  emit: (event: string, payload: unknown) => Promise<void>;
-  print: (text: string) => Promise<void>;
-}
-
-export type SlashCommandHandler = (ctx: SlashCommandContext) => Promise<void>;
-
-export interface SlashCommandManifest {
-  name: string;
-  description: string;
-  usage?: string;
-  source: "builtin" | "plugin" | "file";
-  filePath?: string;
-}
-
-export interface SlashRegistryEntry {
-  manifest: SlashCommandManifest;
-  handler: SlashCommandHandler;
-}
-
-export type RegistryEntry = SlashRegistryEntry;
-
-export interface SlashRegistryService {
-  register(manifest: SlashCommandManifest, handler: SlashCommandHandler): () => void;
-  get(name: string): SlashRegistryEntry | undefined;
-  list(): SlashCommandManifest[];
-}
+export type {
+  SlashCommandContext,
+  SlashCommandHandler,
+  SlashCommandManifest,
+  SlashRegistryEntry,
+  RegistryEntry,
+  SlashRegistryService,
+};
 
 const SEGMENT_RE = /^[a-z][a-z0-9-]*$/;
 

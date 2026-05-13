@@ -2,7 +2,7 @@ import type { ResolvedServerConfig } from "./config.ts";
 import type { McpClientLike, CreateClientResult } from "./client.ts";
 import { computeBackoffMs as defaultBackoff, RETRY_BUDGET as DEFAULT_BUDGET } from "./backoff.ts";
 import { toToolRegistration } from "./registration.ts";
-import type { ServerInfo, ServerStatus } from "./public.d.ts";
+import type { ServerInfo, ServerStatus } from "llm-contracts/public";
 import type { ToolRegistration } from "llm-tools-registry/public";
 
 export interface RegistryLike {

@@ -6,7 +6,7 @@ This plugin implements the `llm:complete` service against OpenAI-style
 `/chat/completions` streaming endpoints. It is a provider implementation, not
 the owner of the shared LLM request/response interface. Cross-plugin LLM types,
 including `LLMCompleteService`, `LLMRequest`, `LLMStreamEvent`, and `ModelInfo`,
-are owned by `llm-events/public` and should be imported from there.
+are owned by `llm-contracts/public` and should be imported from there.
 
 ## What it does
 
@@ -23,13 +23,13 @@ are owned by `llm-events/public` and should be imported from there.
 
 **Provides**: `llm:complete`
 
-**Consumes**: `llm-events:vocabulary`
+**Consumes**: `events:vocabulary`
 
 The service implementation satisfies `LLMCompleteService` from
-`llm-events/public`.
+`llm-contracts/public`.
 
-`llm-events` owns the neutral `llm:complete` service definition. `openai-llm`
-declares a dependency on `llm-events:vocabulary` so `llm-events` setup runs
+`llm-contracts` defines the neutral `llm:complete` service slot. `openai-llm`
+declares a dependency on `events:vocabulary` so `llm-events` setup runs
 first, then this plugin binds the concrete OpenAI-compatible implementation with
 `ctx.provideService("llm:complete", ...)`.
 
@@ -39,7 +39,7 @@ This package intentionally does not export `openai-llm/public`. Consumers should
 not import provider-neutral LLM types from this plugin. Use:
 
 ```ts
-import type { LLMCompleteService, LLMRequest } from "llm-events/public";
+import type { LLMCompleteService, LLMRequest } from "llm-contracts/public";
 ```
 
 ## Configuration

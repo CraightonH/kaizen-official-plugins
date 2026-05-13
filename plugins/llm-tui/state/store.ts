@@ -1,5 +1,6 @@
+import type { ToolCallStatus } from "llm-contracts/public";
+export type { ToolCallStatus };
 export type TranscriptKind = "output" | "notice" | "user" | "thoughts" | "tool_call";
-export type ToolCallStatus = "running" | "done" | "error";
 
 export interface PlainTranscriptLine {
   id: number;

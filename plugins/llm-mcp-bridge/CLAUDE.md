@@ -99,12 +99,16 @@ KAIZEN_INTEGRATION=1 bun test plugins/llm-mcp-bridge/test/integration/
 
 ## Local deploy
 
-The Kaizen runtime prefers the bundled `dist/index.js` over source. After editing, the plugin must be re-bundled into the install dir:
+Build from the source directory (where workspace deps resolve), then sync into the install dir:
 
 ```bash
-cp -R plugins/llm-mcp-bridge/. ~/.kaizen/marketplaces/official/plugins/llm-mcp-bridge@0.1.2/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-mcp-bridge@0.1.2 \
-  && bun build --target=bun --outfile=dist/index.js index.ts)
+PLUGIN=llm-mcp-bridge
+VERSION=$(jq -r .version plugins/$PLUGIN/package.json)
+INSTALL_DIR=~/.kaizen/marketplaces/official/plugins/${PLUGIN}@${VERSION}
+(cd plugins/$PLUGIN && bun build --target=bun --outfile=dist/index.js index.ts)
+mkdir -p "$INSTALL_DIR/dist"
+cp plugins/$PLUGIN/dist/index.js "$INSTALL_DIR/dist/index.js"
+rsync -a --exclude='node_modules' --exclude='dist' plugins/$PLUGIN/ "$INSTALL_DIR/"
 ```
 
 If you also need the harness manifest to pick up changes, sync the local marketplace repo (`~/.kaizen/marketplaces/official/repo/`) — it tracks upstream `main` and `kaizen marketplace update` will overwrite local edits.

@@ -1,7 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
 import { runConversation, type RunConversationDeps } from "../loop.ts";
-import type { ChatMessage } from "llm-events/public";
-import type { SessionsStoreService, TurnHandle } from "llm-session-manager/public";
+import type { ChatMessage } from "llm-contracts/public";
+import type { SessionsStoreService, TurnHandle } from "llm-contracts/public";
 
 function makeSessions(): SessionsStoreService {
   let open: ChatMessage[] | null = null;

@@ -1,6 +1,6 @@
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "./index.ts";
-import type { ToolsRegistryService } from "./registry.ts";
+import type { ToolsRegistryService } from "llm-contracts/public";
 
 function makeCtx() {
   const provided: Record<string, unknown> = {};
@@ -25,13 +25,16 @@ describe("llm-tools-registry plugin", () => {
     expect(plugin.apiVersion).toBe("3.0.0");
     expect(plugin.permissions).toEqual({ tier: "unscoped" });
     expect(plugin.services?.provides).toContain("tools:registry");
-    expect(plugin.services?.consumes).toContain("llm-events:vocabulary");
+    // events:vocabulary removed from consumes: this plugin never calls
+    // useService("events:vocabulary") — events use hardcoded names from
+    // llm-events/public. The old entry was a topo-sort hint only.
+    expect(plugin.services?.consumes).toBeUndefined();
   });
 
-  it("setup defines and provides tools:registry with the registry instance", async () => {
+  it("setup provides tools:registry with the registry instance (defineService is in llm-contracts)", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    expect(ctx.defineService).toHaveBeenCalledWith("tools:registry", expect.objectContaining({ description: expect.any(String) }));
+    expect(ctx.defineService).not.toHaveBeenCalled();
     const svc = ctx.provided["tools:registry"] as ToolsRegistryService;
     expect(svc).toBeDefined();
     expect(typeof svc.register).toBe("function");

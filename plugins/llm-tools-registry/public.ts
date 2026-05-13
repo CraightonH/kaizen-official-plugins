@@ -1,23 +1,25 @@
 // llm-tools-registry public surface.
-// Spec 0 owns ToolSchema, ToolCall, ChatMessage, and the CANCEL_TOOL runtime value.
-// Import CANCEL_TOOL from `llm-events`.
-// This plugin owns ToolsRegistryService, ToolHandler, ToolExecutionContext,
-// ToolSource, and ToolRegistration.
+// ToolsRegistryService, ToolHandler, ToolExecutionContext, and CANCEL_TOOL
+// are now canonical in llm-contracts/public. Re-exported here for backwards
+// compatibility.
+// This plugin owns ToolSource and ToolRegistration.
 
 export type {
   ToolSchema,
   ToolCall,
   ChatMessage,
-} from "llm-events/public";
+} from "llm-contracts/public";
 
 export type {
   ToolsRegistryService,
   ToolHandler,
   ToolExecutionContext,
-} from "./registry";
+} from "llm-contracts/public";
 
-import type { ToolSchema as _ToolSchema } from "llm-events/public";
-import type { ToolHandler as _ToolHandler } from "./registry";
+export { CANCEL_TOOL } from "llm-contracts/public";
+
+import type { ToolSchema as _ToolSchema } from "llm-contracts/public";
+import type { ToolHandler as _ToolHandler } from "llm-contracts/public";
 
 // ToolSource is open-shaped. `kind` is a freeform string so that new
 // provenance kinds can be introduced without editing this file. Well-known

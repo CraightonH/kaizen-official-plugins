@@ -20,7 +20,7 @@ function makeCtx(opts: { driver?: any; sessions?: any; tuiCompletion?: any } = {
         if (!opts.sessions) throw new Error(`useService: no provider for '${name}'`);
         return opts.sessions as T;
       }
-      if (name === "llm-tui:completion") {
+      if (name === "ui:completion-source") {
         if (!opts.tuiCompletion) throw new Error(`useService: no provider for '${name}'`);
         return opts.tuiCompletion as T;
       }

@@ -1,5 +1,5 @@
 import type { SlashRegistryService, SlashCommandManifest } from "./registry.ts";
-import type { CompletionItem, CompletionSource } from "llm-tui/public";
+import type { CompletionItem, CompletionSource } from "llm-contracts/public";
 
 function rank(m: SlashCommandManifest): number {
   if (m.source === "builtin" && !m.name.includes(":")) return 0;

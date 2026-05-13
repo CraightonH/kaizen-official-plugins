@@ -1,6 +1,6 @@
 import { describe, it, expect, mock } from "bun:test";
 import { makeCommands } from "../commands.ts";
-import type { SessionsStoreService, SessionRecord } from "../store.ts";
+import type { SessionsStoreService, SessionRecord } from "llm-contracts/public";
 
 function fakeStore(overrides: Partial<SessionsStoreService> = {}): SessionsStoreService {
   return {

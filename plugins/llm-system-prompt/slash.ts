@@ -1,5 +1,5 @@
 import type { SystemPromptServiceImpl } from "./registry.ts";
-import type { SlashCommandContext, SlashCommandHandler } from "llm-slash-commands/public";
+import type { SlashCommandContext, SlashCommandHandler } from "llm-contracts/public";
 
 export interface PromptSlashOptions {
   registry: SystemPromptServiceImpl;

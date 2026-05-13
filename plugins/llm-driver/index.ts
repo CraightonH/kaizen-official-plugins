@@ -2,9 +2,10 @@ import type { KaizenPlugin } from "kaizen/types";
 import type {
   ChatMessage,
   LLMCompleteService,
-} from "llm-events/public";
-import type { SessionsStoreService } from "llm-session-manager/public";
-import type { DriverService, RunConversationInput, RunConversationOutput, ToolDispatchStrategy } from "./public";
+  SessionsStoreService,
+  UiChannelService,
+} from "llm-contracts/public";
+import type { DriverService, RunConversationInput, RunConversationOutput, ToolDispatchStrategy } from "llm-contracts/public";
 import { runConversation, type RunConversationDeps, type ToolsRegistryService } from "./loop.ts";
 import { type CurrentTurn } from "./state.ts";
 import { newTurnId } from "./ids.ts";
@@ -12,14 +13,6 @@ import { wireCancel } from "./cancel.ts";
 import { pickBusyMessage } from "./busy-messages.ts";
 import { pickDoneMessage } from "./done-messages.ts";
 
-interface UiChannel {
-  readInput(): Promise<string>;
-  setBusy(b: boolean, msg?: string): void;
-  setBusyTiming(startedAt: number): void;
-  writeOutput(s: string): void;
-  writeNotice(s: string): void;
-  writeUser?(s: string): void;
-}
 
 interface DriverConfig {
   defaultSystemPrompt?: string;
@@ -59,7 +52,7 @@ let exitRequested = false;
 // UI channel reference set in start(). Setup-time subscribers reach the UI
 // through this — kaizen forbids ctx.on after init, so listeners must be
 // registered in setup() but use the channel resolved later.
-let moduleUi: UiChannel | null = null;
+let moduleUi: UiChannelService | null = null;
 
 const plugin: KaizenPlugin = {
   name: "llm-driver",
@@ -81,8 +74,8 @@ const plugin: KaizenPlugin = {
   },
   services: {
     consumes: [
-      "llm-events:vocabulary",
-      "llm-tui:channel",
+      "events:vocabulary",
+      "ui:channel",
       "llm:complete",
       "sessions:store",
     ],
@@ -90,17 +83,13 @@ const plugin: KaizenPlugin = {
   },
 
   async setup(ctx) {
-    ctx.consumeService("llm-events:vocabulary");
-    ctx.consumeService("llm-tui:channel");
+    ctx.consumeService("events:vocabulary");
+    ctx.consumeService("ui:channel");
     ctx.consumeService("llm:complete");
     ctx.consumeService("sessions:store");
     // Optional services are discovered with safeUse() below instead of hard
     // service edges. That keeps A-tier harnesses valid when tools/strategy or
     // prompt:system are absent.
-
-    ctx.defineService("driver:run-conversation", {
-      description: "Run a (possibly nested) conversation against the LLM with optional tool dispatch.",
-    });
 
     // Reset plugin-scoped state on every setup() so test re-setups and
     // re-loads start from a clean slate.
@@ -170,11 +159,11 @@ const plugin: KaizenPlugin = {
         llmComplete: ctx.useService<LLMCompleteService>("llm:complete")!,
         sessions: ctx.useService<SessionsStoreService>("sessions:store")!,
         registry: safeUse<ToolsRegistryService>("tools:registry"),
-        strategy: safeUse<ToolDispatchStrategy>("tool-dispatch:strategy"),
+        strategy: safeUse<ToolDispatchStrategy>("dispatch:strategy"),
         log: ctx.log.bind(ctx),
         idGen: newTurnId,
         defaultSystemPrompt: state.systemPrompt || (ctx.config as DriverConfig)?.defaultSystemPrompt || DEFAULTS.defaultSystemPrompt,
-        promptSystem: safeUse<{ assemble(): Promise<string>; generation(): number }>("prompt:system"),
+        promptSystem: safeUse<{ assemble(): Promise<string>; generation(): number }>("prompt:registry"),
       };
       return depsCache;
     };
@@ -188,7 +177,7 @@ const plugin: KaizenPlugin = {
   },
 
   async start(ctx) {
-    const ui = ctx.useService<UiChannel>("llm-tui:channel")!;
+    const ui = ctx.useService<UiChannelService>("ui:channel")!;
     moduleUi = ui;
     if (!buildDeps) {
       throw new Error("llm-driver.start() called before setup() — buildDeps not initialized");

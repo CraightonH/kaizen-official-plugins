@@ -1,4 +1,4 @@
-import type { McpBridgeService, ServerInfo } from "./public.d.ts";
+import type { McpBridgeService, ServerInfo } from "llm-contracts/public";
 import type { ResolvedServerConfig } from "./config.ts";
 
 export interface SlashCommandManifestLike {
@@ -34,7 +34,7 @@ async function emitSystem(ctx: SlashCommandContextLike, content: string): Promis
 
 export function registerSlashCommands(
   slash: SlashRegistryLike,
-  bridge: McpBridgeService & { reload(cfg: Map<string, ResolvedServerConfig>): Promise<{ added: string[]; removed: string[]; updated: string[] }> },
+  bridge: McpBridgeService & { reload(cfg?: Map<string, ResolvedServerConfig>): Promise<{ added: string[]; removed: string[]; updated: string[] }> },
   reloadFromDisk: () => Promise<Map<string, ResolvedServerConfig>>,
   log: (msg: string) => void,
 ): Array<() => void> {

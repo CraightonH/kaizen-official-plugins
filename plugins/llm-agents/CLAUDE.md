@@ -6,7 +6,7 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 
 ```
 index.ts        Plugin lifecycle: loads config, wires registry handle, turn tracker, injector,
-                dispatch tool, and the `prompt:system` Available-agents section. Schedules
+                dispatch tool, and the `prompt:registry` Available-agents section. Schedules
                 discovery in a microtask. Module-scope `toolUnregister`/`sectionHandle`
                 let `stop()` clean up idempotently on reload. The only file that touches `ctx`.
 config.ts       loadConfig({ home, cwd, env, readFile, log }) → AgentsConfig.
@@ -22,7 +22,7 @@ registry.ts     makeRegistry(initial) and makeRegistryHandle(initial). The handl
 turn-tracker.ts makeTurnTracker() — Map<turnId, TurnRecord> driven by turn:start / turn:end.
                 Source of truth for depth and "is top-level".
 injector.ts     makeInjector({ ctx, registry, tracker }) — subscribes to turn:start/end to
-                drive the turn tracker. Also exports buildAgentsBlock for the prompt:system
+                drive the turn tracker. Also exports buildAgentsBlock for the prompt:registry
                 section render. No prompt mutation happens here — the section is registered
                 in index.ts and rendered on demand by the prompt assembler.
 depth.ts        computeDepth(records, turnId) — counts agent-trigger ancestors back to
@@ -36,7 +36,7 @@ dispatch.ts     makeDispatchTool({ registry, tracker, driver, sessions, maxDepth
                 no emit hook, so the plugin captures `ctx.emit` at setup time.
 public.d.ts     Owns AgentManifest and AgentsRegistryService for this plugin. The service
                 name `agents:registry` is owned by llm-agents (defined and provided here);
-                the event vocab in llm-events:vocabulary does NOT define this contract.
+                the event vocab in events:vocabulary does NOT define this contract.
 ```
 
 Boundaries:
@@ -50,7 +50,7 @@ Boundaries:
 - **Registry handle is stable.** `index.ts` registers `agents:registry` once at setup with a `RegistryHandle`. Discovery mutates the inner registry via `setInner()`; consumers keep their reference. Don't replace this with re-registration.
 - **Discovery is non-blocking.** `setup()` returns before discovery completes. While `ready === false`, the dispatch handler throws `Agent registry still loading; retry` — which surfaces as a tool error, not a crash. Don't await discovery in `setup()`.
 - **Depth uses the turn tracker, not the bus.** Depth is computed from the in-memory `Map<turnId, TurnRecord>` walking `parentTurnId`. The driver must emit `turn:start` with the chain or depth degrades to 0. Don't try to recompute depth from event history.
-- **Available-agents block flows through `prompt:system`, not direct prompt mutation.** The section render returns `""` when the registry is empty so the assembler drops the section. Generation is bumped on every registry mutation (initial empty registry included) so the driver's per-deps assembly cache invalidates. Do not subscribe to `llm:before-call` or rewrite `request.systemPrompt` from this plugin.
+- **Available-agents block flows through `prompt:registry`, not direct prompt mutation.** The section render returns `""` when the registry is empty so the assembler drops the section. Generation is bumped on every registry mutation (initial empty registry included) so the driver's per-deps assembly cache invalidates. Do not subscribe to `llm:before-call` or rewrite `request.systemPrompt` from this plugin.
 - **Dispatch failures are tool errors.** Unknown agent, depth exceeded, cancellation, sub-conversation throw, and registry-not-ready all `throw` from the handler. The driver converts these to `tool:error`. Never let the plugin crash the parent turn.
 - **Always-on tools are merged in, never out.** Sub-agents always see `dispatch_agent` (so they can recurse to `maxDepth`) and, if `skills:registry` is present, `load_skill`. A manifest cannot opt out.
 - **Programmatic agents are namespaced.** `register()` requires the `runtime:` prefix. This keeps file-loaded and synthetic agents in disjoint namespaces.

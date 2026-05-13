@@ -2,7 +2,7 @@ import { expect, it } from "bun:test";
 import { tmpdir } from "node:os";
 import plugin from "./index.ts";
 
-it("setup provides prompt:system", async () => {
+it("setup provides prompt:registry", async () => {
   const provided: Record<string, unknown> = {};
   const ctx = {
     cwd: tmpdir(),
@@ -13,7 +13,7 @@ it("setup provides prompt:system", async () => {
     provideService: <T,>(n: string, v: T) => { provided[n] = v; },
     consumeService: (_n: string) => {},
     useService: (n: string) => {
-      if (n === "llm-events:vocabulary") {
+      if (n === "events:vocabulary") {
         return {
           PROMPT_REBUILT: "prompt:rebuilt",
           PROMPT_RELOAD: "prompt:reload",
@@ -27,5 +27,5 @@ it("setup provides prompt:system", async () => {
   };
 
   await plugin.setup(ctx as any);
-  expect(provided["prompt:system"]).toBeTruthy();
+  expect(provided["prompt:registry"]).toBeTruthy();
 });

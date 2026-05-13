@@ -11,7 +11,7 @@
     "kaizen-plugin"
   ],
   "dependencies": {
-    "llm-tui": "workspace:*",
+    "llm-contracts": "workspace:*",
     "yaml": "^2.5.0"
   },
   "devDependencies": {

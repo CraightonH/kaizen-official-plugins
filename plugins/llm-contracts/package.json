@@ -1,0 +1,17 @@
+{
+  "name": "llm-contracts",
+  "version": "0.1.0",
+  "description": "Service contract definitions for the openai-compatible harness. Pure types + defineService; no runtime behavior.",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./public": "./public.ts"
+  },
+  "keywords": ["kaizen-plugin"],
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/json-schema": "^7.0.15",
+    "@types/react": "^19.0.0",
+    "typescript": "^5.4.0"
+  }
+}

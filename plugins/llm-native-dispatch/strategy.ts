@@ -1,8 +1,8 @@
 import type {
   ChatMessage,
-} from "llm-events/public";
+} from "llm-contracts/public";
 import type { ToolExecutionContext } from "llm-tools-registry/public";
-import type { ToolDispatchStrategy } from "llm-driver/public";
+import type { ToolDispatchStrategy } from "llm-contracts/public";
 import { serializeResult, serializeError } from "./serialize.ts";
 import { isValidToolArgs, malformedArgsMessage } from "./args-validation.ts";
 

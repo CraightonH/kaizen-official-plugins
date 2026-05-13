@@ -34,6 +34,7 @@ function makeCtx(registry: any) {
   return {
     log: () => {},
     useService: (n: string) => n === "tools:registry" ? registry : undefined,
+    consumeService: () => {},
     defineEvent: () => {},
     on: () => {},
     emit: async () => [],

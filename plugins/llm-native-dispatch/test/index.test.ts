@@ -1,7 +1,7 @@
 // plugins/llm-native-dispatch/test/index.test.ts
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "../index.ts";
-import type { ToolDispatchStrategy } from "llm-driver/public";
+import type { ToolDispatchStrategy } from "llm-contracts/public";
 
 function makeCtx() {
   const provided: Record<string, unknown> = {};
@@ -25,16 +25,16 @@ describe("llm-native-dispatch plugin", () => {
     expect(plugin.name).toBe("llm-native-dispatch");
     expect(plugin.apiVersion).toBe("3.0.0");
     expect(plugin.permissions).toEqual({ tier: "trusted" });
-    expect(plugin.services?.provides).toContain("tool-dispatch:strategy");
-    expect(plugin.services?.consumes).toContain("tools:registry");
-    expect(plugin.services?.consumes).toContain("llm-events:vocabulary");
+    expect(plugin.services?.provides).toContain("dispatch:strategy");
+    // consumes array removed: dispatch:strategy uses tools:registry only via
+    // the driver's deps injection, not via ctx. No hard consume edges here.
+    expect(plugin.services?.consumes).toBeUndefined();
   });
 
-  it("setup defines and provides tool-dispatch:strategy", async () => {
+  it("setup provides dispatch:strategy", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    expect(ctx.defineService).toHaveBeenCalledWith("tool-dispatch:strategy", expect.objectContaining({ description: expect.any(String) }));
-    const svc = ctx.provided["tool-dispatch:strategy"] as ToolDispatchStrategy;
+    const svc = ctx.provided["dispatch:strategy"] as ToolDispatchStrategy;
     expect(svc).toBeDefined();
     expect(typeof svc.prepareRequest).toBe("function");
     expect(typeof svc.handleResponse).toBe("function");

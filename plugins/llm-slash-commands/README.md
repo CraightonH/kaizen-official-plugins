@@ -17,7 +17,7 @@ Owns slash-command intake for the harness. Intercepts user input that begins wit
 - Session-management commands (`/clear`, `/session:*`) are owned by `llm-session-manager`, not this plugin. They register against `slash:registry` like any other plugin contributor.
 - On parse miss, returns silently so the lower-priority default `input:submit` consumer can treat the line as a normal user message.
 - On unknown command, prints `Unknown command: /foo. Type /help for a list.` and claims the event.
-- Optionally registers a `/`-triggered completion source against `llm-tui:completion` if that service is present.
+- Optionally registers a `/`-triggered completion source against `ui:completion-source` if that service is present.
 
 ## Wiring
 
@@ -61,12 +61,12 @@ All consumed services are optional — there is no hard `services.consumes` edge
 
 **Service** — `driver:run-conversation` (optional). Looked up at command-invocation time. File-based commands invoke `runConversation()` against the active session in lieu of emitting `conversation:user-message`. If the driver or active session is absent, the rendered body is emitted as `conversation:user-message` instead and the turn is skipped.
 
-**Service** — `llm-tui:completion` (optional). When present, the plugin registers one source with `trigger: "/"` that filters `registry.list()` against the prefix and ranks built-ins first, then file-sourced, then plugin-namespaced. When absent, dispatch via `input:submit` works unchanged.
+**Service** — `ui:completion-source` (optional). When present, the plugin registers one source with `trigger: "/"` that filters `registry.list()` against the prefix and ranks built-ins first, then file-sourced, then plugin-namespaced. When absent, dispatch via `input:submit` works unchanged.
 
 ### Events observed
 
 - `session:active-changed` — tracks the active session id for file-command dispatch into `driver:run-conversation`.
-- `harness:start` — deferred lookup of `llm-tui:completion`.
+- `harness:start` — deferred lookup of `ui:completion-source`.
 
 ### Events
 
