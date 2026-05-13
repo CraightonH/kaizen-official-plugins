@@ -11,7 +11,7 @@ export type {
   LLMCompleteService,
 } from "llm-contracts/public";
 
-export declare const CANCEL_TOOL: unique symbol;
+export { CANCEL_TOOL } from "llm-contracts/public";
 
 /**
  * Cancellation sentinel for `codemode:before-execute` subscribers. Set

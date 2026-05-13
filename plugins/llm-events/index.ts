@@ -1,7 +1,6 @@
 import type { KaizenPlugin } from "kaizen/types";
 import type { Vocab } from "llm-contracts/public";
-
-export const CANCEL_TOOL: unique symbol = Symbol.for("kaizen.cancel") as any;
+export { CANCEL_TOOL } from "llm-contracts/public";
 export const CODEMODE_CANCEL_SENTINEL = "__kaizen_cancel__" as const;
 
 export const VOCAB: Vocab = Object.freeze({

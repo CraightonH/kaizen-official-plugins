@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { makeRegistry } from "../registry.ts";
 import { registerSlashCommands, type SlashRegistryLike } from "../slash.ts";
-import type { ToolsRegistryService } from "../registry.ts";
+import type { ToolsRegistryService } from "llm-contracts/public";
 
 interface RegisteredCommand {
   manifest: { name: string; description: string; usage?: string };

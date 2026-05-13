@@ -1,27 +1,12 @@
 import type {
   ToolSchema,
+  ToolsRegistryService,
+  ToolHandler,
+  ToolExecutionContext,
 } from "llm-contracts/public";
-import { CANCEL_TOOL } from "llm-events";
+import { CANCEL_TOOL } from "llm-contracts/public";
 
 import type { ToolSource, ToolRegistration } from "./public";
-
-export interface ToolExecutionContext {
-  signal: AbortSignal;
-  callId: string;
-  turnId?: string;
-  sessionId?: string;
-  log: (msg: string) => void;
-}
-
-export type ToolHandler = (args: unknown, ctx: ToolExecutionContext) => Promise<unknown>;
-
-export interface ToolsRegistryService {
-  register(schema: ToolSchema, handler: ToolHandler): () => void;
-  registerWith(reg: ToolRegistration): () => void;
-  list(filter?: { tags?: string[]; names?: string[]; sources?: ToolSource["kind"][] }): ToolSchema[];
-  listRegistrations(filter?: { tags?: string[]; names?: string[]; sources?: ToolSource["kind"][] }): ToolRegistration[];
-  invoke(name: string, args: unknown, ctx: ToolExecutionContext): Promise<unknown>;
-}
 
 interface Entry { schema: ToolSchema; handler: ToolHandler; source: ToolSource; }
 
