@@ -22,11 +22,20 @@ const plugin: KaizenPlugin = {
   permissions: { tier: "unscoped" },
   services: {
     provides: ["agents:registry"],
-    // Narrow consumes: only the foundation vocabulary is a hard requirement.
-    // All other integrations (tools:registry, driver:run-conversation,
-    // sessions:store, prompt:system, skills:registry) are looked up via
-    // useService and degrade with a harness:error when absent.
-    consumes: ["events:vocabulary"],
+    // `events:vocabulary` is the only hard requirement (consumed via
+    // `consumeService` below). The remaining entries are topo-sort hints —
+    // kaizen orders consumers after providers based on this array, even when
+    // the lookup is optional. Without them, `ctx.useService(...)` in setup
+    // throws "no provider" for providers scheduled later. Each is looked up
+    // with `useService` and the call site degrades when absent.
+    consumes: [
+      "events:vocabulary",
+      "tools:registry",
+      "driver:run-conversation",
+      "sessions:store",
+      "prompt:registry",
+      "skills:registry",
+    ],
   },
 
   async setup(ctx) {

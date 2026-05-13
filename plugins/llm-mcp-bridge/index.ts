@@ -16,9 +16,12 @@ const plugin: KaizenPlugin = {
   permissions: { tier: "unscoped" },
   services: {
     provides: ["mcp:bridge"],
-    // tools:registry is optional — the plugin provides a no-op mcp:bridge when absent
-    // (/mcp:list still works, returns empty). events:vocabulary is not used directly
-    // (events use hardcoded names), so it has been removed.
+    // Topo-sort hints — kaizen uses `services.consumes` to order plugin
+    // setup. `tools:registry` and `slash:registry` are both looked up via
+    // optional `useService` in setup; declaring them here guarantees their
+    // providers run first. Without these, `ctx.useService(...)` throws
+    // "no provider" because kaizen has no edge to schedule us after them.
+    consumes: ["tools:registry", "slash:registry"],
   },
 
   async setup(ctx) {

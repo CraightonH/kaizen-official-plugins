@@ -12,12 +12,14 @@ describe("llm-memory metadata", () => {
   it("provides memory:store", () => {
     expect(plugin.services?.provides).toContain("memory:store");
   });
-  it("has no hard consumes (all integrations degrade gracefully; events use hardcoded names)", () => {
-    // events:vocabulary removed from consumes: llm-memory never calls
-    // useService("events:vocabulary") and emits events with hardcoded names.
-    // All other services (prompt:registry, tools:registry, driver:run-conversation)
-    // are optional and degrade cleanly.
-    expect(plugin.services?.consumes).toBeUndefined();
+  it("declares topo-hint consumes for setup-time optional lookups", () => {
+    // events:vocabulary is not consumed — events are emitted with hardcoded
+    // names. prompt:registry and tools:registry are looked up via optional
+    // useService in setup; kaizen needs them in services.consumes to order
+    // their providers first (otherwise useService throws "no provider").
+    // driver:run-conversation lookup is inside a deferred turn:end listener,
+    // so it's not needed as a topo hint.
+    expect(plugin.services?.consumes).toEqual(["prompt:registry", "tools:registry"]);
   });
 });
 

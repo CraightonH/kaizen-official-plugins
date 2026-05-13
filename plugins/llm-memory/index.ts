@@ -17,10 +17,14 @@ const plugin: KaizenPlugin = {
   permissions: { tier: "unscoped" },
   services: {
     provides: ["memory:store"],
-    // No hard consume edges: all integrations (prompt:registry, tools:registry,
-    // driver:run-conversation) are optional and degrade cleanly when absent.
-    // events:vocabulary is not used directly by this plugin (events are emitted
-    // with hardcoded names), so it is not listed here.
+    // Topo-sort hints — kaizen schedules consumers after providers based on
+    // this array. The lookups below are optional (each call site degrades
+    // when the service is absent), but they happen inside `setup()` and
+    // `ctx.useService(...)` throws "no provider" when the provider hasn't
+    // run yet. Declaring them here forces the right order without making
+    // them hard dependencies. `driver:run-conversation` lookup happens
+    // inside a `turn:end` listener (deferred), so it's not listed.
+    consumes: ["prompt:registry", "tools:registry"],
   },
 
   async setup(ctx) {
