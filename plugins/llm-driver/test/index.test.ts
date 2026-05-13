@@ -1,7 +1,7 @@
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "../index.ts";
 import type { ChatMessage, LLMStreamEvent } from "llm-contracts/public";
-import type { SessionsStoreService, TurnHandle } from "llm-session-manager/public";
+import type { SessionsStoreService, TurnHandle } from "llm-contracts/public";
 
 function makeUi(lines: string[]) {
   const out: string[] = [];

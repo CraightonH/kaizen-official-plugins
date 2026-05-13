@@ -11,3 +11,4 @@ export type {
   LLMStreamEvent,
   LLMCompleteService,
 } from "./contracts/llm-complete";
+export type { SessionsStoreService, SessionRecord, TurnHandle, EventLogEntry } from "./contracts/sessions-store";

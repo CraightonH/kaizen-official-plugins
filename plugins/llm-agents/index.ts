@@ -2,7 +2,7 @@ import type { KaizenPlugin } from "kaizen/types";
 import type { AgentsRegistryService } from "./public";
 import type { ToolsRegistryService } from "llm-tools-registry/public";
 import type { DriverService } from "llm-driver/public";
-import type { SessionsStoreService } from "llm-session-manager/public";
+import type { SessionsStoreService } from "llm-contracts/public";
 import type { SystemPromptService } from "llm-system-prompt/public";
 import { loadConfig, realDeps } from "./config.ts";
 import { loadFromDirs } from "./loader.ts";

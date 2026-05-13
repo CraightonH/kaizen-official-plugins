@@ -1,5 +1,5 @@
 import type { CommandsApi } from "./commands.ts";
-import type { SessionRecord } from "./store.ts";
+import type { SessionRecord } from "llm-contracts/public";
 
 export interface SlashCommandManifestLike {
   name: string;

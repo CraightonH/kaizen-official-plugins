@@ -8,8 +8,7 @@ export type {
   LLMCompleteService,
 } from "llm-contracts/public";
 
-import type { ChatMessage, LLMResponse, ToolSchema } from "llm-contracts/public";
-import type { TurnHandle } from "llm-session-manager/public";
+import type { ChatMessage, LLMResponse, ToolSchema, TurnHandle } from "llm-contracts/public";
 
 // Owned by llm-driver: service contract for `driver:run-conversation`.
 export type RunConversationInput = {

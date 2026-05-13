@@ -1,4 +1,4 @@
-import type { SessionsStoreService } from "./store";
+import type { SessionsStoreService } from "llm-contracts/public";
 
 const LOGGED_EVENTS = new Set([
   "turn:start",

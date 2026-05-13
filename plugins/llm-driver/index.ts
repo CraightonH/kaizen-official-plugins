@@ -2,8 +2,8 @@ import type { KaizenPlugin } from "kaizen/types";
 import type {
   ChatMessage,
   LLMCompleteService,
+  SessionsStoreService,
 } from "llm-contracts/public";
-import type { SessionsStoreService } from "llm-session-manager/public";
 import type { DriverService, RunConversationInput, RunConversationOutput, ToolDispatchStrategy } from "./public";
 import { runConversation, type RunConversationDeps, type ToolsRegistryService } from "./loop.ts";
 import { type CurrentTurn } from "./state.ts";

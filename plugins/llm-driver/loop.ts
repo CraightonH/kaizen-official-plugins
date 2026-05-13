@@ -4,8 +4,8 @@ import type {
   LLMRequest,
   LLMResponse,
   ToolSchema,
+  SessionsStoreService,
 } from "llm-contracts/public";
-import type { SessionsStoreService } from "llm-session-manager/public";
 import type {
   RunConversationInput,
   RunConversationOutput,
