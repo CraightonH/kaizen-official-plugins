@@ -80,7 +80,7 @@ export function makeStrategy(): ToolDispatchStrategy {
           }
           content = ser.content;
         } catch (err) {
-          const message = String((err as any)?.message ?? err);
+          const message = err instanceof Error ? err.message : String(err);
           content = serializeError(message);
         }
 

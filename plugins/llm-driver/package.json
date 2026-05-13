@@ -1,6 +1,6 @@
 {
   "name": "llm-driver",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Coordination plugin for the openai-compatible harness: turn loop, conversation state, lifecycle events.",
   "type": "module",
   "exports": {
@@ -10,6 +10,10 @@
   "keywords": [
     "kaizen-plugin"
   ],
+  "dependencies": {
+    "llm-events": "workspace:*",
+    "llm-session-manager": "workspace:*"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "typescript": "^5.4.0"

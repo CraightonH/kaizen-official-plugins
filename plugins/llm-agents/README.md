@@ -11,7 +11,7 @@ Subagent dispatch and file-backed agent registry. Discovers markdown agent manif
 - Skips files that are malformed, oversized (> 64 KiB cap), or hit a symlink cycle, surfacing each as a `harness:error`. The rest of the registry continues loading.
 - Discovery runs in a microtask so plugin setup does not block on file I/O. While it's still running, `dispatch_agent` returns the tool error `Agent registry still loading; retry`.
 - Programmatic registration is supported but restricted to names prefixed `runtime:` to avoid collisions with file-loaded agents.
-- On every top-level (`trigger === "user"`) turn's first LLM call, appends an `## Available agents (use dispatch_agent to invoke)` section to the outgoing system prompt — one bullet per agent, descriptions trimmed to ~200 chars. Nested agent turns are not injected.
+- Registers an `Available agents` section with `prompt:system` (id `llm-agents:available`, priority `150`). The renderer returns one bullet per agent (descriptions trimmed to ~200 chars) or `""` when the registry is empty (the registry then drops the section). Generation is bumped on every registry mutation so cached assemblies re-render when agents are added or removed.
 - The `dispatch_agent` tool walks the parent turn chain to compute depth, enforces a configurable max depth, creates or resumes a child session under the parent session, builds a `RunConversationInput` from the manifest, and recurses into the driver. The sub-agent's tool view is the manifest filter merged with always-on tools (`dispatch_agent` plus `load_skill` when `skills:registry` is present). Cancellation propagates via the parent's `AbortSignal`. All failure modes return as tool errors, not crashes.
 - Emits `status:item-update { key: "agents.active" }` while a dispatch is in flight and clears it on completion.
 
@@ -44,21 +44,25 @@ Semantics:
 
 ### Consumes
 
-- **Service** — `tools:registry` (required). Used to register `dispatch_agent`. If absent, dispatch is disabled and a `harness:error` is emitted.
-- **Service** — `driver:run-conversation` (required). The dispatch handler calls `runConversation()` with the manifest's system prompt, a child `sessionId`, the user prompt, the merged tool filter, the optional model override, and `parentTurnId` set to the current turn id. If absent, dispatch is disabled and a `harness:error` is emitted.
-- **Service** — `sessions:store` (required). Creates or resumes child sessions for `dispatch_agent`.
-- **Service** — `skills:registry` (optional). When present, sub-agents additionally see `load_skill` regardless of their declared filter.
-- **VOCAB** — `llm-events:vocabulary`. The plugin is a consumer of the shared event vocabulary; it does not define events.
+Per `AGENTS.md`, only the foundation event vocabulary is declared as a hard
+`services.consumes` dependency. The integrations below are looked up via
+`useService` so the plugin degrades cleanly when an optional service is absent.
+
+- **VOCAB** — `llm-events:vocabulary` (hard). The plugin is a consumer of the shared event vocabulary; it does not define events.
+- **Service** — `tools:registry` (soft). Used to register `dispatch_agent`. If absent, dispatch is disabled and a `harness:error` is emitted.
+- **Service** — `driver:run-conversation` (soft). The dispatch handler calls `runConversation()` with the manifest's system prompt, a child `sessionId`, the user prompt, the merged tool filter, the optional model override, and `parentTurnId` set to the current turn id. If absent, dispatch is disabled and a `harness:error` is emitted.
+- **Service** — `sessions:store` (soft). Creates or resumes child sessions for `dispatch_agent`. If absent, dispatch is disabled and a `harness:error` is emitted.
+- **Service** — `prompt:system` (soft). When present, the plugin registers an `Available agents` section. When absent, a `harness:error` is emitted and the section is skipped.
+- **Service** — `skills:registry` (soft). When present, sub-agents additionally see `load_skill` regardless of their declared filter.
 
 ### Events consumed
 
-- `turn:start` — `{ turnId, trigger, parentTurnId? }` — feeds the turn tracker used for depth computation and for distinguishing top-level from agent turns.
-- `turn:end` — `{ turnId }` — drops the tracker record and clears the per-turn injection guard.
-- `prompt:system` — contributes a section with id `"llm-agents:available"`, priority `150`, and title `"Available agents (use dispatch_agent to invoke)"`. The render function returns one bullet per agent (descriptions trimmed to ~200 chars), or `""` when the registry is empty (causing the registry to drop the section). Generation is bumped on every registry mutation so callers re-render when agents are added or removed. The section is only rendered for top-level turns (`trigger === "user"`); nested agent turns are excluded.
+- `turn:start` — `{ turnId, trigger, parentTurnId? }` — feeds the turn tracker used for depth computation.
+- `turn:end` — `{ turnId }` — drops the tracker record.
 
 ### Events emitted
 
-- `harness:error` — discovery failures, missing required services, malformed config.
+- `harness:error` — discovery failures, missing optional services, malformed config.
 - `status:item-update` / `status:item-clear` — `{ key: "agents.active", value: <agent-name> }` around each dispatch.
 
 ## Configuration

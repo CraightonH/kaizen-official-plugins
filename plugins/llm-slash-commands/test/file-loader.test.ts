@@ -91,7 +91,7 @@ describe("loadFileCommands", () => {
     const userMsgCalls = emit.mock.calls.filter((c) => c[0] === "conversation:user-message");
     expect(userMsgCalls.length).toBe(0);
     expect(runConversation).toHaveBeenCalledTimes(1);
-    expect(runConversation.mock.calls[0]![0]).toMatchObject({
+    expect((runConversation.mock.calls as unknown as any[][])[0]![0]).toMatchObject({
       sessionId: "session-1",
       userMessage: { role: "user", content: "You said: hello world.\n" },
     });

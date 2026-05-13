@@ -193,7 +193,7 @@ describe("llm-hooks-shell setup", () => {
       },
     });
     await plugin.setup(ctx);
-    expect(ctx.logs.some((l) => /block_on_nonzero.*turn:end/.test(l.msg))).toBe(true);
+    expect(ctx.logs.some((l: { msg: string }) => /block_on_nonzero.*turn:end/.test(l.msg))).toBe(true);
     // Hook still runs:
     await ctx.handlers["turn:end"]!({ turnId: "t-1", reason: "complete" });
     expect(calls).toEqual(["boom"]);

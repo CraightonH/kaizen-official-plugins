@@ -1,6 +1,6 @@
 {
   "name": "llm-agents",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Subagent dispatch + file-loader registry for the openai-compatible harness",
   "type": "module",
   "exports": {
@@ -11,7 +11,11 @@
     "kaizen-plugin"
   ],
   "dependencies": {
-    "llm-tools-registry": "workspace:*"
+    "llm-events": "workspace:*",
+    "llm-tools-registry": "workspace:*",
+    "llm-driver": "workspace:*",
+    "llm-session-manager": "workspace:*",
+    "llm-system-prompt": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest",

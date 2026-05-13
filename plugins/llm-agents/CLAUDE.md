@@ -6,8 +6,9 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 
 ```
 index.ts        Plugin lifecycle: loads config, wires registry handle, turn tracker, injector,
-                and dispatch tool. Schedules discovery in a microtask. The only file that
-                touches `ctx`.
+                dispatch tool, and the `prompt:system` Available-agents section. Schedules
+                discovery in a microtask. Module-scope `toolUnregister`/`sectionHandle`
+                let `stop()` clean up idempotently on reload. The only file that touches `ctx`.
 config.ts       loadConfig({ home, cwd, env, readFile, log }) → AgentsConfig.
                 Resolves config path, expands ~ and relatives, validates maxDepth.
 loader.ts       loadFromDirs({ userDir, projectDir, deps }) → { manifests, errors }.
@@ -20,16 +21,22 @@ registry.ts     makeRegistry(initial) and makeRegistryHandle(initial). The handl
                 Public list() strips internal fields; register() restricts to `runtime:` names.
 turn-tracker.ts makeTurnTracker() — Map<turnId, TurnRecord> driven by turn:start / turn:end.
                 Source of truth for depth and "is top-level".
-injector.ts     makeInjector({ ctx, tracker }) — subscribes to turn:start/end to drive the
-                turn tracker. Also exports buildAgentsBlock for the prompt:system section.
+injector.ts     makeInjector({ ctx, registry, tracker }) — subscribes to turn:start/end to
+                drive the turn tracker. Also exports buildAgentsBlock for the prompt:system
+                section render. No prompt mutation happens here — the section is registered
+                in index.ts and rendered on demand by the prompt assembler.
 depth.ts        computeDepth(records, turnId) — counts agent-trigger ancestors back to
                 the user turn. 1024-iteration safety guard.
 tool-filter.ts  Glob matcher for manifest `tools` patterns and toolMatches() helper. Pure.
-dispatch.ts     makeDispatchTool({ registry, tracker, driver, maxDepth, hasSkills }) →
-                { schema, handler }. Reads ctx.turnId, builds RunConversationInput
-                from llm-driver/public, recurses.
-public.d.ts     Re-exports AgentManifest and AgentsRegistryService from llm-events/public.
-                The canonical service contract lives in the events VOCAB.
+dispatch.ts     makeDispatchTool({ registry, tracker, driver, sessions, maxDepth, hasSkills,
+                emit? }) → { schema, handler }. Reads ctx.turnId / ctx.sessionId, builds
+                RunConversationInput from llm-driver/public, recurses. ToolSchema is imported
+                from llm-tools-registry/public (the narrowest stable owner re-exports it).
+                Status events go through the injected `emit` dep — ToolExecutionContext has
+                no emit hook, so the plugin captures `ctx.emit` at setup time.
+public.d.ts     Owns AgentManifest and AgentsRegistryService for this plugin. The service
+                name `agents:registry` is owned by llm-agents (defined and provided here);
+                the event vocab in llm-events:vocabulary does NOT define this contract.
 ```
 
 Boundaries:
@@ -43,7 +50,7 @@ Boundaries:
 - **Registry handle is stable.** `index.ts` registers `agents:registry` once at setup with a `RegistryHandle`. Discovery mutates the inner registry via `setInner()`; consumers keep their reference. Don't replace this with re-registration.
 - **Discovery is non-blocking.** `setup()` returns before discovery completes. While `ready === false`, the dispatch handler throws `Agent registry still loading; retry` — which surfaces as a tool error, not a crash. Don't await discovery in `setup()`.
 - **Depth uses the turn tracker, not the bus.** Depth is computed from the in-memory `Map<turnId, TurnRecord>` walking `parentTurnId`. The driver must emit `turn:start` with the chain or depth degrades to 0. Don't try to recompute depth from event history.
-- **Injection runs at most once per top-level turn.** A `Set<turnId>` is cleared on `turn:end`. Multi-call top-level turns must inject only on the first call; nested turns must not inject at all.
+- **Available-agents block flows through `prompt:system`, not direct prompt mutation.** The section render returns `""` when the registry is empty so the assembler drops the section. Generation is bumped on every registry mutation (initial empty registry included) so the driver's per-deps assembly cache invalidates. Do not subscribe to `llm:before-call` or rewrite `request.systemPrompt` from this plugin.
 - **Dispatch failures are tool errors.** Unknown agent, depth exceeded, cancellation, sub-conversation throw, and registry-not-ready all `throw` from the handler. The driver converts these to `tool:error`. Never let the plugin crash the parent turn.
 - **Always-on tools are merged in, never out.** Sub-agents always see `dispatch_agent` (so they can recurse to `maxDepth`) and, if `skills:registry` is present, `load_skill`. A manifest cannot opt out.
 - **Programmatic agents are namespaced.** `register()` requires the `runtime:` prefix. This keeps file-loaded and synthetic agents in disjoint namespaces.
@@ -111,8 +118,8 @@ When adding tests for the lifecycle, build the registry handle and turn tracker 
 The Kaizen runtime prefers the bundled `dist/index.js` over source. After editing, the plugin must be re-bundled into the install dir:
 
 ```bash
-cp -R plugins/llm-agents/. ~/.kaizen/marketplaces/official/plugins/llm-agents@0.1.0/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-agents@0.1.0 \
+cp -R plugins/llm-agents/. ~/.kaizen/marketplaces/official/plugins/llm-agents@0.2.1/
+(cd ~/.kaizen/marketplaces/official/plugins/llm-agents@0.2.1 \
   && bun build --target=bun --outfile=dist/index.js index.ts)
 ```
 

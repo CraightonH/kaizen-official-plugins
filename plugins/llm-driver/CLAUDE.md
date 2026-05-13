@@ -78,8 +78,8 @@ Tests use `bun:test` only. `makeIdGen(seq)` from `ids.ts` is the standard way to
 The Kaizen runtime prefers the bundled `dist/index.js` over source. After editing, the plugin must be re-bundled into the install dir:
 
 ```bash
-cp -R plugins/llm-driver/. ~/.kaizen/marketplaces/official/plugins/llm-driver@0.1.0/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-driver@0.1.0 \
+cp -R plugins/llm-driver/. ~/.kaizen/marketplaces/official/plugins/llm-driver@0.2.1/
+(cd ~/.kaizen/marketplaces/official/plugins/llm-driver@0.2.1 \
   && bun build --target=bun --outfile=dist/index.js index.ts)
 ```
 

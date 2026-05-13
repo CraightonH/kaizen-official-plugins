@@ -79,7 +79,11 @@ describe("llm-agents plugin", () => {
     expect(plugin.name).toBe("llm-agents");
     expect(plugin.permissions?.tier).toBe("unscoped");
     expect(plugin.services?.provides).toContain("agents:registry");
-    expect(plugin.services?.consumes).toContain("prompt:system");
+    // Optional integrations (tools:registry, driver:run-conversation,
+    // sessions:store, prompt:system) are not declared as hard consumes —
+    // the plugin emits harness:error and degrades when they're absent.
+    expect(plugin.services?.consumes).toContain("llm-events:vocabulary");
+    expect(plugin.services?.consumes).not.toContain("prompt:system");
   });
 
   it("agents:registry list() reflects discovered manifests after microtask", async () => {
@@ -134,6 +138,23 @@ describe("llm-agents plugin", () => {
     await new Promise((r) => setTimeout(r, 10));
     // After discovery microtask: setInner triggers onChange → bumpGeneration
     expect(bumpGeneration.mock.calls.length).toBeGreaterThan(callsBefore);
+  });
+
+  it("stop() unregisters tool and section, and is idempotent", async () => {
+    const toolUnregister = mock(() => {});
+    const tools = { register: () => () => {}, registerWith: mock(() => toolUnregister), list: () => [], invoke: async () => {} };
+    const driver = { runConversation: async () => ({ finalMessage: { role: "assistant", content: "" }, messages: [], usage: { promptTokens: 0, completionTokens: 0 } }) };
+    const sectionUnregister = mock(() => {});
+    const promptSystem = { register: () => ({ unregister: sectionUnregister, bumpGeneration: () => {} }), assemble: async () => "", list: () => [], generation: () => 0 };
+    const ctx = makeCtx({ tools, driver, promptSystem });
+    await plugin.setup(ctx);
+    await plugin.stop?.(ctx);
+    expect(toolUnregister).toHaveBeenCalledTimes(1);
+    expect(sectionUnregister).toHaveBeenCalledTimes(1);
+    // Second stop() is a no-op (no double-free).
+    await plugin.stop?.(ctx);
+    expect(toolUnregister).toHaveBeenCalledTimes(1);
+    expect(sectionUnregister).toHaveBeenCalledTimes(1);
   });
 
   it("no llm:before-call subscription is registered", async () => {

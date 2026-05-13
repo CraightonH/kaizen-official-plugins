@@ -11,10 +11,10 @@ Owns slash-command intake for the harness. Intercepts user input that begins wit
   - **Project:** `<cwd>/.kaizen/commands/*.md`
   - YAML frontmatter (`description`, optional `usage`, optional `arguments.required`); body supports `{{args}}` substitution. Project files shadow user files of the same name.
 - Ships built-ins:
-  - `/help [command]` — list all registered commands grouped by source (Built-in, Driver, Skills, Agents, Memory, MCP, User), or print one entry's detail.
+  - `/help [command]` — list all registered commands grouped by source (Built-in, Driver, Skills, Agents, Sessions, Memory, MCP, User), or print one entry's detail.
   - `/exit` — request harness shutdown via `harness:exit-requested`.
-  - `/clear` — archive the current transcript by creating a fresh active session.
-  - `/session:new`, `/session:list`, `/session:resume <id>`, `/session:delete <id> [--cascade]` — manage persistent sessions when `sessions:store` is available.
+  - `/history` — enter the TUI audit/history view via `tui:enter-history`.
+- Session-management commands (`/clear`, `/session:*`) are owned by `llm-session-manager`, not this plugin. They register against `slash:registry` like any other plugin contributor.
 - On parse miss, returns silently so the lower-priority default `input:submit` consumer can treat the line as a normal user message.
 - On unknown command, prints `Unknown command: /foo. Type /help for a list.` and claims the event.
 - Optionally registers a `/`-triggered completion source against `llm-tui:completion` if that service is present.
@@ -57,11 +57,16 @@ Semantics:
 
 ### Consumes
 
-**Service** — `driver:run-conversation` (optional). Looked up at command-invocation time. File-based commands invoke `runConversation()` against the active session after emitting their rendered `conversation:user-message`. If the driver or active session is absent, the user message is still emitted and the turn is skipped.
+All consumed services are optional — there is no hard `services.consumes` edge. Plugins that need slash commands declare a hard `consumes: ["slash:registry"]` against this plugin; this plugin itself degrades cleanly when peers are absent.
 
-**Service** — `sessions:store` (optional). Enables `/clear` archival semantics and the `/session:*` built-ins. Without it, only `/help` and `/exit` are registered.
+**Service** — `driver:run-conversation` (optional). Looked up at command-invocation time. File-based commands invoke `runConversation()` against the active session in lieu of emitting `conversation:user-message`. If the driver or active session is absent, the rendered body is emitted as `conversation:user-message` instead and the turn is skipped.
 
 **Service** — `llm-tui:completion` (optional). When present, the plugin registers one source with `trigger: "/"` that filters `registry.list()` against the prefix and ranks built-ins first, then file-sourced, then plugin-namespaced. When absent, dispatch via `input:submit` works unchanged.
+
+### Events observed
+
+- `session:active-changed` — tracks the active session id for file-command dispatch into `driver:run-conversation`.
+- `harness:start` — deferred lookup of `llm-tui:completion`.
 
 ### Events
 
@@ -71,11 +76,10 @@ Subscribes:
 Emits:
 - `input:handled` — `{ by: "llm-slash-commands" }`. Emitted after every claimed dispatch (matched, unknown-command, or handler-threw).
 - `conversation:system-message` — used by `print()`, by the unknown-command path, and by file-loader startup warnings.
-- `conversation:user-message` — emitted by file-based command handlers before invoking `driver:run-conversation`.
+- `conversation:user-message` — emitted by file-based command handlers when `driver:run-conversation` or the active session is absent.
 - `harness:error` — when a handler throws. The original dispatch still emits `input:handled`.
 - `harness:exit-requested` — emitted by `/exit`.
-- `session:active-changed` — emitted by `/clear`, `/session:new`, `/session:resume`, and active-session deletion.
-- `session:resumed` — emitted by `/session:resume`.
+- `tui:enter-history` — emitted by `/history`. Owned by `llm-tui`.
 
 The wrapped `emit` passed to handlers throws `ReentrantSlashEmitError` if a handler attempts to re-emit `input:submit`. A per-dispatch flag also drops any nested `input:submit` the subscriber sees as defense in depth.
 

@@ -1,7 +1,8 @@
 import type {
+  ToolExecutionContext,
+  ToolHandler,
   ToolSchema,
-} from "llm-events/public";
-import type { ToolExecutionContext, ToolHandler } from "llm-tools-registry/public";
+} from "llm-tools-registry/public";
 import type {
   DriverService,
   RunConversationInput,
@@ -13,6 +14,8 @@ import type { TurnTracker } from "./turn-tracker.ts";
 import { computeDepth } from "./depth.ts";
 import { randomUUID } from "node:crypto";
 
+export type EmitFn = (event: string, payload: unknown) => Promise<void>;
+
 export interface DispatchDeps {
   registry: RegistryHandle;
   tracker: TurnTracker;
@@ -20,6 +23,13 @@ export interface DispatchDeps {
   sessions: SessionsStoreService;
   maxDepth: number;
   hasSkills: () => boolean;
+  /**
+   * Optional. When provided, dispatch emits `status:item-update` /
+   * `status:item-clear` around each call. The plugin captures this from
+   * `ctx.emit` at setup() because `ToolExecutionContext` does not expose
+   * an emit hook.
+   */
+  emit?: EmitFn;
 }
 
 export const DISPATCH_SCHEMA: ToolSchema = {
@@ -114,7 +124,7 @@ export function makeDispatchTool(deps: DispatchDeps): { schema: ToolSchema; hand
     };
 
     // Status telemetry: track active agent dispatches.
-    const emit = (ctx as any).emit as ((e: string, p: unknown) => Promise<void>) | undefined;
+    const emit = deps.emit;
     try {
       await emit?.("status:item-update", { key: "agents.active", value: name });
       let output: RunConversationOutput;

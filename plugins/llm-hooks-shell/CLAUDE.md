@@ -8,8 +8,8 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 index.ts     Plugin lifecycle: consumes llm-events:vocabulary, loads config, groups
              entries by event, registers one ctx.on(event) listener per event that
              runs all matching hooks sequentially. The only file that touches `ctx`.
-             Owns the cancellation sentinels (CANCEL_TOOL Symbol, CODEMODE_CANCEL_SENTINEL string)
-             and the per-event blocking dispatch.
+             Imports the cancellation sentinels (`CANCEL_TOOL`, `CODEMODE_CANCEL_SENTINEL`)
+             from `llm-events` (owner) and applies them in the per-event blocking dispatch.
 config.ts    loadHookConfigs(deps, vocab) → { entries, warnings }. Pure logic.
              Reads home + project hooks.json, merges (home first), validates each
              entry's event against vocab (throws on unknown), warns on
@@ -73,8 +73,8 @@ Fixtures live under `test/fixtures/`.
 The Kaizen runtime prefers the bundled `dist/index.js` over source. After editing, the plugin must be re-bundled into the install dir:
 
 ```bash
-cp -R plugins/llm-hooks-shell/. ~/.kaizen/marketplaces/official/plugins/llm-hooks-shell@0.1.0/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-hooks-shell@0.1.0 \
+cp -R plugins/llm-hooks-shell/. ~/.kaizen/marketplaces/official/plugins/llm-hooks-shell@0.1.1/
+(cd ~/.kaizen/marketplaces/official/plugins/llm-hooks-shell@0.1.1 \
   && bun build --target=bun --outfile=dist/index.js index.ts)
 ```
 

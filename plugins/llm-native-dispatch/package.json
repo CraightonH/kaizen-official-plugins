@@ -1,6 +1,6 @@
 {
   "name": "llm-native-dispatch",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Native OpenAI tool-calling dispatch strategy for the openai-compatible harness.",
   "type": "module",
   "exports": {
@@ -11,6 +11,7 @@
   ],
   "dependencies": {
     "llm-driver": "workspace:*",
+    "llm-events": "workspace:*",
     "llm-tools-registry": "workspace:*"
   },
   "devDependencies": {

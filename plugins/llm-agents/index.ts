@@ -12,22 +12,38 @@ import { makeInjector, buildAgentsBlock } from "./injector.ts";
 import { makeDispatchTool } from "./dispatch.ts";
 import { readdir, stat as fsStat, realpath as fsRealpath, readFile as fsReadFile } from "node:fs/promises";
 
+// Module-scope handles for idempotent stop() cleanup. Reset every setup().
+let sectionHandle: { bumpGeneration(): void; unregister(): void } | undefined;
+let toolUnregister: (() => void) | undefined;
+
 const plugin: KaizenPlugin = {
   name: "llm-agents",
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
   services: {
     provides: ["agents:registry"],
-    consumes: ["tools:registry", "driver:run-conversation", "sessions:store", "llm-events:vocabulary", "prompt:system"],
+    // Narrow consumes: only the foundation vocabulary is a hard requirement.
+    // All other integrations (tools:registry, driver:run-conversation,
+    // sessions:store, prompt:system, skills:registry) are looked up via
+    // useService and degrade with a harness:error when absent.
+    consumes: ["llm-events:vocabulary"],
   },
 
   async setup(ctx) {
     const log = (m: string) => ctx.log(m);
     const config = await loadConfig(realDeps(log));
 
-    // Create a handle that wraps an initially-empty registry.
-    // After discovery completes, we call handle.setInner(newRegistry).
-    const handle = makeRegistryHandle(makeRegistry([]));
+    // bumpGeneration callback — closure-captured so both the initial empty
+    // registry and the post-discovery registry can call it without knowing
+    // about prompt:system.
+    const bumpSection = () => sectionHandle?.bumpGeneration();
+
+    // Create a handle that wraps an initially-empty registry. After
+    // discovery completes, we call handle.setInner(newRegistry). The initial
+    // registry is built with bumpSection so synthetic agents registered
+    // before discovery still trigger a re-render.
+    const handle = makeRegistryHandle(makeRegistry([], bumpSection));
+
     let ready = false;
 
     ctx.defineService("agents:registry", { description: "Agent manifest registry." });
@@ -55,18 +71,18 @@ const plugin: KaizenPlugin = {
         sessions,
         maxDepth: config.maxDepth,
         hasSkills: () => !!ctx.useService("skills:registry"),
+        emit: async (event, payload) => { await ctx.emit(event, payload); },
       });
       const realHandler = dispatch.handler;
       const guardedHandler: typeof realHandler = async (args, tCtx) => {
         if (!ready) throw new Error("Agent registry still loading; retry");
         return realHandler(args, tCtx);
       };
-      tools.registerWith({ schema: dispatch.schema, handler: guardedHandler, source: { kind: "agent" } });
+      toolUnregister = tools.registerWith({ schema: dispatch.schema, handler: guardedHandler, source: { kind: "agent" } });
     }
 
     // Register prompt:system section for available agents.
     const promptSystem = ctx.useService<SystemPromptService>("prompt:system");
-    let sectionHandle: { bumpGeneration(): void; unregister(): void } | undefined;
     if (promptSystem) {
       sectionHandle = promptSystem.register({
         id: "llm-agents:available",
@@ -75,7 +91,7 @@ const plugin: KaizenPlugin = {
         render: () => buildAgentsBlock(handle.service.list()),
       });
     } else {
-      void ctx.emit("harness:error", { message: "llm-agents: missing required service(s): prompt:system; available-agents section disabled" });
+      void ctx.emit("harness:error", { message: "llm-agents: missing optional service prompt:system; available-agents section disabled" });
     }
 
     // Discovery in a microtask — does not block setup().
@@ -91,7 +107,7 @@ const plugin: KaizenPlugin = {
             readFile: (p) => fsReadFile(p, "utf8"),
           },
         });
-        handle.setInner(makeRegistry(result.manifests, () => sectionHandle?.bumpGeneration()), () => sectionHandle?.bumpGeneration());
+        handle.setInner(makeRegistry(result.manifests, bumpSection), bumpSection);
         ready = true;
         for (const e of result.errors) {
           await ctx.emit("harness:error", { message: `llm-agents: ${e.path}: ${e.message}` });
@@ -101,6 +117,15 @@ const plugin: KaizenPlugin = {
         await ctx.emit("harness:error", { message: `llm-agents: discovery failed: ${(err as Error).message}` });
       }
     });
+  },
+
+  async stop() {
+    // Idempotent cleanup on reload. The registry handle is intentionally not
+    // torn down — its in-memory state is rebuilt by the next setup() call.
+    try { toolUnregister?.(); } catch { /* ignore */ }
+    toolUnregister = undefined;
+    try { sectionHandle?.unregister(); } catch { /* ignore */ }
+    sectionHandle = undefined;
   },
 };
 

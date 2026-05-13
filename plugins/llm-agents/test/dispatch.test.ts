@@ -64,7 +64,7 @@ describe("dispatch_agent", () => {
     tracker.onTurnStart({ turnId: "t-parent", trigger: "user" });
     const driver = {
       runConversation: mock(async (input: any) => ({
-        finalMessage: { role: "assistant", content: "RESULT" },
+        finalMessage: { role: "assistant" as const, content: "RESULT" },
         usage: { promptTokens: 1, completionTokens: 1 },
       })),
     };
@@ -94,10 +94,10 @@ describe("dispatch_agent", () => {
     const reg = makeRegistryHandle(makeRegistry([m("a")]));
     const tracker = makeTurnTracker();
     tracker.onTurnStart({ turnId: "t-parent", trigger: "user" });
-    const driver = { runConversation: async () => ({ finalMessage: { role: "assistant", content: "" }, usage: { promptTokens: 0, completionTokens: 0 } }) };
+    const driver = { runConversation: async () => ({ finalMessage: { role: "assistant" as const, content: "" }, usage: { promptTokens: 0, completionTokens: 0 } }) };
     const tool = makeDispatchTool({ registry: reg, tracker, driver, sessions: makeSessions(), maxDepth: 3, hasSkills: () => true });
     let captured: any;
-    (driver as any).runConversation = async (input: any) => { captured = input; return { finalMessage: { role: "assistant", content: "" }, usage: { promptTokens: 0, completionTokens: 0 } }; };
+    (driver as any).runConversation = async (input: any) => { captured = input; return { finalMessage: { role: "assistant" as const, content: "" }, usage: { promptTokens: 0, completionTokens: 0 } }; };
     await tool.handler({ agent_name: "a", prompt: "p" }, makeCtx());
     expect(captured.toolFilter.names).toContain("load_skill");
   });
@@ -127,7 +127,7 @@ describe("dispatch_agent", () => {
     const tracker = makeTurnTracker();
     tracker.onTurnStart({ turnId: "tp", trigger: "user" });
     let captured: AbortSignal | undefined;
-    const driver = { runConversation: async (input: any) => { captured = input.signal; return { finalMessage: { role: "assistant", content: "" }, usage: { promptTokens: 0, completionTokens: 0 } }; } };
+    const driver = { runConversation: async (input: any) => { captured = input.signal; return { finalMessage: { role: "assistant" as const, content: "" }, usage: { promptTokens: 0, completionTokens: 0 } }; } };
     const tool = makeDispatchTool({ registry: reg, tracker, driver, sessions: makeSessions(), maxDepth: 3, hasSkills: () => false });
     const ac = new AbortController();
     const ctx = { ...makeCtx("tp"), signal: ac.signal };
@@ -166,12 +166,13 @@ describe("dispatch_agent", () => {
     const reg = makeRegistryHandle(makeRegistry([m("a")]));
     const tracker = makeTurnTracker();
     tracker.onTurnStart({ turnId: "tp", trigger: "user" });
-    const driver = { runConversation: async () => ({ finalMessage: { role: "assistant", content: "ok" }, usage: { promptTokens: 0, completionTokens: 0 } }) };
-    const tool = makeDispatchTool({ registry: reg, tracker, driver, sessions: makeSessions(), maxDepth: 3, hasSkills: () => false });
-    const ctx = makeCtx("tp");
-    await tool.handler({ agent_name: "a", prompt: "p" }, ctx);
-    const updateEvent = ctx.events.find((e: any) => e.event === "status:item-update");
-    const clearEvent = ctx.events.find((e: any) => e.event === "status:item-clear");
+    const driver = { runConversation: async () => ({ finalMessage: { role: "assistant" as const, content: "ok" }, usage: { promptTokens: 0, completionTokens: 0 } }) };
+    const emitted: { event: string; payload: any }[] = [];
+    const emit = async (event: string, payload: unknown) => { emitted.push({ event, payload }); };
+    const tool = makeDispatchTool({ registry: reg, tracker, driver, sessions: makeSessions(), maxDepth: 3, hasSkills: () => false, emit });
+    await tool.handler({ agent_name: "a", prompt: "p" }, makeCtx("tp"));
+    const updateEvent = emitted.find((e) => e.event === "status:item-update");
+    const clearEvent = emitted.find((e) => e.event === "status:item-clear");
     expect(updateEvent?.payload).toMatchObject({ key: "agents.active", value: "a" });
     expect(clearEvent?.payload).toMatchObject({ key: "agents.active" });
   });
@@ -191,7 +192,7 @@ describe("dispatch_agent", () => {
       pluginFingerprint: [],
     });
     let captured: any;
-    const driver = { runConversation: async (input: any) => { captured = input; return { finalMessage: { role: "assistant", content: "ok" }, usage: { promptTokens: 0, completionTokens: 0 } }; } };
+    const driver = { runConversation: async (input: any) => { captured = input; return { finalMessage: { role: "assistant" as const, content: "ok" }, usage: { promptTokens: 0, completionTokens: 0 } }; } };
     const tool = makeDispatchTool({ registry: reg, tracker, driver, sessions, maxDepth: 3, hasSkills: () => false });
     await tool.handler({ agent_name: "a", prompt: "p", session_id: "thread" }, makeCtx("tp"));
     expect(captured.sessionId).toBe("parent-session/thread");
@@ -222,7 +223,7 @@ describe("dispatch_agent", () => {
     tracker.onTurnStart({ turnId: "tp", trigger: "user" });
     const sessions = makeSessions();
     let captured: any;
-    const driver = { runConversation: async (input: any) => { captured = input; return { finalMessage: { role: "assistant", content: "ok" }, usage: { promptTokens: 0, completionTokens: 0 } }; } };
+    const driver = { runConversation: async (input: any) => { captured = input; return { finalMessage: { role: "assistant" as const, content: "ok" }, usage: { promptTokens: 0, completionTokens: 0 } }; } };
     const tool = makeDispatchTool({ registry: reg, tracker, driver, sessions, maxDepth: 3, hasSkills: () => false });
     await tool.handler({ agent_name: "a", prompt: "p" }, makeCtx("tp"));
     expect(captured.sessionId).toMatch(/^parent-session\/oneshot-/);

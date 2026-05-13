@@ -68,7 +68,7 @@ describe("llm-hooks-shell integration", () => {
     let captured: Record<string, string> | null = null;
     const { ctx } = makeBusCtx({
       hooks: [{ event: "turn:start", command: "echo $EVENT_TURN_ID" }],
-      exec: async (_b, _a, opts) => { captured = opts.env; return { exitCode: 0, stdout: "t-42\n", stderr: "" }; },
+      exec: async (_b, _a, opts: { env: Record<string, string> }) => { captured = opts.env; return { exitCode: 0, stdout: "t-42\n", stderr: "" }; },
     });
     // Add turn:start to the vocab so config validation passes.
     ctx.useService = (name: string) => {
@@ -77,6 +77,6 @@ describe("llm-hooks-shell integration", () => {
     };
     await plugin.setup(ctx);
     await ctx.emit("turn:start", { turnId: "t-42", trigger: "user" });
-    expect(captured?.EVENT_TURN_ID).toBe("t-42");
+    expect((captured as Record<string, string> | null)?.EVENT_TURN_ID).toBe("t-42");
   });
 });

@@ -64,9 +64,11 @@ When mocking the registry in `strategy.test.ts`, mirror the real contract: `invo
 The Kaizen runtime prefers the bundled `dist/index.js` over source. After editing, the plugin must be re-bundled into the install dir:
 
 ```bash
-cp -R plugins/llm-native-dispatch/. ~/.kaizen/marketplaces/official/plugins/llm-native-dispatch@0.1.0/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-native-dispatch@0.1.0 \
+cp -R plugins/llm-native-dispatch/. ~/.kaizen/marketplaces/official/plugins/llm-native-dispatch@<version>/
+(cd ~/.kaizen/marketplaces/official/plugins/llm-native-dispatch@<version> \
   && bun build --target=bun --outfile=dist/index.js index.ts)
 ```
+
+Substitute `<version>` with the version pinned by your local harness manifest (see `harnesses/openai-compatible.json`).
 
 If you also need the harness manifest to pick up changes, sync the local marketplace repo (`~/.kaizen/marketplaces/official/repo/`) — it tracks upstream `main` and `kaizen marketplace update` will overwrite local edits.

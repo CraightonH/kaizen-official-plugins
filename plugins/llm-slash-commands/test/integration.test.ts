@@ -85,7 +85,7 @@ describe("llm-slash-commands integration", () => {
     const userMsg = emits.find((e) => e.event === "conversation:user-message");
     expect(userMsg).toBeUndefined();
     expect(runConversation).toHaveBeenCalledTimes(1);
-    expect(runConversation.mock.calls[0]![0]).toMatchObject({
+    expect((runConversation.mock.calls as unknown as any[][])[0]![0]).toMatchObject({
       sessionId: "session-1",
       userMessage: { role: "user", content: "PROJECT:hello world\n" },
     });

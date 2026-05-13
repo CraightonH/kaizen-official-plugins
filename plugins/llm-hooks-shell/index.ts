@@ -1,7 +1,5 @@
 import type { KaizenPlugin } from "kaizen/types";
-
-const CANCEL_TOOL: unique symbol = Symbol.for("kaizen.cancel") as never;
-const CODEMODE_CANCEL_SENTINEL = "__kaizen_cancel__";
+import { CANCEL_TOOL, CODEMODE_CANCEL_SENTINEL } from "llm-events";
 import { loadHookConfigs, MUTABLE_EVENTS, realConfigDeps, type ConfigDeps, type HookEntry } from "./config.ts";
 import { envify } from "./envify.ts";
 import { runHook, type RunnerDeps } from "./runner.ts";

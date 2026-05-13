@@ -16,8 +16,9 @@ dispatcher.ts     makeOnInputSubmit({ registry, bus }) → onInputSubmit handler
                   per-dispatch inSlashDispatch guard, builds SlashCommandContext, wraps emit
                   to reject re-entrant input:submit, emits input:handled exactly once per claim.
 builtins.ts       registerBuiltins(registry). Defines /help, /exit (emits
-                  harness:exit-requested), /clear, and /session:* commands.
-                  Pure with injected session dependencies.
+                  harness:exit-requested), and /history (emits tui:enter-history).
+                  Session-management commands (/clear, /session:*) live in
+                  llm-session-manager and register against this registry as peers.
 file-loader.ts    loadFileCommands({ home, cwd, registry, readDir, readFile, getDriver }) →
                   warnings[]. Walks user dir then project dir; project shadows user (same-name
                   user file is unregistered before re-registering). Builds per-file handlers
@@ -94,8 +95,8 @@ Tests use `bun:test` only. Each module has a focused test file; `integration.tes
 The Kaizen runtime prefers the bundled `dist/index.js` over source. After editing, the plugin must be re-bundled into the install dir:
 
 ```bash
-cp -R plugins/llm-slash-commands/. ~/.kaizen/marketplaces/official/plugins/llm-slash-commands@0.1.0/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-slash-commands@0.1.0 \
+cp -R plugins/llm-slash-commands/. ~/.kaizen/marketplaces/official/plugins/llm-slash-commands@0.2.1/
+(cd ~/.kaizen/marketplaces/official/plugins/llm-slash-commands@0.2.1 \
   && bun build --target=bun --outfile=dist/index.js index.ts)
 ```
 
