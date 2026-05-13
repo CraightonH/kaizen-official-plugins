@@ -1,10 +1,9 @@
 import React from "react";
 import { render } from "ink";
 import type { KaizenPlugin } from "kaizen/types";
-import type { UiChannelService, UiTheme, UiThemeService } from "llm-contracts/public";
+import type { UiChannelService, UiTheme, UiThemeService, UiStatusService } from "llm-contracts/public";
 import type {
   TuiCompletionService,
-  TuiStatusService,
 } from "./public.d.ts";
 import { TuiStore } from "./state/store.ts";
 import { makeCompletionRegistry } from "./completion/registry.ts";
@@ -20,7 +19,7 @@ const plugin: KaizenPlugin = {
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
   services: {
-    provides: ["ui:channel", "llm-tui:completion", "llm-tui:status", "ui:theme", "llm-tui:tool-renderer"],
+    provides: ["ui:channel", "llm-tui:completion", "ui:status", "ui:theme", "llm-tui:tool-renderer"],
     consumes: ["events:vocabulary"],
   },
 
@@ -33,7 +32,7 @@ const plugin: KaizenPlugin = {
 
     // ui:channel is defined on llm-contracts; this plugin provides the implementation.
     ctx.defineService("llm-tui:completion", { description: "Registry of completion sources for the input popup." });
-    ctx.defineService("llm-tui:status", { description: "Marker service: subscribes to status:item-* and renders the bar." });
+    // ui:status is defined on llm-contracts; this plugin provides the implementation.
     // ui:theme is defined on llm-contracts; this plugin provides the implementation.
     ctx.defineService("llm-tui:tool-renderer", { description: "Per-tool TUI rendering registry." });
 
@@ -44,8 +43,8 @@ const plugin: KaizenPlugin = {
     ctx.provideService<UiThemeService>("ui:theme", themeService);
 
     // Status bar: marker service, but also publish the empty value so consumers can wire dependencies.
-    const statusService: TuiStatusService = {};
-    ctx.provideService<TuiStatusService>("llm-tui:status", statusService);
+    const statusService: UiStatusService = {};
+    ctx.provideService<UiStatusService>("ui:status", statusService);
 
     // Store + completion registry are shared between the channel + UI.
     const store = new TuiStore();

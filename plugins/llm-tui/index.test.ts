@@ -34,7 +34,7 @@ describe("llm-tui plugin", () => {
     await plugin.setup(ctx);
     expect(ctx.provided["ui:channel"]).toBeDefined();
     expect(ctx.provided["llm-tui:completion"]).toBeDefined();
-    expect(ctx.provided["llm-tui:status"]).toBeDefined();
+    expect(ctx.provided["ui:status"]).toBeDefined();
     expect(ctx.provided["ui:theme"]).toBeDefined();
     expect(ctx.provided["llm-tui:tool-renderer"]).toBeDefined();
   });

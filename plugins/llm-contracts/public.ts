@@ -30,3 +30,4 @@ export type { McpBridgeService, ServerInfo, ServerStatus } from "./contracts/mcp
 export type { ToolDispatchStrategy, ToolDispatchRegistry } from "./contracts/dispatch";
 export type { UiChannelService } from "./contracts/ui-channel";
 export type { UiTheme, UiThemeService } from "./contracts/ui-theme";
+export type { UiStatusService } from "./contracts/ui-status";
