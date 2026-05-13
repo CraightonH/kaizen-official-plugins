@@ -35,7 +35,7 @@ describe("llm-tui plugin", () => {
     expect(ctx.provided["ui:channel"]).toBeDefined();
     expect(ctx.provided["llm-tui:completion"]).toBeDefined();
     expect(ctx.provided["llm-tui:status"]).toBeDefined();
-    expect(ctx.provided["llm-tui:theme"]).toBeDefined();
+    expect(ctx.provided["ui:theme"]).toBeDefined();
     expect(ctx.provided["llm-tui:tool-renderer"]).toBeDefined();
   });
 
@@ -66,10 +66,10 @@ describe("llm-tui plugin", () => {
     off();
   });
 
-  it("theme service current() returns a TuiTheme with default values", async () => {
+  it("theme service current() returns a UiTheme with default values", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    const t = (ctx.provided["llm-tui:theme"] as any).current();
+    const t = (ctx.provided["ui:theme"] as any).current();
     expect(t.promptLabel).toBe("kaizen");
     expect(t.promptColor).toBe("magenta");
   });
@@ -111,7 +111,7 @@ describe("llm-tui plugin", () => {
   it("accepts harness-provided default theme via plugin config", async () => {
     const ctx = makeCtx({ config: { theme: { promptLabel: "kaizen" } } });
     await plugin.setup(ctx);
-    const t = (ctx.provided["llm-tui:theme"] as any).current();
+    const t = (ctx.provided["ui:theme"] as any).current();
     expect(t.promptLabel).toBe("kaizen");
   });
 });

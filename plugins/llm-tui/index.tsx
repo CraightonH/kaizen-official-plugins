@@ -1,18 +1,17 @@
 import React from "react";
 import { render } from "ink";
 import type { KaizenPlugin } from "kaizen/types";
-import type { UiChannelService } from "llm-contracts/public";
+import type { UiChannelService, UiTheme, UiThemeService } from "llm-contracts/public";
 import type {
   TuiCompletionService,
   TuiStatusService,
-  TuiThemeService,
 } from "./public.d.ts";
 import { TuiStore } from "./state/store.ts";
 import { makeCompletionRegistry } from "./completion/registry.ts";
 import { makeToolRendererRegistry } from "./tool-renderers/registry.ts";
 import type { TuiToolRendererService } from "./tool-renderers/registry.ts";
 import { defaultRenderers } from "./tool-renderers/defaults.tsx";
-import { loadTheme, realThemeDeps, type TuiTheme } from "./theme/loader.ts";
+import { loadTheme, realThemeDeps } from "./theme/loader.ts";
 import { App } from "./ui/App.tsx";
 import { createFallbackChannel } from "./fallback.ts";
 
@@ -21,7 +20,7 @@ const plugin: KaizenPlugin = {
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
   services: {
-    provides: ["ui:channel", "llm-tui:completion", "llm-tui:status", "llm-tui:theme", "llm-tui:tool-renderer"],
+    provides: ["ui:channel", "llm-tui:completion", "llm-tui:status", "ui:theme", "llm-tui:tool-renderer"],
     consumes: ["events:vocabulary"],
   },
 
@@ -35,14 +34,14 @@ const plugin: KaizenPlugin = {
     // ui:channel is defined on llm-contracts; this plugin provides the implementation.
     ctx.defineService("llm-tui:completion", { description: "Registry of completion sources for the input popup." });
     ctx.defineService("llm-tui:status", { description: "Marker service: subscribes to status:item-* and renders the bar." });
-    ctx.defineService("llm-tui:theme", { description: "Read-only theme tokens." });
+    // ui:theme is defined on llm-contracts; this plugin provides the implementation.
     ctx.defineService("llm-tui:tool-renderer", { description: "Per-tool TUI rendering registry." });
 
     // Theme: harness defaults from plugin config, user override from config file.
-    const harnessDefaults = (ctx.config as any)?.theme as Partial<TuiTheme> | undefined;
+    const harnessDefaults = (ctx.config as any)?.theme as Partial<UiTheme> | undefined;
     const theme = await loadTheme(realThemeDeps(ctx.log, harnessDefaults));
-    const themeService: TuiThemeService = { current: () => theme };
-    ctx.provideService<TuiThemeService>("llm-tui:theme", themeService);
+    const themeService: UiThemeService = { current: () => theme };
+    ctx.provideService<UiThemeService>("ui:theme", themeService);
 
     // Status bar: marker service, but also publish the empty value so consumers can wire dependencies.
     const statusService: TuiStatusService = {};

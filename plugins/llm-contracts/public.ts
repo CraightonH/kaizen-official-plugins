@@ -29,3 +29,4 @@ export type { AgentsRegistryService, AgentManifest } from "./contracts/agents-re
 export type { McpBridgeService, ServerInfo, ServerStatus } from "./contracts/mcp-bridge";
 export type { ToolDispatchStrategy, ToolDispatchRegistry } from "./contracts/dispatch";
 export type { UiChannelService } from "./contracts/ui-channel";
+export type { UiTheme, UiThemeService } from "./contracts/ui-theme";

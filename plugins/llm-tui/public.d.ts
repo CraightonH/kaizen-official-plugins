@@ -1,9 +1,8 @@
-import type { TuiTheme } from "./theme/loader.ts";
-
 export type { TuiToolRendererService, TuiToolRenderer } from "./tool-renderers/registry";
 export type { ToolCallStatus } from "./state/store";
 
 export type { UiChannelService } from "llm-contracts/public";
+export type { UiTheme, UiThemeService } from "llm-contracts/public";
 
 export interface CompletionItem {
   label: string;
@@ -24,9 +23,3 @@ export interface TuiCompletionService {
 
 // Marker only; consumers may require this service name to assert wiring.
 export interface TuiStatusService {}
-
-export interface TuiThemeService {
-  current(): TuiTheme;
-}
-
-export type { TuiTheme };
