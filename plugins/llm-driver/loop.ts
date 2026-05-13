@@ -9,7 +9,7 @@ import type {
 import type {
   RunConversationInput,
   RunConversationOutput,
-} from "./public";
+} from "llm-contracts/public";
 import type {
   ToolDispatchRegistry,
   ToolDispatchStrategy,

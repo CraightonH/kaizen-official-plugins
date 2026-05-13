@@ -5,7 +5,7 @@ import type {
   SessionsStoreService,
   UiChannelService,
 } from "llm-contracts/public";
-import type { DriverService, RunConversationInput, RunConversationOutput, ToolDispatchStrategy } from "./public";
+import type { DriverService, RunConversationInput, RunConversationOutput, ToolDispatchStrategy } from "llm-contracts/public";
 import { runConversation, type RunConversationDeps, type ToolsRegistryService } from "./loop.ts";
 import { type CurrentTurn } from "./state.ts";
 import { newTurnId } from "./ids.ts";
@@ -90,10 +90,6 @@ const plugin: KaizenPlugin = {
     // Optional services are discovered with safeUse() below instead of hard
     // service edges. That keeps A-tier harnesses valid when tools/strategy or
     // prompt:system are absent.
-
-    ctx.defineService("driver:run-conversation", {
-      description: "Run a (possibly nested) conversation against the LLM with optional tool dispatch.",
-    });
 
     // Reset plugin-scoped state on every setup() so test re-setups and
     // re-loads start from a clean slate.

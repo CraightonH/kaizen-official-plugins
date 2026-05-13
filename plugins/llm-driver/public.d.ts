@@ -6,44 +6,10 @@ export type {
   LLMResponse,
   LLMStreamEvent,
   LLMCompleteService,
+  ToolDispatchStrategy,
+  ToolDispatchRegistry,
+  DriverService,
+  RunConversationInput,
+  RunConversationOutput,
+  TurnHandle,
 } from "llm-contracts/public";
-
-import type { ChatMessage, TurnHandle } from "llm-contracts/public";
-
-// Owned by llm-driver: service contract for `driver:run-conversation`.
-export type RunConversationInput = {
-  systemPrompt: string;
-  sessionId: string;
-  toolFilter?: { tags?: string[]; names?: string[] };
-  model?: string;
-  parentTurnId?: string;
-  signal?: AbortSignal;
-  trigger?: "user" | "agent";
-} & (
-  | {
-      externalTurnId: string;
-      turnHandle: TurnHandle;
-      userMessage?: never;
-    }
-  | {
-      /**
-       * The user message to append before inference. When omitted (and the call
-       * owns the turn), runConversation infers against the current snapshot tail —
-       * which must already end with a user turn (e.g. one seeded by session:handoff).
-       */
-      userMessage?: ChatMessage;
-      externalTurnId?: never;
-      turnHandle?: never;
-    }
-);
-
-export interface RunConversationOutput {
-  finalMessage: ChatMessage;
-  usage: { promptTokens: number; completionTokens: number };
-}
-
-export type { ToolDispatchStrategy, ToolDispatchRegistry } from "llm-contracts/public";
-
-export interface DriverService {
-  runConversation(input: RunConversationInput): Promise<RunConversationOutput>;
-}

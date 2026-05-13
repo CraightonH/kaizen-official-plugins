@@ -15,6 +15,7 @@ import * as uiThemeContract from "./contracts/ui-theme";
 import * as uiStatusContract from "./contracts/ui-status";
 import * as uiCompletionContract from "./contracts/ui-completion";
 import * as uiToolRendererContract from "./contracts/ui-tool-renderer";
+import * as driverContract from "./contracts/driver";
 
 const plugin: KaizenPlugin = {
   name: "llm-contracts",
@@ -39,6 +40,7 @@ const plugin: KaizenPlugin = {
     ctx.defineService(uiStatusContract.CONTRACT_ID, { description: uiStatusContract.DESCRIPTION });
     ctx.defineService(uiCompletionContract.CONTRACT_ID, { description: uiCompletionContract.DESCRIPTION });
     ctx.defineService(uiToolRendererContract.CONTRACT_ID, { description: uiToolRendererContract.DESCRIPTION });
+    ctx.defineService(driverContract.CONTRACT_ID, { description: driverContract.DESCRIPTION });
   },
 };
 

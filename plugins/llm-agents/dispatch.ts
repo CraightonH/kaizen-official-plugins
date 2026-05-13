@@ -7,7 +7,7 @@ import type {
   DriverService,
   RunConversationInput,
   RunConversationOutput,
-} from "llm-driver/public";
+} from "llm-contracts/public";
 import type { SessionsStoreService } from "llm-contracts/public";
 import type { RegistryHandle } from "./registry.ts";
 import type { TurnTracker } from "./turn-tracker.ts";
