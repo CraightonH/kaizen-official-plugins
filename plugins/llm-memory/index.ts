@@ -6,7 +6,7 @@ import { makeMemoryStore } from "./service.ts";
 import { buildMemoryBlock } from "./injection.ts";
 import { registerTools, type ToolsRegistryLike } from "./tools.ts";
 import { maybeExtract, type RunConversationFn } from "./extract.ts";
-import type { MemoryStoreService } from "./public.d.ts";
+import type { MemoryStoreService } from "llm-contracts/public";
 
 let sectionHandle: RegisteredSection | undefined;
 let toolsUnregister: (() => void) | undefined;
@@ -46,7 +46,6 @@ const plugin: KaizenPlugin = {
       log,
       onChange: () => { sectionHandle?.bumpGeneration(); },
     });
-    ctx.defineService("memory:store", { description: "File-backed persistent memory store." });
     ctx.provideService<MemoryStoreService>("memory:store", store);
 
     // Register a prompt:system section for saved memories.
