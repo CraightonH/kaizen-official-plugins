@@ -27,7 +27,7 @@ describe("llm-native-dispatch plugin", () => {
     expect(plugin.permissions).toEqual({ tier: "trusted" });
     expect(plugin.services?.provides).toContain("tool-dispatch:strategy");
     expect(plugin.services?.consumes).toContain("tools:registry");
-    expect(plugin.services?.consumes).toContain("llm-events:vocabulary");
+    expect(plugin.services?.consumes).toContain("events:vocabulary");
   });
 
   it("setup defines and provides tool-dispatch:strategy", async () => {

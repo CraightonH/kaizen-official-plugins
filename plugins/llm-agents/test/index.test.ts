@@ -82,7 +82,7 @@ describe("llm-agents plugin", () => {
     // Optional integrations (tools:registry, driver:run-conversation,
     // sessions:store, prompt:system) are not declared as hard consumes —
     // the plugin emits harness:error and degrades when they're absent.
-    expect(plugin.services?.consumes).toContain("llm-events:vocabulary");
+    expect(plugin.services?.consumes).toContain("events:vocabulary");
     expect(plugin.services?.consumes).not.toContain("prompt:system");
   });
 

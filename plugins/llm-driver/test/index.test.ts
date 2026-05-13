@@ -109,7 +109,7 @@ describe("llm-driver index", () => {
       properties: { defaultSystemPrompt: { type: "string" } },
     });
     expect(plugin.services?.consumes).toEqual([
-      "llm-events:vocabulary",
+      "events:vocabulary",
       "llm-tui:channel",
       "llm:complete",
       "sessions:store",

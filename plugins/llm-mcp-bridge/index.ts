@@ -14,7 +14,7 @@ const plugin: KaizenPlugin = {
   name: "llm-mcp-bridge",
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
-  services: { provides: ["mcp:bridge"], consumes: ["tools:registry", "llm-events:vocabulary"] },
+  services: { provides: ["mcp:bridge"], consumes: ["tools:registry", "events:vocabulary"] },
 
   async setup(ctx) {
     const log = (m: string) => ctx.log(m);

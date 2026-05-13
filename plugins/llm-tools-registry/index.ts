@@ -7,7 +7,7 @@ const plugin: KaizenPlugin = {
   name: "llm-tools-registry",
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
-  services: { provides: ["tools:registry"], consumes: ["llm-events:vocabulary"] },
+  services: { provides: ["tools:registry"], consumes: ["events:vocabulary"] },
 
   async setup(ctx) {
     const emit = (event: string, payload: unknown) => ctx.emit(event, payload);

@@ -52,13 +52,13 @@ const plugin: KaizenPlugin = {
   permissions: { tier: "unscoped" },
   services: {
     provides: ["prompt:system"],
-    consumes: ["llm-events:vocabulary"],
+    consumes: ["events:vocabulary"],
   },
 
   async setup(ctx) {
     const runtime = ctx as PluginContext & RuntimeHints;
-    ctx.consumeService("llm-events:vocabulary");
-    const vocab = ctx.useService<PromptEventVocabulary>("llm-events:vocabulary");
+    ctx.consumeService("events:vocabulary");
+    const vocab = ctx.useService<PromptEventVocabulary>("events:vocabulary");
     // prompt:rebuilt / prompt:reload are defined by llm-events (canonical VOCAB owner).
 
     const registry: SystemPromptServiceImpl = createRegistry({

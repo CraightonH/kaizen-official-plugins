@@ -53,7 +53,7 @@ function makeCtx(opts: { rateTable?: Record<string, any> } = {}) {
     defineService: mock(() => {}),
     provideService: mock(() => {}),
     consumeService: mock(() => {}),
-    useService: mock((id: string) => id === "llm-events:vocabulary" ? VOCAB : undefined),
+    useService: mock((id: string) => id === "events:vocabulary" ? VOCAB : undefined),
     secrets: { get: mock(async () => undefined), refresh: mock(async () => undefined) },
     // Internal facades the plugin reads — see Step 2 implementation.
     _testCostDeps: {
@@ -65,7 +65,7 @@ function makeCtx(opts: { rateTable?: Record<string, any> } = {}) {
 
 describe("llm-status-items setup", () => {
   it("requires only the events vocabulary and LLM completion service", () => {
-    expect(plugin.services?.consumes).toEqual(["llm-events:vocabulary", "llm:complete"]);
+    expect(plugin.services?.consumes).toEqual(["events:vocabulary", "llm:complete"]);
   });
 
   it("subscribes to exactly the spec'd events", async () => {
@@ -216,7 +216,7 @@ describe("status:show slash + tool registration", () => {
     const slashRegistered: Array<{ name: string }> = [];
     const toolsRegistered: Array<{ name: string }> = [];
     ctx.useService = mock((id: string) => {
-      if (id === "llm-events:vocabulary") return VOCAB;
+      if (id === "events:vocabulary") return VOCAB;
       if (id === "slash:registry") {
         return {
           register: (manifest: any) => {
@@ -246,7 +246,7 @@ describe("status:show slash + tool registration", () => {
     let slashHandler: ((ctx: { args: string; print: (t: string) => Promise<void> }) => Promise<void>) | null = null;
     let toolHandler: ((args: any, ctx: any) => Promise<unknown>) | null = null;
     ctx.useService = mock((id: string) => {
-      if (id === "llm-events:vocabulary") return VOCAB;
+      if (id === "events:vocabulary") return VOCAB;
       if (id === "slash:registry") {
         return {
           register: (manifest: any, h: any) => {
@@ -287,7 +287,7 @@ describe("status:show slash + tool registration", () => {
 
   it("works without slash:registry or tools:registry (both soft)", async () => {
     const ctx = makeCtx();
-    ctx.useService = mock((id: string) => id === "llm-events:vocabulary" ? VOCAB : undefined);
+    ctx.useService = mock((id: string) => id === "events:vocabulary" ? VOCAB : undefined);
     await plugin.setup(ctx);
     // Should not throw.
     await ctx.handlers["harness:start"]!({});
@@ -298,7 +298,7 @@ describe("status:show slash + tool registration", () => {
     let slashCount = 0;
     let toolCount = 0;
     ctx.useService = mock((id: string) => {
-      if (id === "llm-events:vocabulary") return VOCAB;
+      if (id === "events:vocabulary") return VOCAB;
       if (id === "slash:registry") return { register: () => { slashCount += 1; return () => {}; } };
       if (id === "tools:registry") return { register: () => { toolCount += 1; return () => {}; } };
       return undefined;
@@ -317,7 +317,7 @@ describe("status:show slash + tool registration", () => {
     const unregisterSlash = mock(() => {});
     const unregisterTool = mock(() => {});
     ctx.useService = mock((id: string) => {
-      if (id === "llm-events:vocabulary") return VOCAB;
+      if (id === "events:vocabulary") return VOCAB;
       if (id === "slash:registry") return { register: () => unregisterSlash };
       if (id === "tools:registry") return { register: () => unregisterTool };
       return undefined;

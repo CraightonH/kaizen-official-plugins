@@ -27,11 +27,11 @@ const plugin: KaizenPlugin = {
   name: "llm-status-items",
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
-  services: { consumes: ["llm-events:vocabulary", "llm:complete"] },
+  services: { consumes: ["events:vocabulary", "llm:complete"] },
 
   async setup(ctx) {
-    ctx.consumeService("llm-events:vocabulary");
-    const vocab = ctx.useService<Vocab>("llm-events:vocabulary");
+    ctx.consumeService("events:vocabulary");
+    const vocab = ctx.useService<Vocab>("events:vocabulary");
     // Consumed lazily — listModels() only runs the first time we see a
     // model id at runtime, by which point the provider has registered.
     ctx.consumeService("llm:complete");

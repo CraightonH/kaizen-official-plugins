@@ -1,5 +1,5 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { Vocab } from "./public";
+import type { Vocab } from "llm-contracts/public";
 
 export const CANCEL_TOOL: unique symbol = Symbol.for("kaizen.cancel") as any;
 export const CODEMODE_CANCEL_SENTINEL = "__kaizen_cancel__" as const;
@@ -56,16 +56,13 @@ const plugin: KaizenPlugin = {
   name: "llm-events",
   apiVersion: "3.0.0",
   permissions: { tier: "trusted" },
-  services: { provides: ["llm-events:vocabulary"] },
+  services: { provides: ["events:vocabulary"] },
 
   async setup(ctx) {
-    ctx.defineService("llm-events:vocabulary", {
-      description: "Event-name vocabulary for the openai-compatible harness.",
-    });
     ctx.defineService("llm:complete", {
       description: "Provider-neutral streaming LLM completion service.",
     });
-    ctx.provideService<Vocab>("llm-events:vocabulary", VOCAB);
+    ctx.provideService<Vocab>("events:vocabulary", VOCAB);
     for (const name of Object.values(VOCAB)) ctx.defineEvent(name);
   },
 };

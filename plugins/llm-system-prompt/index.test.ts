@@ -13,7 +13,7 @@ it("setup provides prompt:system", async () => {
     provideService: <T,>(n: string, v: T) => { provided[n] = v; },
     consumeService: (_n: string) => {},
     useService: (n: string) => {
-      if (n === "llm-events:vocabulary") {
+      if (n === "events:vocabulary") {
         return {
           PROMPT_REBUILT: "prompt:rebuilt",
           PROMPT_RELOAD: "prompt:reload",

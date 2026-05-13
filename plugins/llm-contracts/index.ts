@@ -1,4 +1,5 @@
 import type { KaizenPlugin } from "kaizen/types";
+import * as eventsContract from "./contracts/events";
 
 const plugin: KaizenPlugin = {
   name: "llm-contracts",
@@ -7,9 +8,7 @@ const plugin: KaizenPlugin = {
   services: { provides: [], consumes: [] },
 
   async setup(ctx) {
-    // Contract definitions are added by Phase 2 migration tasks.
-    // Each migration adds one `ctx.defineService("<id>", { description: "..." });` line here.
-    void ctx;
+    ctx.defineService(eventsContract.CONTRACT_ID, { description: eventsContract.DESCRIPTION });
   },
 };
 

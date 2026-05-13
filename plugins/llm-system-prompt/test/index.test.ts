@@ -39,7 +39,7 @@ function makeFakeCtx(opts: { slash?: boolean } = {}) {
     provideService: <T,>(n: string, v: T) => { provided[n] = v; },
     consumeService: (n: string) => { consumed.push(n); },
     useService: (n: string) => {
-      if (n === "llm-events:vocabulary") return vocab;
+      if (n === "events:vocabulary") return vocab;
       if (n === "slash:registry" && slash) return slashRegistry;
       throw new Error(`missing service ${n}`);
     },
@@ -63,7 +63,7 @@ describe("llm-system-prompt plugin manifest", () => {
   });
 
   it("requires the llm-events vocabulary and leaves slash commands optional", () => {
-    expect(plugin.services?.consumes).toContain("llm-events:vocabulary");
+    expect(plugin.services?.consumes).toContain("events:vocabulary");
     expect(plugin.services?.consumes ?? []).not.toContain("slash:registry");
   });
 });
@@ -87,7 +87,7 @@ describe("index.ts — plugin lifecycle", () => {
   it("setup defines and provides prompt:system", async () => {
     const ctx = makeFakeCtx();
     await plugin.setup!(ctx as any);
-    expect(ctx.consumed).toContain("llm-events:vocabulary");
+    expect(ctx.consumed).toContain("events:vocabulary");
     expect("prompt:system" in ctx.services).toBe(true);
     expect("prompt:system" in ctx.provided).toBe(true);
   });

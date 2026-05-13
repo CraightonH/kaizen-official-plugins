@@ -22,11 +22,11 @@ const plugin: KaizenPlugin = {
   permissions: { tier: "unscoped" },
   services: {
     provides: ["llm-tui:channel", "llm-tui:completion", "llm-tui:status", "llm-tui:theme", "llm-tui:tool-renderer"],
-    consumes: ["llm-events:vocabulary"],
+    consumes: ["events:vocabulary"],
   },
 
   async setup(ctx) {
-    ctx.consumeService("llm-events:vocabulary");
+    ctx.consumeService("events:vocabulary");
 
     // Plugin-private control events (not in the shared VOCAB; owned by this
     // plugin per llm-events convention). Peers emit these to drive TUI state.

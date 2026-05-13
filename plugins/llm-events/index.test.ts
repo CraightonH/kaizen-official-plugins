@@ -182,11 +182,11 @@ describe("llm-events", () => {
     expect(VOCAB.SESSION_HANDOFF).toBe("session:handoff");
   });
 
-  it("provides llm-events:vocabulary and defines foundation services/events", async () => {
+  it("provides events:vocabulary and defines foundation services/events", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    expect(ctx.definedServices).toEqual(["llm-events:vocabulary", "llm:complete"]);
-    expect(ctx.provided["llm-events:vocabulary"]).toBe(VOCAB);
+    expect(ctx.definedServices).toEqual(["llm:complete"]);
+    expect(ctx.provided["events:vocabulary"]).toBe(VOCAB);
     expect(ctx.provided["llm:complete"]).toBeUndefined();
     for (const name of Object.values(VOCAB)) {
       expect(ctx.definedEvents).toContain(name);

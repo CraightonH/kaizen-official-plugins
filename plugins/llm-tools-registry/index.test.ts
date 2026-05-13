@@ -25,7 +25,7 @@ describe("llm-tools-registry plugin", () => {
     expect(plugin.apiVersion).toBe("3.0.0");
     expect(plugin.permissions).toEqual({ tier: "unscoped" });
     expect(plugin.services?.provides).toContain("tools:registry");
-    expect(plugin.services?.consumes).toContain("llm-events:vocabulary");
+    expect(plugin.services?.consumes).toContain("events:vocabulary");
   });
 
   it("setup defines and provides tools:registry with the registry instance", async () => {

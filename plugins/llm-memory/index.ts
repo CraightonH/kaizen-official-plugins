@@ -19,7 +19,7 @@ const plugin: KaizenPlugin = {
     provides: ["memory:store"],
     // All consumed services are optional — the plugin degrades cleanly when any are
     // absent. Hard `consumes` is reserved for required services per AGENTS.md.
-    consumes: ["llm-events:vocabulary"],
+    consumes: ["events:vocabulary"],
   },
 
   async setup(ctx) {

@@ -8,7 +8,7 @@ const plugin: KaizenPlugin = {
   permissions: { tier: "trusted" },
   services: {
     provides: ["tool-dispatch:strategy"],
-    consumes: ["tools:registry", "llm-events:vocabulary"],
+    consumes: ["tools:registry", "events:vocabulary"],
   },
 
   async setup(ctx) {

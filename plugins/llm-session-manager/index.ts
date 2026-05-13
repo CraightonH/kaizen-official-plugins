@@ -46,12 +46,12 @@ const plugin: KaizenPlugin = {
     events: { subscribe: [...TRACE_EVENTS, ...LIFECYCLE_EVENTS] },
   },
   services: {
-    consumes: ["llm-events:vocabulary"],
+    consumes: ["events:vocabulary"],
     provides: ["sessions:store"],
   },
 
   async setup(ctx) {
-    ctx.consumeService("llm-events:vocabulary");
+    ctx.consumeService("events:vocabulary");
     const config = (ctx.config ?? {}) as SessionManagerConfig;
     const sessionsBase = config.sessionsBase ?? join(homedir(), ".kaizen", "sessions");
     // ctx.harness is a Kaizen runtime extension not yet on PluginContext.

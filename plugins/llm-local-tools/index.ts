@@ -11,7 +11,7 @@ const plugin: KaizenPlugin = {
   name: "llm-local-tools",
   apiVersion: "3.0.0",
   permissions: { tier: "trusted" },
-  services: { consumes: ["tools:registry", "llm-events:vocabulary"] },
+  services: { consumes: ["tools:registry", "events:vocabulary"] },
 
   async setup(ctx) {
     const registry = ctx.useService<ToolsRegistryService>("tools:registry");

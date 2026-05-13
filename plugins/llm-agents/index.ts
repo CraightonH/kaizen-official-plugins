@@ -26,7 +26,7 @@ const plugin: KaizenPlugin = {
     // All other integrations (tools:registry, driver:run-conversation,
     // sessions:store, prompt:system, skills:registry) are looked up via
     // useService and degrade with a harness:error when absent.
-    consumes: ["llm-events:vocabulary"],
+    consumes: ["events:vocabulary"],
   },
 
   async setup(ctx) {

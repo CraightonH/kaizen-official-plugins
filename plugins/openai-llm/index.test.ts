@@ -5,7 +5,7 @@ it("declares provider service metadata without exposing a local type contract", 
   expect(plugin.name).toBe("openai-llm");
   expect(plugin.permissions?.tier).toBe("unscoped");
   expect(plugin.services?.provides).toEqual(["llm:complete"]);
-  expect(plugin.services?.consumes).toEqual(["llm-events:vocabulary"]);
+  expect(plugin.services?.consumes).toEqual(["events:vocabulary"]);
 });
 
 it("setup consumes llm-events and provides llm:complete without defining it", async () => {
@@ -29,7 +29,7 @@ it("setup consumes llm-events and provides llm:complete without defining it", as
     else process.env.KAIZEN_OPENAI_LLM_CONFIG = oldConfigPath;
   }
 
-  expect(consumed).toEqual(["llm-events:vocabulary"]);
+  expect(consumed).toEqual(["events:vocabulary"]);
   expect(defined).toEqual([]);
   expect(provided["llm:complete"]).toMatchObject({
     complete: expect.any(Function),

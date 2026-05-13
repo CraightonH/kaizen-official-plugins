@@ -9,6 +9,9 @@
   "keywords": [
     "kaizen-plugin"
   ],
+  "dependencies": {
+    "llm-contracts": "workspace:*"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "typescript": "^5.4.0"

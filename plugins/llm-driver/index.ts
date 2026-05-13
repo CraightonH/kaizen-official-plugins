@@ -81,7 +81,7 @@ const plugin: KaizenPlugin = {
   },
   services: {
     consumes: [
-      "llm-events:vocabulary",
+      "events:vocabulary",
       "llm-tui:channel",
       "llm:complete",
       "sessions:store",
@@ -90,7 +90,7 @@ const plugin: KaizenPlugin = {
   },
 
   async setup(ctx) {
-    ctx.consumeService("llm-events:vocabulary");
+    ctx.consumeService("events:vocabulary");
     ctx.consumeService("llm-tui:channel");
     ctx.consumeService("llm:complete");
     ctx.consumeService("sessions:store");

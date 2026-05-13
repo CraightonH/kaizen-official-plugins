@@ -25,7 +25,7 @@ it("setup subscribes to status source events", async () => {
     defineService: (_n: string, _o: unknown) => {},
     provideService: (_n: string, _v: unknown) => {},
     consumeService: (_n: string) => {},
-    useService: (n: string) => n === "llm-events:vocabulary" ? VOCAB : undefined,
+    useService: (n: string) => n === "events:vocabulary" ? VOCAB : undefined,
     defineEvent: (_n: string) => {},
     emit: async () => [],
     on: (n: string, _h: unknown) => { subscribed.push(n); },
