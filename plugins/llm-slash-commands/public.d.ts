@@ -5,7 +5,7 @@ export type {
   SlashRegistryService,
   SlashRegistryEntry,
   RegistryEntry,
-} from "./registry";
+} from "llm-contracts/public";
 export {
   BareNamePluginError,
   ReentrantSlashEmitError,

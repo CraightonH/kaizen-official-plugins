@@ -11,8 +11,7 @@
     "kaizen-plugin"
   ],
   "dependencies": {
-    "llm-contracts": "workspace:*",
-    "llm-slash-commands": "workspace:*"
+    "llm-contracts": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest",

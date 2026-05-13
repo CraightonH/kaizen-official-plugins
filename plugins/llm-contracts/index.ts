@@ -4,6 +4,7 @@ import * as llmCompleteContract from "./contracts/llm-complete";
 import * as sessionsStoreContract from "./contracts/sessions-store";
 import * as toolsRegistryContract from "./contracts/tools-registry";
 import * as promptRegistryContract from "./contracts/prompt-registry";
+import * as slashRegistryContract from "./contracts/slash-registry";
 
 const plugin: KaizenPlugin = {
   name: "llm-contracts",
@@ -17,6 +18,7 @@ const plugin: KaizenPlugin = {
     ctx.defineService(sessionsStoreContract.CONTRACT_ID, { description: sessionsStoreContract.DESCRIPTION });
     ctx.defineService(toolsRegistryContract.CONTRACT_ID, { description: toolsRegistryContract.DESCRIPTION });
     ctx.defineService(promptRegistryContract.CONTRACT_ID, { description: promptRegistryContract.DESCRIPTION });
+    ctx.defineService(slashRegistryContract.CONTRACT_ID, { description: slashRegistryContract.DESCRIPTION });
   },
 };
 

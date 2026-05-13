@@ -5,7 +5,7 @@ import { createRegistry, type SystemPromptServiceImpl } from "./registry.ts";
 import { resolveIdentity } from "./identity.ts";
 import { makePromptSlashHandlers } from "./slash.ts";
 import type { SystemPromptService } from "llm-contracts/public";
-import type { SlashRegistryService } from "llm-slash-commands/public";
+import type { SlashRegistryService } from "llm-contracts/public";
 
 interface PromptEventVocabulary {
   PROMPT_REBUILT: string;

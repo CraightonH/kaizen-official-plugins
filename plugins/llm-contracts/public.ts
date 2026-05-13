@@ -15,3 +15,11 @@ export type { SessionsStoreService, SessionRecord, TurnHandle, EventLogEntry } f
 export type { ToolsRegistryService, ToolHandler, ToolExecutionContext } from "./contracts/tools-registry";
 export { CANCEL_TOOL } from "./contracts/tools-registry";
 export type { SystemPromptService, SystemPromptSection, RegisteredSection } from "./contracts/prompt-registry";
+export type {
+  SlashRegistryService,
+  SlashCommandContext,
+  SlashCommandHandler,
+  SlashCommandManifest,
+  SlashRegistryEntry,
+  RegistryEntry,
+} from "./contracts/slash-registry";

@@ -1,6 +1,7 @@
 import type { KaizenPlugin } from "kaizen/types";
 import { readdir, readFile } from "node:fs/promises";
-import { createRegistry, type SlashRegistryService } from "./registry.ts";
+import { createRegistry } from "./registry.ts";
+import type { SlashRegistryService } from "llm-contracts/public";
 import { registerBuiltins } from "./builtins.ts";
 import { loadFileCommands, type DriverLike } from "./file-loader.ts";
 import { makeOnInputSubmit } from "./dispatcher.ts";
@@ -38,7 +39,6 @@ const plugin: KaizenPlugin = {
 
     // Service defined+provided before file commands run so any file-loader
     // diagnostics or consumer lookups in the same tick see a live registry.
-    ctx.defineService("slash:registry", { description: "Slash command registry." });
     ctx.provideService<SlashRegistryService>("slash:registry", registry);
 
     // File commands.

@@ -220,6 +220,7 @@
       "name": "llm-slash-commands",
       "version": "0.2.1",
       "dependencies": {
+        "llm-contracts": "workspace:*",
         "llm-tui": "workspace:*",
         "yaml": "^2.5.0",
       },
@@ -244,7 +245,6 @@
       "version": "0.1.0",
       "dependencies": {
         "llm-contracts": "workspace:*",
-        "llm-slash-commands": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "latest",
