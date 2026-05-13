@@ -24,8 +24,8 @@ export function truncate(s: string, maxBytes: number): string {
   return `${head}\n...[truncated, ${more} more bytes]`;
 }
 
-export interface FormatInputOk { ok: true; returnValue: unknown; stdout: string; ignoredBlocks?: number; }
-export interface FormatInputErr { ok: false; errorName: string; errorMessage: string; stdout: string; ignoredBlocks?: number; }
+export interface FormatInputOk { ok: true; returnValue: unknown; stdout: string; }
+export interface FormatInputErr { ok: false; errorName: string; errorMessage: string; stdout: string; }
 export type FormatInput = FormatInputOk | FormatInputErr;
 
 /**
@@ -36,7 +36,7 @@ export type FormatInput = FormatInputOk | FormatInputErr;
  */
 export function formatToolResult(
   input: FormatInput,
-  caps: { maxStdoutBytes: number; maxReturnBytes: number; maxBlocksPerResponse?: number },
+  caps: { maxStdoutBytes: number; maxReturnBytes: number },
 ): string {
   const stdout = truncate(input.stdout ?? "", caps.maxStdoutBytes);
   const lines: string[] = [];

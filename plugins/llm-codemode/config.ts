@@ -4,7 +4,6 @@ export interface CodeModeConfig {
   timeoutMs: number;
   maxStdoutBytes: number;
   maxReturnBytes: number;
-  maxBlocksPerResponse: number;
   sandbox: "bun-worker";
 }
 
@@ -12,7 +11,6 @@ export const DEFAULT_CONFIG: CodeModeConfig = Object.freeze({
   timeoutMs: 30000,
   maxStdoutBytes: 16384,
   maxReturnBytes: 4096,
-  maxBlocksPerResponse: 8,
   sandbox: "bun-worker" as const,
 });
 
@@ -35,7 +33,6 @@ function validate(cfg: CodeModeConfig): void {
   if (cfg.timeoutMs <= 0) throw new Error("llm-codemode: timeoutMs must be > 0");
   if (cfg.maxStdoutBytes <= 0) throw new Error("llm-codemode: maxStdoutBytes must be > 0");
   if (cfg.maxReturnBytes <= 0) throw new Error("llm-codemode: maxReturnBytes must be > 0");
-  if (cfg.maxBlocksPerResponse <= 0) throw new Error("llm-codemode: maxBlocksPerResponse must be > 0");
   if (cfg.sandbox !== "bun-worker") throw new Error("llm-codemode: sandbox must be 'bun-worker'");
 }
 

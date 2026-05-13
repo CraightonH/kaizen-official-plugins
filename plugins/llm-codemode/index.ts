@@ -29,7 +29,7 @@ const plugin: KaizenPlugin = {
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
   services: {
-    consumes: ["tools:registry", "llm-tui:tool-renderer"],
+    consumes: ["tools:registry"],
   },
 
   async setup(ctx) {
@@ -86,15 +86,14 @@ const plugin: KaizenPlugin = {
       return formatToolResult(result, {
         maxStdoutBytes: config.maxStdoutBytes,
         maxReturnBytes: config.maxReturnBytes,
-        maxBlocksPerResponse: config.maxBlocksPerResponse,
       });
     };
 
     toolsRegistry.register(schema, handler);
 
     // Register TUI renderer if the service is available (lazy import to avoid
-    // pulling React/Ink in non-TUI environments).
-    ctx.consumeService("llm-tui:tool-renderer");
+    // pulling React/Ink in non-TUI environments). Optional dependency: no
+    // hard consume edge — the plugin degrades to no inline renderer.
     const tuiRenderers = ctx.useService?.("llm-tui:tool-renderer") as
       | { register: (r: any) => () => void }
       | undefined;

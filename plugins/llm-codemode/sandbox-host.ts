@@ -7,7 +7,9 @@ import type { CodeModeConfig } from "./config.ts";
 import type { HostToWorker, WorkerToHost, InitMsg, ToolResultMsg, RegistrationMeta } from "./rpc-types.ts";
 import { wrapCode } from "./wrapper.ts";
 import { truncate } from "./serialize.ts";
-import { bucketFor } from "./buckets.ts";
+import { buildKaizenTree, type KaizenTree } from "./kaizen-tree.ts";
+
+type InvokeFn = (a: unknown) => Promise<unknown>;
 
 /**
  * Build the `kaizen` global object exposed inside the sandbox.
@@ -19,54 +21,20 @@ import { bucketFor } from "./buckets.ts";
  *   - skill  → kaizen.skills.<name>
  *   - memory → kaizen.memory.<name>
  *
- * Empty groups are omitted so the surface only advertises what's actually
- * registered.
+ * Empty groups are omitted. The grouping policy lives in `kaizen-tree.ts`
+ * and is shared with the sandbox worker entry to prevent host/worker drift.
  */
 export interface BuildKaizenGlobalArgs {
   registrations: ReadonlyArray<Pick<ToolRegistration, "schema" | "source">>;
   invoke: (name: string, args: unknown) => Promise<unknown>;
 }
 
-export function buildKaizenGlobal(args: BuildKaizenGlobalArgs): {
-  tools?: Record<string, (a: unknown) => Promise<unknown>>;
-  mcp?: Record<string, Record<string, (a: unknown) => Promise<unknown>>>;
-  agents?: Record<string, (a: unknown) => Promise<unknown>>;
-  skills?: Record<string, (a: unknown) => Promise<unknown>>;
-  memory?: Record<string, (a: unknown) => Promise<unknown>>;
-} {
+export function buildKaizenGlobal(args: BuildKaizenGlobalArgs): KaizenTree<InvokeFn> {
   const { registrations, invoke } = args;
-  const out: Record<string, unknown> = {};
-  const ensure = (k: string): Record<string, unknown> => {
-    if (!out[k]) out[k] = {};
-    return out[k] as Record<string, unknown>;
-  };
-  const fn = (name: string) => (a: unknown) => invoke(name, a);
-
-  for (const r of registrations) {
-    const name = r.schema.name;
-    const bucket = bucketFor(r.source);
-    switch (bucket.kind) {
-      case "tools":
-        ensure("tools")[name] = fn(name);
-        break;
-      case "mcp": {
-        const ns = ensure("mcp");
-        if (!ns[bucket.server]) ns[bucket.server] = {};
-        (ns[bucket.server] as Record<string, unknown>)[name] = fn(name);
-        break;
-      }
-      case "agents":
-        ensure("agents")[name] = fn(name);
-        break;
-      case "skills":
-        ensure("skills")[name] = fn(name);
-        break;
-      case "memory":
-        ensure("memory")[name] = fn(name);
-        break;
-    }
-  }
-  return out as ReturnType<typeof buildKaizenGlobal>;
+  return buildKaizenTree<InvokeFn>(
+    registrations.map((r) => ({ name: r.schema.name, source: r.source })),
+    (name) => (a) => invoke(name, a),
+  );
 }
 
 export type SandboxRunResult =

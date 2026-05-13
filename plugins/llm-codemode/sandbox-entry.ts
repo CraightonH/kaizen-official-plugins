@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 import type { HostToWorker, ToolInvokeMsg, ToolResultMsg, StdoutMsg, DoneMsg, ErrorMsg, RegistrationMeta } from "./rpc-types.ts";
-import { bucketFor } from "./buckets.ts";
+import { buildKaizenTree } from "./kaizen-tree.ts";
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -90,39 +90,12 @@ function makeLazyToolsProxy(): unknown {
 function makeKaizen(registrations: RegistrationMeta[] | undefined): unknown {
   if (!registrations || registrations.length === 0) {
     // No metadata: fall back to a fully-lazy `kaizen.tools.*` proxy so that
-    // legacy tests / callers without `listRegistrations` still work.
+    // legacy tests / callers without `listRegistrations` still work. The
+    // fallback lives at the call site, not inside `buildKaizenTree`, so the
+    // shared grouping helper stays policy-free.
     return { tools: makeLazyToolsProxy() };
   }
-  const out: Record<string, unknown> = {};
-  const ensure = (k: string): Record<string, unknown> => {
-    if (!out[k]) out[k] = {};
-    return out[k] as Record<string, unknown>;
-  };
-  for (const r of registrations) {
-    const name = r.name;
-    const bucket = bucketFor(r.source);
-    switch (bucket.kind) {
-      case "tools":
-        ensure("tools")[name] = invokeFn(name);
-        break;
-      case "mcp": {
-        const ns = ensure("mcp");
-        if (!ns[bucket.server]) ns[bucket.server] = {};
-        (ns[bucket.server] as Record<string, unknown>)[name] = invokeFn(name);
-        break;
-      }
-      case "agents":
-        ensure("agents")[name] = invokeFn(name);
-        break;
-      case "skills":
-        ensure("skills")[name] = invokeFn(name);
-        break;
-      case "memory":
-        ensure("memory")[name] = invokeFn(name);
-        break;
-    }
-  }
-  return out;
+  return buildKaizenTree(registrations, invokeFn);
 }
 
 // ---------- Main (single listener) ----------

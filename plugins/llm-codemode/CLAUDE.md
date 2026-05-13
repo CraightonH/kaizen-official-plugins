@@ -36,6 +36,14 @@ buckets.ts          Codemode-owned presentation policy. Maps the open
                     Unknown source kinds fall through to the `tools` bucket.
                     Loaded both from the host and from the sandbox worker —
                     keep runtime-dependency-free.
+kaizen-tree.ts      Shared grouping helper. Turns a flat list of
+                    `{ name, source }` into the nested
+                    `kaizen.{tools,mcp,agents,skills,memory}` tree, with the
+                    leaf type chosen by the caller. Used by both
+                    `sandbox-host.ts` (direct invoke functions, for tests) and
+                    `sandbox-entry.ts` (postMessage proxies, what the LLM
+                    sees). Single source of truth — keep host and worker on
+                    this helper so they cannot drift.
 rpc-types.ts        Host↔worker message shapes.
 tui-renderer.tsx    `codemodeRenderer: TuiToolRenderer`. Exported for the TUI to
                     register via `llm-tui:tool-renderer`.
@@ -48,12 +56,13 @@ tui-renderer.tsx    `codemodeRenderer: TuiToolRenderer`. Exported for the TUI to
 - **`tool:progress` emission requires `outerCallId`.** The handler in `index.ts` passes `exec.callId` to `runInSandbox`. Without that, no progress emits.
 - **No system-prompt mutation.** Unlike `llm-codemode-dispatch`, this plugin does not consume `prompt:system`. The API surface lives in the tool description.
 - **No code-from-prose extraction.** The LLM emits `tool_calls` with `code` as the argument. There is no fence parsing.
+- **Optional TUI integration.** `llm-tui:tool-renderer` is looked up via `ctx.useService` only — never declared in `services.consumes` and never hard-consumed via `ctx.consumeService`. The plugin must run unchanged without `llm-tui` (no inline renderer, everything else identical).
 
 ## Local deploy
 
 ```bash
-cp -R plugins/llm-codemode/. ~/.kaizen/marketplaces/official/plugins/llm-codemode@0.2.0/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-codemode@0.2.0 \
+cp -R plugins/llm-codemode/. ~/.kaizen/marketplaces/official/plugins/llm-codemode@0.3.0/
+(cd ~/.kaizen/marketplaces/official/plugins/llm-codemode@0.3.0 \
   && bun build --target=bun --outfile=dist/index.js index.ts)
 ```
 

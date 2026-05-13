@@ -13,7 +13,7 @@
     "official/llm-slash-commands@0.2.0",
     "official/llm-system-prompt@0.1.0",
     "official/llm-native-dispatch@0.3.0",
-    "official/llm-codemode@0.2.0",
+    "official/llm-codemode@0.3.0",
     "official/llm-driver@0.2.0",
     "official/llm-status-items@0.1.1",
     "official/llm-hooks-shell@0.1.0",

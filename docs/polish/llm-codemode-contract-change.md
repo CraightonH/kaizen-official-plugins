@@ -108,3 +108,90 @@ kind. Published as `llm-codemode@0.2.0`.
   long-term default versus a dedicated `other` bucket. The current
   choice favors LLM-surface stability over honesty; the trade-off is
   worth revisiting if surprise kinds become common.
+
+---
+
+# llm-codemode Contract Change — 0.3.0
+
+Date: 2026-05-13
+Session target: llm-codemode
+
+## Summary
+
+`llm-codemode` 0.3.0 tightens its surface in three small ways that do not
+affect the runtime tool shape or the in-sandbox `kaizen.*` global:
+
+1. Removes the dead `maxBlocksPerResponse` config key from `CodeModeConfig`
+   and the `formatToolResult` cap shape. The key was documented as
+   "reserved" and was never consulted at runtime.
+2. Drops `llm-tui:tool-renderer` from `services.consumes`. The TUI
+   integration is optional and is accessed through a guarded `useService`
+   lookup; the prior declaration overstated the dependency.
+3. Deletes `public.d.ts`. The file was not exposed in `package.json`
+   `exports`, had no internal or external consumers, and its
+   `CodeModeConfig` interface had drifted from the real one in
+   `config.ts` (missing the `sandbox` field). The plugin has no
+   intentional cross-plugin public API — it is a pure tool registrant.
+
+A shared `kaizen-tree.ts` helper now backs both the host and the sandbox
+worker's view of the `kaizen.{tools,mcp,agents,skills,memory}` grouping.
+This is an internal refactor; the runtime shape consumers see is unchanged.
+
+## Previous Contract
+
+- Owner: `llm-codemode`.
+- Consumers (config): users who edit
+  `~/.kaizen/plugins/llm-codemode/config.json`.
+- Consumers (services): the openai-compatible harness.
+- Consumers (public types): none. `package.json` exports did not expose
+  `./public`, and no plugin imports from `llm-codemode/public`.
+- Old behavior or shape:
+  - `CodeModeConfig` included `maxBlocksPerResponse: number`; `validate()`
+    rejected `<= 0`; `formatToolResult` accepted it in `caps` but never
+    referenced it.
+  - `services.consumes` listed `["tools:registry", "llm-tui:tool-renderer"]`,
+    and `setup()` called `ctx.consumeService("llm-tui:tool-renderer")` even
+    though the renderer was already guarded by a `useService` lookup.
+  - `public.d.ts` exported a 4-field `CodeModeConfig` without `sandbox`.
+
+## New Contract
+
+- New behavior or shape:
+  - `CodeModeConfig`: `{ timeoutMs, maxStdoutBytes, maxReturnBytes, sandbox: "bun-worker" }`.
+  - `services.consumes`: `["tools:registry"]`.
+  - `public.d.ts`: deleted.
+  - `kaizen-tree.ts`: new internal module shared by host and worker.
+
+- Compatibility notes:
+  - Existing user `config.json` files that set `maxBlocksPerResponse`
+    continue to load. The config loader uses
+    `{ ...DEFAULT_CONFIG, ...parsed }`, which lets unknown keys pass
+    through; `validate()` no longer reads the field, so it cannot fail on
+    it. The key now has no effect (which is what it had at runtime all
+    along — only the validator made it look load-bearing).
+  - Harnesses pinned at `official/llm-codemode@0.2.0` keep working
+    unchanged. Newly pinned harnesses should target `0.3.0`. The
+    openai-compatible harness in this repo was bumped to `0.3.0`.
+
+- Migration required by consumers: none. The runtime tool surface
+  (`execute_typescript`), the `tool:progress` event, and the `kaizen.*`
+  global inside the sandbox are byte-identical.
+
+## Affected OpenAI-Compatible Plugins
+
+- `llm-codemode`: bumped from `0.2.0` to `0.3.0`; harness coordinate
+  updated; marketplace entry adds `0.3.0`.
+- `llm-tools-registry`, `llm-tui`, `llm-driver`, `openai-llm`,
+  `llm-events`, `llm-status-items`, `llm-native-dispatch`,
+  `llm-mcp-bridge`, `llm-skills`, `llm-memory`, `llm-agents`,
+  `llm-slash-commands`, `llm-system-prompt`, `llm-tavily-search`,
+  `llm-local-tools`, `llm-session-manager`, `llm-hooks-shell`: verified
+  compatible. None import from `llm-codemode/public` or its services.
+
+## Verification
+
+- Tests run: `bun test plugins/llm-codemode` (all pass, including the new
+  `test/kaizen-tree.test.ts` that locks the shared grouping shape).
+- Tests not run and why: full-repo `bun test` not run; this session only
+  touched `llm-codemode` and its harness coordinate. No service contract
+  owned by another plugin changed.

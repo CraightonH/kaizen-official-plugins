@@ -8,6 +8,11 @@ Registers `execute_typescript` as a single tool with `tools:registry`. The LLM i
 - A TUI renderer (registered with `llm-tui:tool-renderer` if available) that displays the code, stdout, and result inline.
 - A `tool:progress` event emitted from the sandbox host while user code writes to stdout.
 
+## Dependencies
+
+- Required: `tools:registry` (from `llm-tools-registry`). Without it, the plugin logs and no-ops at setup.
+- Optional: `llm-tui:tool-renderer` (from `llm-tui`). When present, an inline renderer for `execute_typescript` is registered; when absent, the plugin runs normally with no inline UI.
+
 ## What it doesn't do
 
 - Does not provide `tool-dispatch:strategy`. The harness's dispatch strategy (`llm-native-dispatch`) consumes this tool like any other.
@@ -20,7 +25,11 @@ Registers `execute_typescript` as a single tool with `tools:registry`. The LLM i
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `timeoutMs` | 30000 | Sandbox execution timeout. |
-| `maxStdoutBytes` | 65536 | Cap on captured stdout. |
-| `maxReturnBytes` | 65536 | Cap on returned-value serialization length. |
-| `maxBlocksPerResponse` | 8 | Reserved (the new envelope only handles one block per call). |
+| `timeoutMs` | 30000 | Sandbox execution timeout (ms). |
+| `maxStdoutBytes` | 16384 | Cap on captured stdout (bytes). |
+| `maxReturnBytes` | 4096 | Cap on returned-value serialization length (bytes). |
+| `sandbox` | `"bun-worker"` | Sandbox backend. Only `bun-worker` is supported today. |
+
+Unknown keys in `config.json` are silently ignored. The previous
+`maxBlocksPerResponse` key was reserved and never consulted; it was removed in
+0.3.0. Existing configs that set it continue to load without error.
