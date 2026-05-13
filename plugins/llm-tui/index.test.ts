@@ -33,7 +33,7 @@ describe("llm-tui plugin", () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
     expect(ctx.provided["ui:channel"]).toBeDefined();
-    expect(ctx.provided["llm-tui:completion"]).toBeDefined();
+    expect(ctx.provided["ui:completion-source"]).toBeDefined();
     expect(ctx.provided["ui:status"]).toBeDefined();
     expect(ctx.provided["ui:theme"]).toBeDefined();
     expect(ctx.provided["llm-tui:tool-renderer"]).toBeDefined();
@@ -59,7 +59,7 @@ describe("llm-tui plugin", () => {
   it("completion service exposes register()", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    const cs = ctx.provided["llm-tui:completion"] as any;
+    const cs = ctx.provided["ui:completion-source"] as any;
     expect(typeof cs.register).toBe("function");
     const off = cs.register({ id: "x", trigger: "/", list: () => [] });
     expect(typeof off).toBe("function");

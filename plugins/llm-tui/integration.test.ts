@@ -1,6 +1,6 @@
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "./index.tsx";
-import type { TuiCompletionService } from "./public.d.ts";
+import type { UiCompletionService } from "llm-contracts/public";
 import { TuiStore } from "./state/store.ts";
 
 function makeCtx() {
@@ -28,7 +28,7 @@ describe("llm-tui integration (non-TTY)", () => {
   it("public completion service registers and unregisters cleanly", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    const cs = ctx.provided["llm-tui:completion"] as TuiCompletionService;
+    const cs = ctx.provided["ui:completion-source"] as UiCompletionService;
     const off = cs.register({
       id: "test", trigger: "/",
       list: () => [{ label: "/help", insertText: "/help " }],

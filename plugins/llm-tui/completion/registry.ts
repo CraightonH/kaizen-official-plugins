@@ -1,8 +1,8 @@
-import type { CompletionItem, CompletionSource, TuiCompletionService } from "../public";
-export type { CompletionItem, CompletionSource, TuiCompletionService } from "../public";
+import type { CompletionItem, CompletionSource, UiCompletionService } from "llm-contracts/public";
+export type { CompletionItem, CompletionSource, UiCompletionService } from "llm-contracts/public";
 
 export interface CompletionRegistry {
-  service: TuiCompletionService;
+  service: UiCompletionService;
   query(trigger: string, q: string): Promise<CompletionItem[]>;
 }
 
@@ -21,7 +21,7 @@ export function makeCompletionRegistry(opts: RegistryOptions = {}): CompletionRe
   let timer: ReturnType<typeof setTimeout> | null = null;
   let pending: Pending | null = null;
 
-  const service: TuiCompletionService = {
+  const service: UiCompletionService = {
     register(source) {
       sources.set(source.id, source);
       return () => {

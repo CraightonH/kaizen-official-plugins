@@ -13,6 +13,7 @@ import * as dispatchContract from "./contracts/dispatch";
 import * as uiChannelContract from "./contracts/ui-channel";
 import * as uiThemeContract from "./contracts/ui-theme";
 import * as uiStatusContract from "./contracts/ui-status";
+import * as uiCompletionContract from "./contracts/ui-completion";
 
 const plugin: KaizenPlugin = {
   name: "llm-contracts",
@@ -35,6 +36,7 @@ const plugin: KaizenPlugin = {
     ctx.defineService(uiChannelContract.CONTRACT_ID, { description: uiChannelContract.DESCRIPTION });
     ctx.defineService(uiThemeContract.CONTRACT_ID, { description: uiThemeContract.DESCRIPTION });
     ctx.defineService(uiStatusContract.CONTRACT_ID, { description: uiStatusContract.DESCRIPTION });
+    ctx.defineService(uiCompletionContract.CONTRACT_ID, { description: uiCompletionContract.DESCRIPTION });
   },
 };
 

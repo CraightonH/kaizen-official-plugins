@@ -31,3 +31,4 @@ export type { ToolDispatchStrategy, ToolDispatchRegistry } from "./contracts/dis
 export type { UiChannelService } from "./contracts/ui-channel";
 export type { UiTheme, UiThemeService } from "./contracts/ui-theme";
 export type { UiStatusService } from "./contracts/ui-status";
+export type { UiCompletionService, CompletionItem, CompletionSource } from "./contracts/ui-completion";

@@ -6,7 +6,7 @@ import { registerBuiltins } from "./builtins.ts";
 import { loadFileCommands, type DriverLike } from "./file-loader.ts";
 import { makeOnInputSubmit } from "./dispatcher.ts";
 import { buildCompletionSource } from "./completion.ts";
-import type { TuiCompletionService } from "llm-tui/public";
+import type { UiCompletionService } from "llm-contracts/public";
 
 // Module-scope handles so stop() can clean up idempotently on reload.
 let completionOff: (() => void) | undefined;
@@ -73,14 +73,14 @@ const plugin: KaizenPlugin = {
     });
     on("input:submit", onSubmit as (payload?: unknown) => Promise<unknown | void>, { priority: 100 });
 
-    // Optional llm-tui:completion. Defer to harness:start so the lookup runs
+    // Optional ui:completion-source. Defer to harness:start so the lookup runs
     // after llm-tui has provided the service (load order is no longer pinned
     // by a hard consumes declaration).
     on("harness:start", async () => {
       try {
-        const completion = ctx.useService<TuiCompletionService>("llm-tui:completion");
+        const completion = ctx.useService<UiCompletionService>("ui:completion-source");
         if (completion) completionOff = completion.register(buildCompletionSource(registry));
-      } catch { /* llm-tui:completion absent — skip */ }
+      } catch { /* ui:completion-source absent — skip */ }
     });
   },
 
