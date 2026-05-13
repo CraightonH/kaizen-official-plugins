@@ -49,7 +49,7 @@ describe("llm-tui integration (non-TTY)", () => {
   it("channel.writeOutput + writeNotice + setBusy + readInput respect the contract", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    const ch = ctx.provided["llm-tui:channel"] as any;
+    const ch = ctx.provided["ui:channel"] as any;
     // Non-TTY path uses the fallback channel: writeOutput goes to stdout.
     // We just exercise the methods to verify they don't throw.
     ch.writeOutput("hi");

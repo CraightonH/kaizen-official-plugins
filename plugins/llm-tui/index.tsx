@@ -1,8 +1,8 @@
 import React from "react";
 import { render } from "ink";
 import type { KaizenPlugin } from "kaizen/types";
+import type { UiChannelService } from "llm-contracts/public";
 import type {
-  TuiChannelService,
   TuiCompletionService,
   TuiStatusService,
   TuiThemeService,
@@ -21,7 +21,7 @@ const plugin: KaizenPlugin = {
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
   services: {
-    provides: ["llm-tui:channel", "llm-tui:completion", "llm-tui:status", "llm-tui:theme", "llm-tui:tool-renderer"],
+    provides: ["ui:channel", "llm-tui:completion", "llm-tui:status", "llm-tui:theme", "llm-tui:tool-renderer"],
     consumes: ["events:vocabulary"],
   },
 
@@ -32,7 +32,7 @@ const plugin: KaizenPlugin = {
     // plugin per llm-events convention). Peers emit these to drive TUI state.
     ctx.defineEvent("tui:enter-history");
 
-    ctx.defineService("llm-tui:channel", { description: "Pull-style chat I/O channel." });
+    // ui:channel is defined on llm-contracts; this plugin provides the implementation.
     ctx.defineService("llm-tui:completion", { description: "Registry of completion sources for the input popup." });
     ctx.defineService("llm-tui:status", { description: "Marker service: subscribes to status:item-* and renders the bar." });
     ctx.defineService("llm-tui:theme", { description: "Read-only theme tokens." });
@@ -186,7 +186,7 @@ const plugin: KaizenPlugin = {
 
     if (!isTTY) {
       const channel = createFallbackChannel();
-      ctx.provideService<TuiChannelService>("llm-tui:channel", channel);
+      ctx.provideService<UiChannelService>("ui:channel", channel);
       return;
     }
 
@@ -228,7 +228,7 @@ const plugin: KaizenPlugin = {
       { exitOnCtrlC: false },
     );
 
-    const channel: TuiChannelService = {
+    const channel: UiChannelService = {
       readInput: () => store.awaitInput(),
       writeOutput: (chunk: string) => store.appendOutput(chunk),
       writeNotice: (text: string) => store.appendNotice(text),
@@ -242,7 +242,7 @@ const plugin: KaizenPlugin = {
       clearLiveThinking: () => store.clearLiveThinking(),
       setInputDraft: (text: string) => store.setInput(text, text.length),
     };
-    ctx.provideService<TuiChannelService>("llm-tui:channel", channel);
+    ctx.provideService<UiChannelService>("ui:channel", channel);
 
     (plugin as any).__ink = inkApp;
   },

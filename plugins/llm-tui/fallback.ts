@@ -1,7 +1,7 @@
 import readline from "node:readline";
-import type { TuiChannelService } from "./public.d.ts";
+import type { UiChannelService } from "llm-contracts/public";
 
-export function createFallbackChannel(): TuiChannelService {
+export function createFallbackChannel(): UiChannelService {
   let queued: string[] = [];
   let pending: ((line: string) => void) | null = null;
   let rl: readline.Interface | null = null;

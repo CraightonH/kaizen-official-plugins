@@ -79,7 +79,7 @@ function makeCtx(deps: { ui: any; llm: any; cleared?: () => Promise<void>; cfg?:
     consumeService: mock(() => {}),
     defineEvent: mock(() => {}),
     useService: (name: string) => {
-      if (name === "llm-tui:channel") return deps.ui;
+      if (name === "ui:channel") return deps.ui;
       if (name === "llm:complete") return deps.llm;
       if (name === "sessions:store") return sessions;
       throw new Error(`useService: no provider for '${name}'`);
@@ -110,7 +110,7 @@ describe("llm-driver index", () => {
     });
     expect(plugin.services?.consumes).toEqual([
       "events:vocabulary",
-      "llm-tui:channel",
+      "ui:channel",
       "llm:complete",
       "sessions:store",
     ]);

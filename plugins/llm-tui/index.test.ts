@@ -32,7 +32,7 @@ describe("llm-tui plugin", () => {
   it("provides all five services in non-TTY mode", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    expect(ctx.provided["llm-tui:channel"]).toBeDefined();
+    expect(ctx.provided["ui:channel"]).toBeDefined();
     expect(ctx.provided["llm-tui:completion"]).toBeDefined();
     expect(ctx.provided["llm-tui:status"]).toBeDefined();
     expect(ctx.provided["llm-tui:theme"]).toBeDefined();
@@ -46,10 +46,10 @@ describe("llm-tui plugin", () => {
     expect(ctx.subs["status:item-clear"]?.length).toBe(1);
   });
 
-  it("channel exposes the four TuiChannelService methods", async () => {
+  it("channel exposes the four UiChannelService methods", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    const ch = ctx.provided["llm-tui:channel"] as any;
+    const ch = ctx.provided["ui:channel"] as any;
     expect(typeof ch.readInput).toBe("function");
     expect(typeof ch.writeOutput).toBe("function");
     expect(typeof ch.writeNotice).toBe("function");
@@ -102,7 +102,7 @@ describe("llm-tui plugin", () => {
   it("channel exposes setInputDraft", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
-    const ch = ctx.provided["llm-tui:channel"] as any;
+    const ch = ctx.provided["ui:channel"] as any;
     expect(typeof ch.setInputDraft).toBe("function");
     // Non-TTY mode provides the fallback channel; setInputDraft is a no-op there.
     expect(() => ch.setInputDraft("draft")).not.toThrow();

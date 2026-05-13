@@ -28,3 +28,4 @@ export type { MemoryStoreService, MemoryEntry, MemoryType, MemoryScope } from ".
 export type { AgentsRegistryService, AgentManifest } from "./contracts/agents-registry";
 export type { McpBridgeService, ServerInfo, ServerStatus } from "./contracts/mcp-bridge";
 export type { ToolDispatchStrategy, ToolDispatchRegistry } from "./contracts/dispatch";
+export type { UiChannelService } from "./contracts/ui-channel";

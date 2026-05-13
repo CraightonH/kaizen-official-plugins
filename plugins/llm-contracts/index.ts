@@ -10,6 +10,7 @@ import * as memoryStoreContract from "./contracts/memory-store";
 import * as agentsRegistryContract from "./contracts/agents-registry";
 import * as mcpBridgeContract from "./contracts/mcp-bridge";
 import * as dispatchContract from "./contracts/dispatch";
+import * as uiChannelContract from "./contracts/ui-channel";
 
 const plugin: KaizenPlugin = {
   name: "llm-contracts",
@@ -29,6 +30,7 @@ const plugin: KaizenPlugin = {
     ctx.defineService(agentsRegistryContract.CONTRACT_ID, { description: agentsRegistryContract.DESCRIPTION });
     ctx.defineService(mcpBridgeContract.CONTRACT_ID, { description: mcpBridgeContract.DESCRIPTION });
     ctx.defineService(dispatchContract.CONTRACT_ID, { description: dispatchContract.DESCRIPTION });
+    ctx.defineService(uiChannelContract.CONTRACT_ID, { description: uiChannelContract.DESCRIPTION });
   },
 };
 

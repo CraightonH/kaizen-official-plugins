@@ -72,7 +72,7 @@ describe("llm-driver integration (synthetic llm:complete)", () => {
       consumeService: () => {},
       defineEvent: () => {},
       useService: (n: string) => {
-        if (n === "llm-tui:channel") return ui;
+        if (n === "ui:channel") return ui;
         if (n === "llm:complete") return llm;
         if (n === "sessions:store") return sessions;
         throw new Error(`useService: no provider for '${n}'`);
@@ -223,7 +223,7 @@ describe("llm-driver integration (synthetic llm:complete)", () => {
       consumeService: () => {},
       defineEvent: () => {},
       useService: (n: string) => {
-        if (n === "llm-tui:channel") return ui;
+        if (n === "ui:channel") return ui;
         if (n === "llm:complete") return llm;
         if (n === "sessions:store") return sessions;
         throw new Error(`useService: no provider for '${n}'`);
