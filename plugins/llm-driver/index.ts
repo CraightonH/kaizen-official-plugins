@@ -170,7 +170,7 @@ const plugin: KaizenPlugin = {
         llmComplete: ctx.useService<LLMCompleteService>("llm:complete")!,
         sessions: ctx.useService<SessionsStoreService>("sessions:store")!,
         registry: safeUse<ToolsRegistryService>("tools:registry"),
-        strategy: safeUse<ToolDispatchStrategy>("tool-dispatch:strategy"),
+        strategy: safeUse<ToolDispatchStrategy>("dispatch:strategy"),
         log: ctx.log.bind(ctx),
         idGen: newTurnId,
         defaultSystemPrompt: state.systemPrompt || (ctx.config as DriverConfig)?.defaultSystemPrompt || DEFAULTS.defaultSystemPrompt,

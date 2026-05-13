@@ -9,9 +9,11 @@ import type {
 import type {
   RunConversationInput,
   RunConversationOutput,
+} from "./public";
+import type {
   ToolDispatchRegistry,
   ToolDispatchStrategy,
-} from "./public";
+} from "llm-contracts/public";
 import { aggregateUsage } from "./state.ts";
 
 export interface ToolsRegistryService extends ToolDispatchRegistry {

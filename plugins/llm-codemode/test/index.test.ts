@@ -52,10 +52,10 @@ test("description embeds the rendered kaizen.tools .d.ts surface", async () => {
   expect(desc).toContain("kaizen.tools");
 });
 
-test("does NOT provide tool-dispatch:strategy", async () => {
+test("does NOT provide dispatch:strategy", async () => {
   const ctx = makeFakeCtx();
   await (plugin as any).setup(ctx);
-  expect(ctx.consumed.has("tool-dispatch:strategy")).toBe(false);
+  expect(ctx.consumed.has("dispatch:strategy")).toBe(false);
 });
 
 test("consumes tools:registry only", async () => {

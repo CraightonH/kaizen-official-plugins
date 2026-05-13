@@ -8,7 +8,7 @@ export type {
   LLMCompleteService,
 } from "llm-contracts/public";
 
-import type { ChatMessage, LLMResponse, ToolSchema, TurnHandle } from "llm-contracts/public";
+import type { ChatMessage, TurnHandle } from "llm-contracts/public";
 
 // Owned by llm-driver: service contract for `driver:run-conversation`.
 export type RunConversationInput = {
@@ -42,33 +42,7 @@ export interface RunConversationOutput {
   usage: { promptTokens: number; completionTokens: number };
 }
 
-export interface ToolDispatchRegistry {
-  invoke(
-    name: string,
-    args: unknown,
-    ctx: {
-      signal: AbortSignal;
-      callId: string;
-      turnId?: string;
-      sessionId?: string;
-      log: (msg: string) => void;
-    },
-  ): Promise<unknown>;
-}
-
-export interface ToolDispatchStrategy {
-  prepareRequest(input: { availableTools: ToolSchema[] }):
-    | { tools?: ToolSchema[]; systemPromptAppend?: string }
-    | Promise<{ tools?: ToolSchema[]; systemPromptAppend?: string }>;
-  handleResponse(input: {
-    response: LLMResponse;
-    registry: ToolDispatchRegistry;
-    signal: AbortSignal;
-    emit: (event: string, payload: unknown) => Promise<void>;
-    turnId: string;
-    sessionId: string;
-  }): Promise<ChatMessage[]>;
-}
+export type { ToolDispatchStrategy, ToolDispatchRegistry } from "llm-contracts/public";
 
 export interface DriverService {
   runConversation(input: RunConversationInput): Promise<RunConversationOutput>;
