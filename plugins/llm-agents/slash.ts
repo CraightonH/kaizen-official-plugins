@@ -5,6 +5,7 @@ export interface SlashHandlerDeps {
   registry: {
     service: { list(): Array<Pick<InternalAgentManifest, "name" | "description" | "systemPrompt" | "toolFilter">> };
     getInternal(name: string): InternalAgentManifest | undefined;
+    getErrors(): Array<{ path: string; message: string }>;
   };
 }
 
@@ -48,17 +49,27 @@ export function makeSlashHandlers(deps: SlashHandlerDeps): {
   const listHandler: SlashCommandHandler = async (cmdCtx) => {
     try {
       const items = deps.registry.service.list();
-      if (items.length === 0) {
-        await cmdCtx.print("No agents registered.");
-        return;
-      }
+      const errors = deps.registry.getErrors();
       const lines: string[] = [];
-      for (const pub of [...items].sort((a, b) => a.name.localeCompare(b.name))) {
-        const internal = deps.registry.getInternal(pub.name);
-        if (!internal) continue;
-        lines.push(`- **\`${pub.name}\`** [${scopeTag(internal)}] — ${pub.description}`);
+      if (items.length === 0) {
+        lines.push("No agents registered.");
+      } else {
+        for (const pub of [...items].sort((a, b) => a.name.localeCompare(b.name))) {
+          const internal = deps.registry.getInternal(pub.name);
+          if (!internal) continue;
+          lines.push(`- **\`${pub.name}\`** [${scopeTag(internal)}] — ${pub.description}`);
+        }
       }
-      await cmdCtx.print(lines.join("\n"));
+      const body = items.length === 0 ? lines[0]! : lines.join("\n");
+      if (errors.length > 0) {
+        const footer = [
+          `**Errors loading agents (${errors.length}):**`,
+          ...errors.map((e) => `- ${e.path}: ${e.message}`),
+        ].join("\n");
+        await cmdCtx.print(`${body}\n\n${footer}`);
+      } else {
+        await cmdCtx.print(body);
+      }
     } catch (err) {
       await cmdCtx.print(`Error: ${(err as Error).message}`);
     }

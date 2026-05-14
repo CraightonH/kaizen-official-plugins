@@ -23,6 +23,7 @@ function fakeRegistry(manifests: InternalAgentManifest[]) {
       register: () => () => {},
     },
     getInternal: (name: string) => byName.get(name),
+    getErrors: () => [],
   };
 }
 
@@ -165,5 +166,66 @@ describe("showHandler", () => {
     await showHandler(ctx);
     expect(ctx.printed[0]).toContain("- Names: read_*");
     expect(ctx.printed[0]).not.toContain("- Tags:");
+  });
+});
+
+describe("listHandler error footer", () => {
+  function regWithErrors(manifests: InternalAgentManifest[], errors: { path: string; message: string }[]) {
+    const byName = new Map(manifests.map((m) => [m.name, m]));
+    return {
+      service: {
+        list: () => manifests.map(({ sourcePath, scope, modelOverride, ...rest }) => rest),
+        register: () => () => {},
+      },
+      getInternal: (name: string) => byName.get(name),
+      getErrors: () => [...errors],
+    };
+  }
+
+  it("renders an Errors footer below the agent list when errors exist", async () => {
+    const reg = regWithErrors(
+      [mkManifest({ name: "code-reviewer", description: "Reviews diffs." })],
+      [
+        { path: "/u/.kaizen/agents/coder.md", message: "missing YAML frontmatter (file must begin with '---')" },
+      ],
+    );
+    const { listHandler } = makeSlashHandlers({ registry: reg });
+    const ctx = fakeCmdCtx();
+    await listHandler(ctx);
+    expect(ctx.printed).toHaveLength(1);
+    expect(ctx.printed[0]).toBe(
+      "- **`code-reviewer`** [user] — Reviews diffs.\n" +
+      "\n" +
+      "**Errors loading agents (1):**\n" +
+      "- /u/.kaizen/agents/coder.md: missing YAML frontmatter (file must begin with '---')",
+    );
+  });
+
+  it("renders the Errors footer below 'No agents registered.' when registry is empty + errors exist", async () => {
+    const reg = regWithErrors(
+      [],
+      [
+        { path: "/p/.kaizen/agents/coder.md", message: "missing YAML frontmatter (file must begin with '---')" },
+        { path: "/p/.kaizen/agents/reviewer.md", message: "missing YAML frontmatter (file must begin with '---')" },
+      ],
+    );
+    const { listHandler } = makeSlashHandlers({ registry: reg });
+    const ctx = fakeCmdCtx();
+    await listHandler(ctx);
+    expect(ctx.printed[0]).toBe(
+      "No agents registered.\n" +
+      "\n" +
+      "**Errors loading agents (2):**\n" +
+      "- /p/.kaizen/agents/coder.md: missing YAML frontmatter (file must begin with '---')\n" +
+      "- /p/.kaizen/agents/reviewer.md: missing YAML frontmatter (file must begin with '---')",
+    );
+  });
+
+  it("does not render a footer when errors are empty", async () => {
+    const reg = regWithErrors([mkManifest({ name: "a", description: "A." })], []);
+    const { listHandler } = makeSlashHandlers({ registry: reg });
+    const ctx = fakeCmdCtx();
+    await listHandler(ctx);
+    expect(ctx.printed[0]).toBe("- **`a`** [user] — A.");
   });
 });
