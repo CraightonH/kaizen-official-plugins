@@ -26,32 +26,70 @@ export interface LoaderResult {
 }
 
 const MAX_BYTES = 64 * 1024;
+const MAX_DEPTH = 8;
 
 async function loadOneScope(
-  dir: string,
+  rootDir: string,
   scope: "user" | "project",
   deps: LoaderDeps,
   errors: LoaderError[],
 ): Promise<InternalAgentManifest[]> {
-  let entries: string[];
-  try { entries = await deps.readDir(dir); }
-  catch (err: any) {
-    if (err?.code === "ENOENT") return [];
-    errors.push({ path: dir, message: `failed to read dir: ${err?.message ?? err}` });
-    return [];
+  const collected: string[] = [];
+  const seenRealPaths = new Set<string>();
+
+  async function walk(dir: string, depth: number): Promise<void> {
+    let entries: string[];
+    try { entries = await deps.readDir(dir); }
+    catch (err: any) {
+      if (err?.code === "ENOENT") return;
+      errors.push({ path: dir, message: `failed to read dir: ${err?.message ?? err}` });
+      return;
+    }
+    entries.sort();
+    for (const entry of entries) {
+      if (entry.startsWith(".")) continue;
+      const fullPath = `${dir}/${entry}`;
+      let st;
+      try { st = await deps.stat(fullPath); }
+      catch (err: any) {
+        errors.push({ path: fullPath, message: `stat failed: ${err?.message ?? err}` });
+        continue;
+      }
+      if (st.isDirectory()) {
+        if (depth >= MAX_DEPTH) {
+          errors.push({ path: fullPath, message: `directory depth exceeds 8; skipped` });
+          continue;
+        }
+        let real = fullPath;
+        if (st.isSymbolicLink()) {
+          try { real = await deps.realpath(fullPath); }
+          catch (err: any) { errors.push({ path: fullPath, message: `realpath failed: ${err?.message ?? err}` }); continue; }
+          if (seenRealPaths.has(real)) {
+            errors.push({ path: fullPath, message: `symlink cycle detected; skipped` });
+            continue;
+          }
+          seenRealPaths.add(real);
+        } else {
+          seenRealPaths.add(real);
+        }
+        await walk(fullPath, depth + 1);
+        continue;
+      }
+      if (!st.isFile()) continue;
+      if (!entry.endsWith(".md")) continue;
+      collected.push(fullPath);
+    }
   }
-  // Lexicographic order — Spec 11 collision rule (first lexicographic wins within scope).
-  entries.sort();
+
+  await walk(rootDir, 1);
+  collected.sort();
+
   const out: InternalAgentManifest[] = [];
   const seenNames = new Set<string>();
-  const seenRealPaths = new Set<string>();
-  for (const entry of entries) {
-    if (!entry.endsWith(".md")) continue;
-    const fullPath = `${dir}/${entry}`;
+  for (const fullPath of collected) {
     let st;
     try { st = await deps.stat(fullPath); }
     catch (err: any) { errors.push({ path: fullPath, message: `stat failed: ${err?.message ?? err}` }); continue; }
-    if (!st.isFile()) continue;
     if (st.size > MAX_BYTES) {
       errors.push({ path: fullPath, message: `agent file exceeds 64 KiB cap (${st.size} bytes); skipped` });
       continue;
@@ -64,8 +102,8 @@ async function loadOneScope(
         errors.push({ path: fullPath, message: `symlink cycle detected; skipped` });
         continue;
       }
+      seenRealPaths.add(real);
     }
-    seenRealPaths.add(real);
     let text: string;
     try { text = await deps.readFile(fullPath); }
     catch (err: any) { errors.push({ path: fullPath, message: `read failed: ${err?.message ?? err}` }); continue; }
