@@ -46,14 +46,18 @@ export function makeRegistry(initial: InternalAgentManifest[], onChange?: () => 
   };
 }
 
+export interface LoadError { path: string; message: string }
+
 export interface RegistryHandle {
   service: AgentsRegistryService;
   getInternal(name: string): InternalAgentManifest | undefined;
-  setInner(next: AgentsRegistry, onChange?: () => void): void;
+  getErrors(): LoadError[];
+  setInner(next: AgentsRegistry, errors?: LoadError[], onChange?: () => void): void;
 }
 
 export function makeRegistryHandle(initial: AgentsRegistry): RegistryHandle {
   let inner = initial;
+  let errors: LoadError[] = [];
   return {
     get service() {
       return {
@@ -62,8 +66,10 @@ export function makeRegistryHandle(initial: AgentsRegistry): RegistryHandle {
       } as AgentsRegistryService;
     },
     getInternal(name) { return inner.getInternal(name); },
-    setInner(next, onChange) {
+    getErrors() { return [...errors]; },
+    setInner(next, nextErrors, onChange) {
       inner = next;
+      if (nextErrors !== undefined) errors = [...nextErrors];
       onChange?.();
     },
   } as RegistryHandle;

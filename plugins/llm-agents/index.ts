@@ -134,7 +134,7 @@ const plugin: KaizenPlugin = {
             readFile: (p) => fsReadFile(p, "utf8"),
           },
         });
-        handle.setInner(makeRegistry(result.manifests, bumpSection), bumpSection);
+        handle.setInner(makeRegistry(result.manifests, bumpSection), result.errors, bumpSection);
         ready = true;
         for (const e of result.errors) {
           await ctx.emit("harness:error", { message: `llm-agents: ${e.path}: ${e.message}` });

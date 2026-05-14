@@ -67,7 +67,24 @@ describe("makeRegistry onChange callback", () => {
     const onChange = mock(() => {});
     const handle = makeRegistryHandle(makeRegistry([]));
     const next = makeRegistry([]);
-    handle.setInner(next, onChange);
+    handle.setInner(next, undefined, onChange);
     expect(onChange.mock.calls.length).toBe(1);
+  });
+});
+
+describe("RegistryHandle errors slot", () => {
+  it("initial handle has empty errors", () => {
+    const handle = makeRegistryHandle(makeRegistry([]));
+    expect(handle.getErrors()).toEqual([]);
+  });
+
+  it("setInner stores errors and getErrors returns a defensive copy", () => {
+    const handle = makeRegistryHandle(makeRegistry([]));
+    const errors = [{ path: "/x/a.md", message: "boom" }];
+    handle.setInner(makeRegistry([]), errors);
+    const out1 = handle.getErrors();
+    expect(out1).toEqual([{ path: "/x/a.md", message: "boom" }]);
+    out1.push({ path: "/y", message: "leak" });
+    expect(handle.getErrors()).toEqual([{ path: "/x/a.md", message: "boom" }]);
   });
 });
