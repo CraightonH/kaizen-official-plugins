@@ -1,0 +1,28 @@
+import chalk from "chalk";
+import { marked } from "marked";
+import { markedTerminal } from "marked-terminal";
+
+// Ensure ANSI output even in non-TTY contexts (e.g. test runners).
+// chalk reads `level` per-call, so setting it here is sufficient.
+if (chalk.level === 0) {
+  chalk.level = 1;
+}
+
+// One-time configuration. marked-terminal installs a custom renderer that
+// emits ANSI-styled strings instead of HTML.
+marked.use(markedTerminal() as any);
+
+/**
+ * Render a markdown source string as an ANSI-styled string suitable for
+ * passing directly to Ink's <Text> (Ink honors embedded ANSI). Returns the
+ * input verbatim if the renderer throws — we never want a malformed message
+ * to crash the TUI.
+ */
+export function renderMarkdown(src: string): string {
+  try {
+    const result = marked.parse(src);
+    return typeof result === "string" ? result : src;
+  } catch {
+    return src;
+  }
+}
