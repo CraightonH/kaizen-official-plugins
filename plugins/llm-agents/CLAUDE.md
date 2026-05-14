@@ -6,8 +6,9 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 
 ```
 index.ts        Plugin lifecycle: loads config, wires registry handle, turn tracker, injector,
-                dispatch tool, and the `prompt:registry` Available-agents section. Schedules
-                discovery in a microtask. Module-scope `toolUnregister`/`sectionHandle`
+                dispatch tool, the `prompt:registry` Available-agents section, and the
+                `agents:list` / `agents:show` slash commands. Schedules discovery in a
+                microtask. Module-scope `toolUnregister` / `sectionHandle` / `slashOffs`
                 let `stop()` clean up idempotently on reload. The only file that touches `ctx`.
 config.ts       loadConfig({ home, cwd, env, readFile, log }) → AgentsConfig.
                 Resolves config path, expands ~ and relatives, validates maxDepth.
@@ -34,6 +35,9 @@ dispatch.ts     makeDispatchTool({ registry, tracker, driver, sessions, maxDepth
                 from llm-tools-registry/public (the narrowest stable owner re-exports it).
                 Status events go through the injected `emit` dep — ToolExecutionContext has
                 no emit hook, so the plugin captures `ctx.emit` at setup time.
+slash.ts        makeSlashHandlers({ registry }) → { listHandler, showHandler } for the
+                /agents:list and /agents:show plugin-source slash commands. Pure factory;
+                no `ctx`. Reads via registry.service.list() and registry.getInternal().
 public.d.ts     Owns AgentManifest and AgentsRegistryService for this plugin. The service
                 name `agents:registry` is owned by llm-agents (defined and provided here);
                 the event vocab in events:vocabulary does NOT define this contract.
@@ -55,6 +59,7 @@ Boundaries:
 - **Always-on tools are merged in, never out.** Sub-agents always see `dispatch_agent` (so they can recurse to `maxDepth`) and, if `skills:registry` is present, `load_skill`. A manifest cannot opt out.
 - **Programmatic agents are namespaced.** `register()` requires the `runtime:` prefix. This keeps file-loaded and synthetic agents in disjoint namespaces.
 - **Frontmatter parser is strict-subset on purpose.** Only scalars, integers, flow arrays, and `>-` folded block scalars. Don't pull in a real YAML lib — the test surface depends on the deterministic error messages.
+- **Slash registration is topo-hint optional.** `slash:registry` is in `services.consumes` so kaizen orders `llm-slash-commands` first when present, but the lookup is guarded with `try`/`catch`. A harness without slash commands still boots — the dispatch tool, registry, and prompt section all work; only the `/agents:list` and `/agents:show` user-facing commands are absent.
 
 ## Adding an agent file
 
