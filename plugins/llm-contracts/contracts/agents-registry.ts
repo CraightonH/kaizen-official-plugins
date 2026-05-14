@@ -3,7 +3,12 @@ export interface AgentManifest {
   description: string;
   systemPrompt: string;
   /** Restricts the tool view available to this agent's nested driver runs. */
-  toolFilter?: { tags?: string[]; names?: string[] };
+  toolFilter?: {
+    tags?: string[];
+    names?: string[];
+    excludeTags?: string[];
+    excludeNames?: string[];
+  };
 }
 
 export interface AgentsRegistryService {
