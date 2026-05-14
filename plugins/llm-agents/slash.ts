@@ -13,6 +13,34 @@ function scopeTag(m: InternalAgentManifest): "user" | "project" | "runtime" {
   return m.scope;
 }
 
+function renderToolFilter(m: InternalAgentManifest): string {
+  const tf = m.toolFilter;
+  if (!tf || ((!tf.tags || tf.tags.length === 0) && (!tf.names || tf.names.length === 0))) {
+    return "Tool filter: none (agent inherits parent's tool view, plus always-on dispatch_agent / load_skill).";
+  }
+  const parts = ["**Tool filter**:"];
+  if (tf.tags && tf.tags.length > 0) parts.push(`- Tags: ${tf.tags.join(", ")}`);
+  if (tf.names && tf.names.length > 0) parts.push(`- Names: ${tf.names.join(", ")}`);
+  return parts.join("\n");
+}
+
+function renderShow(m: InternalAgentManifest): string {
+  return [
+    `**Agent**: ${m.name}`,
+    `**Scope**: ${scopeTag(m)}`,
+    `**Source**: ${m.sourcePath}`,
+    "",
+    `**Description**: ${m.description}`,
+    "",
+    renderToolFilter(m),
+    "",
+    "**System prompt**:",
+    "```",
+    m.systemPrompt,
+    "```",
+  ].join("\n");
+}
+
 export function makeSlashHandlers(deps: SlashHandlerDeps): {
   listHandler: SlashCommandHandler;
   showHandler: SlashCommandHandler;
@@ -37,8 +65,21 @@ export function makeSlashHandlers(deps: SlashHandlerDeps): {
   };
 
   const showHandler: SlashCommandHandler = async (cmdCtx) => {
-    // Implemented in Task 2.
-    await cmdCtx.print("Usage: /agents:show <name>");
+    try {
+      const name = cmdCtx.args.trim();
+      if (name === "") {
+        await cmdCtx.print("Usage: /agents:show <name>");
+        return;
+      }
+      const internal = deps.registry.getInternal(name);
+      if (!internal) {
+        await cmdCtx.print(`Unknown agent: ${name}. Run /agents:list to see registered agents.`);
+        return;
+      }
+      await cmdCtx.print(renderShow(internal));
+    } catch (err) {
+      await cmdCtx.print(`Error: ${(err as Error).message}`);
+    }
   };
 
   return { listHandler, showHandler };

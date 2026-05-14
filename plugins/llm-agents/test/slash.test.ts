@@ -71,3 +71,99 @@ describe("listHandler", () => {
     expect(ctx.printed[0]).toBe("- **`a`** [user] — A.");
   });
 });
+
+describe("showHandler", () => {
+  it("prints usage when args are empty/whitespace", async () => {
+    const { showHandler } = makeSlashHandlers({ registry: fakeRegistry([]) });
+    const ctx = fakeCmdCtx("   ");
+    await showHandler(ctx);
+    expect(ctx.printed).toEqual(["Usage: /agents:show <name>"]);
+  });
+
+  it("prints unknown-agent message when name is not in registry", async () => {
+    const reg = fakeRegistry([mkManifest({ name: "a" })]);
+    const { showHandler } = makeSlashHandlers({ registry: reg });
+    const ctx = fakeCmdCtx("does-not-exist");
+    await showHandler(ctx);
+    expect(ctx.printed).toEqual([
+      "Unknown agent: does-not-exist. Run /agents:list to see registered agents.",
+    ]);
+  });
+
+  it("renders a file-loaded agent with full system prompt and tool filter (tags + names)", async () => {
+    const reg = fakeRegistry([
+      mkManifest({
+        name: "code-reviewer",
+        description: "Reviews diffs.",
+        systemPrompt: "You are a focused code reviewer.\nFollow the rules.",
+        toolFilter: { tags: ["read-only"], names: ["read_file", "grep*"] },
+        scope: "user",
+        sourcePath: "/home/u/.kaizen/agents/code-reviewer.md",
+      }),
+    ]);
+    const { showHandler } = makeSlashHandlers({ registry: reg });
+    const ctx = fakeCmdCtx("code-reviewer");
+    await showHandler(ctx);
+    expect(ctx.printed).toHaveLength(1);
+    expect(ctx.printed[0]).toBe(
+      "**Agent**: code-reviewer\n" +
+      "**Scope**: user\n" +
+      "**Source**: /home/u/.kaizen/agents/code-reviewer.md\n" +
+      "\n" +
+      "**Description**: Reviews diffs.\n" +
+      "\n" +
+      "**Tool filter**:\n" +
+      "- Tags: read-only\n" +
+      "- Names: read_file, grep*\n" +
+      "\n" +
+      "**System prompt**:\n" +
+      "```\n" +
+      "You are a focused code reviewer.\nFollow the rules.\n" +
+      "```",
+    );
+  });
+
+  it("renders a runtime agent with sourcePath '<runtime>' and 'none' tool filter", async () => {
+    const reg = fakeRegistry([
+      mkManifest({
+        name: "runtime:router:main",
+        description: "Routes.",
+        systemPrompt: "Router.",
+        sourcePath: "<runtime>",
+        toolFilter: undefined,
+      }),
+    ]);
+    const { showHandler } = makeSlashHandlers({ registry: reg });
+    const ctx = fakeCmdCtx("runtime:router:main");
+    await showHandler(ctx);
+    expect(ctx.printed[0]).toContain("**Scope**: runtime");
+    expect(ctx.printed[0]).toContain("**Source**: <runtime>");
+    expect(ctx.printed[0]).toContain(
+      "Tool filter: none (agent inherits parent's tool view, plus always-on dispatch_agent / load_skill).",
+    );
+    expect(ctx.printed[0]).not.toContain("- Tags:");
+    expect(ctx.printed[0]).not.toContain("- Names:");
+  });
+
+  it("omits Names: sub-bullet when toolFilter has only tags", async () => {
+    const reg = fakeRegistry([
+      mkManifest({ name: "a", toolFilter: { tags: ["read-only"] } }),
+    ]);
+    const { showHandler } = makeSlashHandlers({ registry: reg });
+    const ctx = fakeCmdCtx("a");
+    await showHandler(ctx);
+    expect(ctx.printed[0]).toContain("- Tags: read-only");
+    expect(ctx.printed[0]).not.toContain("- Names:");
+  });
+
+  it("omits Tags: sub-bullet when toolFilter has only names", async () => {
+    const reg = fakeRegistry([
+      mkManifest({ name: "a", toolFilter: { names: ["read_*"] } }),
+    ]);
+    const { showHandler } = makeSlashHandlers({ registry: reg });
+    const ctx = fakeCmdCtx("a");
+    await showHandler(ctx);
+    expect(ctx.printed[0]).toContain("- Names: read_*");
+    expect(ctx.printed[0]).not.toContain("- Tags:");
+  });
+});
