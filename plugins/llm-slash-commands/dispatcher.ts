@@ -30,7 +30,7 @@ export function makeOnInputSubmit(deps: DispatcherDeps): (payload: { text: strin
         const payload: { message: { role: "system"; content: string }; markdown?: boolean } = {
           message: { role: "system", content: text },
         };
-        if (opts?.markdown) payload.markdown = true;
+        if (opts?.markdown !== undefined) payload.markdown = opts.markdown;
         await deps.bus.emit("conversation:system-message", payload);
       };
       const ctx: SlashCommandContext = {

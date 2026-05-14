@@ -125,4 +125,18 @@ describe("makeOnInputSubmit", () => {
     expect(sys.payload.markdown).toBe(true);
     expect(sys.payload.message.content).toBe("# hi");
   });
+
+  it("ctx.print with { markdown: false } emits conversation:system-message with markdown: false", async () => {
+    const reg = createRegistry();
+    reg.register({ name: "test:nomd", description: "d", source: "plugin" }, async (ctx) => {
+      await ctx.print("plain", { markdown: false });
+    });
+    const bus = makeBus();
+    const fn = makeOnInputSubmit({ registry: reg, bus });
+    await fn({ text: "/test:nomd" });
+    const sys = bus.emitted.find((e) => e.event === "conversation:system-message") as any;
+    expect(sys).toBeDefined();
+    expect(sys.payload.markdown).toBe(false);
+    expect(sys.payload.message.content).toBe("plain");
+  });
 });
