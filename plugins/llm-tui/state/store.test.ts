@@ -379,3 +379,34 @@ describe("TuiStore", () => {
     });
   });
 });
+
+describe("TuiStore.latestOutputText", () => {
+  it("returns null on empty transcript", () => {
+    const s = new TuiStore();
+    expect(s.latestOutputText()).toBeNull();
+  });
+
+  it("returns null when transcript has only non-output kinds", () => {
+    const s = new TuiStore();
+    s.appendNotice("hello");
+    s.appendUser("hi");
+    expect(s.latestOutputText()).toBeNull();
+  });
+
+  it("returns the text of the only output entry", () => {
+    const s = new TuiStore();
+    s.appendNotice("ignored");
+    s.appendOutput("the answer");
+    expect(s.latestOutputText()).toBe("the answer");
+  });
+
+  it("returns the most recent output across mixed kinds", () => {
+    const s = new TuiStore();
+    s.appendOutput("first");
+    s.appendNotice("note");
+    s.appendUser("question");
+    s.appendOutput("second");
+    s.appendNotice("done");
+    expect(s.latestOutputText()).toBe("second");
+  });
+});

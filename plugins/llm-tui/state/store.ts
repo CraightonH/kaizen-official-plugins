@@ -105,6 +105,19 @@ export class TuiStore {
 
   snapshot(): TuiSnapshot { return this._snapshot; }
 
+  /**
+   * Return the text of the most recent `kind: "output"` transcript entry,
+   * or null if no output has been written yet. Used by the Ctrl+X copy
+   * shortcut to pluck the latest assistant message.
+   */
+  latestOutputText(): string | null {
+    for (let i = this._transcript.length - 1; i >= 0; i--) {
+      const e = this._transcript[i];
+      if (e?.kind === "output") return e.text;
+    }
+    return null;
+  }
+
   appendOutput(text: string): void {
     this._transcript = [...this._transcript, { id: ++this._seq, kind: "output", text }];
     this._emit();
