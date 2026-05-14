@@ -8,6 +8,12 @@ export interface PlainTranscriptLine {
   text: string;
   /** Set on `kind: "user"` lines that were seeded by a session:handoff. */
   handoffFrom?: string;
+  /**
+   * Whether to render the text through renderMarkdown in the UI.
+   * Undefined means "use the kind's default" (output → true, notice/user → false).
+   * Thoughts ignore this field — they are governed by theme.thoughtsMarkdown.
+   */
+  markdown?: boolean;
 }
 
 export interface ToolCallEntry {
@@ -118,23 +124,24 @@ export class TuiStore {
     return null;
   }
 
-  appendOutput(text: string): void {
-    this._transcript = [...this._transcript, { id: ++this._seq, kind: "output", text }];
+  appendOutput(text: string, opts?: { markdown?: boolean }): void {
+    const entry: PlainTranscriptLine = { id: ++this._seq, kind: "output", text };
+    if (opts?.markdown !== undefined) entry.markdown = opts.markdown;
+    this._transcript = [...this._transcript, entry];
     this._emit();
   }
 
-  appendNotice(text: string): void {
-    this._transcript = [...this._transcript, { id: ++this._seq, kind: "notice", text }];
+  appendNotice(text: string, opts?: { markdown?: boolean }): void {
+    const entry: PlainTranscriptLine = { id: ++this._seq, kind: "notice", text };
+    if (opts?.markdown !== undefined) entry.markdown = opts.markdown;
+    this._transcript = [...this._transcript, entry];
     this._emit();
   }
 
-  appendUser(text: string, opts?: { handoffFrom?: string }): void {
-    const entry: PlainTranscriptLine = {
-      id: ++this._seq,
-      kind: "user",
-      text,
-      ...(opts?.handoffFrom ? { handoffFrom: opts.handoffFrom } : {}),
-    };
+  appendUser(text: string, opts?: { handoffFrom?: string; markdown?: boolean }): void {
+    const entry: PlainTranscriptLine = { id: ++this._seq, kind: "user", text };
+    if (opts?.handoffFrom) entry.handoffFrom = opts.handoffFrom;
+    if (opts?.markdown !== undefined) entry.markdown = opts.markdown;
     this._transcript = [...this._transcript, entry];
     this._emit();
   }

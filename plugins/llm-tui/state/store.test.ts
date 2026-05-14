@@ -344,6 +344,54 @@ describe("TuiStore", () => {
     });
   });
 
+  it("appendOutput defaults to no markdown flag on the entry", () => {
+    const s = new TuiStore();
+    s.appendOutput("hello");
+    const e = s.snapshot().transcript[0]! as any;
+    expect(e.markdown).toBeUndefined();
+  });
+
+  it("appendOutput records markdown: false when explicitly opted out", () => {
+    const s = new TuiStore();
+    s.appendOutput("raw", { markdown: false });
+    const e = s.snapshot().transcript[0]! as any;
+    expect(e.markdown).toBe(false);
+  });
+
+  it("appendNotice records markdown: true when opted in", () => {
+    const s = new TuiStore();
+    s.appendNotice("# heading", { markdown: true });
+    const e = s.snapshot().transcript[0]! as any;
+    expect(e.kind).toBe("notice");
+    expect(e.markdown).toBe(true);
+  });
+
+  it("appendNotice without opts leaves markdown undefined", () => {
+    const s = new TuiStore();
+    s.appendNotice("plain");
+    const e = s.snapshot().transcript[0]! as any;
+    expect(e.markdown).toBeUndefined();
+  });
+
+  it("appendUser records markdown: true when opted in (handoffFrom unaffected)", () => {
+    const s = new TuiStore();
+    s.appendUser("**hi**", { markdown: true, handoffFrom: "abc" });
+    const e = s.snapshot().transcript[0]! as any;
+    expect(e.kind).toBe("user");
+    expect(e.markdown).toBe(true);
+    expect(e.handoffFrom).toBe("abc");
+  });
+
+  it("two consecutive writes with different flags produce two distinct entries", () => {
+    const s = new TuiStore();
+    s.appendNotice("plain");
+    s.appendNotice("# md", { markdown: true });
+    const t = s.snapshot().transcript as any[];
+    expect(t).toHaveLength(2);
+    expect(t[0].markdown).toBeUndefined();
+    expect(t[1].markdown).toBe(true);
+  });
+
   describe("paste registry", () => {
     it("registerPaste returns id+placeholder, with line count baked in", () => {
       const s = new TuiStore();
