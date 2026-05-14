@@ -119,7 +119,7 @@ describe("llm-tui plugin", () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
     const hint = ctx.emitted.find(
-      (e) => e.event === "status:item-update" && (e.payload as any)?.key === "tui:hint:copy",
+      (e) => e.event === "status:item-update" && (e.payload as any)?.key === "_tui:hint:copy",
     );
     expect(hint).toBeDefined();
     expect((hint!.payload as any).value).toContain("⌃X");

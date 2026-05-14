@@ -181,7 +181,7 @@ const plugin: KaizenPlugin = {
     // The handler one block up writes it into the store, which the StatusBar
     // renders. Never cleared — the hint is a fixed bottom-bar entry.
     await ctx.emit("status:item-update", {
-      key: "tui:hint:copy",
+      key: "_tui:hint:copy",
       value: "⌃X copy last",
     });
 
