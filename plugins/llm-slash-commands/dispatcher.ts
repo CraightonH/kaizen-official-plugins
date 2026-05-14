@@ -26,10 +26,12 @@ export function makeOnInputSubmit(deps: DispatcherDeps): (payload: { text: strin
         if (event === "input:submit") throw new ReentrantSlashEmitError(event);
         await deps.bus.emit(event, p);
       };
-      const print = async (text: string) => {
-        await deps.bus.emit("conversation:system-message", {
+      const print = async (text: string, opts?: { markdown?: boolean }) => {
+        const payload: { message: { role: "system"; content: string }; markdown?: boolean } = {
           message: { role: "system", content: text },
-        });
+        };
+        if (opts?.markdown) payload.markdown = true;
+        await deps.bus.emit("conversation:system-message", payload);
       };
       const ctx: SlashCommandContext = {
         args: parsed.args,

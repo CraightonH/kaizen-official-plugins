@@ -19,6 +19,7 @@ export type {
   SlashRegistryService,
   SlashCommandContext,
   SlashCommandHandler,
+  SlashPrintOptions,
   SlashCommandManifest,
   SlashRegistryEntry,
   RegistryEntry,

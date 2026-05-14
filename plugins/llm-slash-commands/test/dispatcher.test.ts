@@ -97,4 +97,32 @@ describe("makeOnInputSubmit", () => {
     expect(sys.payload.message.role).toBe("system");
     expect(sys.payload.message.content).toBe("hello world");
   });
+
+  it("ctx.print without opts emits conversation:system-message without a markdown flag", async () => {
+    const reg = createRegistry();
+    reg.register({ name: "test:plain", description: "d", source: "plugin" }, async (ctx) => {
+      await ctx.print("hello");
+    });
+    const bus = makeBus();
+    const fn = makeOnInputSubmit({ registry: reg, bus });
+    await fn({ text: "/test:plain" });
+    const sys = bus.emitted.find((e) => e.event === "conversation:system-message") as any;
+    expect(sys).toBeDefined();
+    expect(sys.payload.markdown).toBeUndefined();
+    expect(sys.payload.message.content).toBe("hello");
+  });
+
+  it("ctx.print with { markdown: true } emits conversation:system-message with markdown: true", async () => {
+    const reg = createRegistry();
+    reg.register({ name: "test:md", description: "d", source: "plugin" }, async (ctx) => {
+      await ctx.print("# hi", { markdown: true });
+    });
+    const bus = makeBus();
+    const fn = makeOnInputSubmit({ registry: reg, bus });
+    await fn({ text: "/test:md" });
+    const sys = bus.emitted.find((e) => e.event === "conversation:system-message") as any;
+    expect(sys).toBeDefined();
+    expect(sys.payload.markdown).toBe(true);
+    expect(sys.payload.message.content).toBe("# hi");
+  });
 });
