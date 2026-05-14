@@ -109,4 +109,44 @@ describe("HistoryView", () => {
     expect(lastFrame() ?? "").toContain("read_file");
     expect(lastFrame() ?? "").toContain("🔧");
   });
+
+  it("renders expanded thoughts through markdown when theme.thoughtsMarkdown is true (no dim on body)", async () => {
+    const s = new TuiStore();
+    s.appendReasoning("**bold thought**");
+    s.finalizeReasoning();
+    s.enterHistoryMode();
+    s.historySetAllExpanded(true);
+    const theme = { ...DEFAULT_THEME, thoughtsMarkdown: true };
+    const { lastFrame } = render(<HistoryView store={s} theme={theme} />);
+    const frame = lastFrame() ?? "";
+    expect(frame.includes("**bold thought**")).toBe(false);
+    expect(frame.includes("bold thought")).toBe(true);
+  });
+
+  it("renders expanded thoughts as plain per-line dim text when theme.thoughtsMarkdown is false", async () => {
+    const s = new TuiStore();
+    s.appendReasoning("**not rendered**");
+    s.finalizeReasoning();
+    s.enterHistoryMode();
+    s.historySetAllExpanded(true);
+    const theme = { ...DEFAULT_THEME, thoughtsMarkdown: false };
+    const { lastFrame } = render(<HistoryView store={s} theme={theme} />);
+    expect((lastFrame() ?? "").includes("**not rendered**")).toBe(true);
+  });
+
+  it("memoizes rendered markdown per entry id (renderMarkdown not re-run on collapse/expand)", async () => {
+    const s = new TuiStore();
+    s.appendReasoning("**stable**");
+    s.finalizeReasoning();
+    s.enterHistoryMode();
+    s.historySetAllExpanded(true);
+    const theme = { ...DEFAULT_THEME, thoughtsMarkdown: true };
+    const { lastFrame, rerender } = render(<HistoryView store={s} theme={theme} />);
+    const first = lastFrame() ?? "";
+    s.historySetAllExpanded(false);
+    rerender(<HistoryView store={s} theme={theme} />);
+    s.historySetAllExpanded(true);
+    rerender(<HistoryView store={s} theme={theme} />);
+    expect(lastFrame()).toBe(first);
+  });
 });

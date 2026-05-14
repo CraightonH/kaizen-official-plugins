@@ -2,6 +2,7 @@ import React, { useSyncExternalStore } from "react";
 import { Box, Text, useInput } from "ink";
 import type { PlainTranscriptLine, ToolCallEntry, TuiStore, TranscriptLine } from "../state/store.ts";
 import type { TuiTheme } from "../theme/loader.ts";
+import { renderMarkdown } from "./markdown.ts";
 
 export interface HistoryViewProps {
   store: TuiStore;
@@ -13,6 +14,19 @@ type HistoryEntry = ThoughtsEntry | ToolCallEntry;
 
 function isHistoryEntry(entry: TranscriptLine): entry is HistoryEntry {
   return entry.kind === "thoughts" || entry.kind === "tool_call";
+}
+
+// Memo keyed by transcript entry id. Entries are immutable once committed
+// (see TuiStore snapshot identity invariant), so a per-id cache never needs
+// invalidation. Survives expand/collapse cycles within the session.
+const renderedThoughtsCache = new Map<number, string>();
+
+function getRenderedThoughts(id: number, text: string): string {
+  const cached = renderedThoughtsCache.get(id);
+  if (cached !== undefined) return cached;
+  const out = renderMarkdown(text);
+  renderedThoughtsCache.set(id, out);
+  return out;
 }
 
 /**
@@ -62,13 +76,17 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ store, theme }) => {
           const focusMarker = isFocused ? "▎ " : "  ";
           if (e.kind === "thoughts") {
             const lineCount = e.text.split("\n").filter((l) => l.length > 0).length || 1;
+            const renderMd = theme.thoughtsMarkdown;
             return (
               <Box key={e.id} flexDirection="column" borderStyle={isFocused ? "double" : "round"}
                    borderColor={isFocused ? theme.promptColor : theme.noticeColor} paddingX={1}>
                 <Text color={isFocused ? theme.promptColor : theme.noticeColor} dimColor={!isFocused}>
                   {`${focusMarker}${caret} 💭 Thoughts ${i + 1} (${lineCount} line${lineCount === 1 ? "" : "s"})`}
                 </Text>
-                {isOpen && (
+                {isOpen && renderMd && (
+                  <Text color={theme.noticeColor}>{getRenderedThoughts(e.id, e.text)}</Text>
+                )}
+                {isOpen && !renderMd && (
                   <Box flexDirection="column">
                     {e.text.split("\n").map((l, j) => (
                       <Text key={j} color={theme.noticeColor} dimColor>{l.length === 0 ? " " : l}</Text>
