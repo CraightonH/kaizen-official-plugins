@@ -69,3 +69,91 @@ describe("parseAgentFile", () => {
     expect(r.manifest.modelOverride).toBeUndefined();
   });
 });
+
+describe("disallowedTools / disallowedTags", () => {
+  it("parses disallowedTools into toolFilter.excludeNames", () => {
+    const text = `---
+name: a
+description: An agent.
+disallowedTools: ["edit_file", "write_file"]
+---
+body`;
+    const r = parseAgentFile(text, "/x/a.md");
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("unreachable");
+    expect(r.manifest.toolFilter?.excludeNames).toEqual(["edit_file", "write_file"]);
+  });
+
+  it("parses disallowedTags into toolFilter.excludeTags", () => {
+    const text = `---
+name: a
+description: An agent.
+disallowedTags: ["destructive", "network"]
+---
+body`;
+    const r = parseAgentFile(text, "/x/a.md");
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("unreachable");
+    expect(r.manifest.toolFilter?.excludeTags).toEqual(["destructive", "network"]);
+  });
+
+  it("merges all four filter halves when present", () => {
+    const text = `---
+name: a
+description: An agent.
+tools: ["read_file"]
+tags: ["read-only"]
+disallowedTools: ["edit_file"]
+disallowedTags: ["destructive"]
+---
+body`;
+    const r = parseAgentFile(text, "/x/a.md");
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("unreachable");
+    expect(r.manifest.toolFilter).toEqual({
+      names: ["read_file"],
+      tags: ["read-only"],
+      excludeNames: ["edit_file"],
+      excludeTags: ["destructive"],
+    });
+  });
+
+  it("rejects malformed disallowedTools (non-array)", () => {
+    const text = `---
+name: a
+description: An agent.
+disallowedTools: "edit_file"
+---
+body`;
+    const r = parseAgentFile(text, "/x/a.md");
+    expect(r.ok).toBe(false);
+    if (r.ok) throw new Error("unreachable");
+    expect(r.error).toBe("/x/a.md: 'disallowedTools' must be an array of strings");
+  });
+
+  it("rejects malformed disallowedTags (non-string element)", () => {
+    const text = `---
+name: a
+description: An agent.
+disallowedTags: ["ok", 42]
+---
+body`;
+    const r = parseAgentFile(text, "/x/a.md");
+    expect(r.ok).toBe(false);
+    if (r.ok) throw new Error("unreachable");
+    expect(r.error).toMatch(/disallowedTags|array items must be strings/);
+  });
+
+  it("treats absent disallowed fields as no denylist (no excludeNames/excludeTags in toolFilter)", () => {
+    const text = `---
+name: a
+description: An agent.
+tools: ["read_file"]
+---
+body`;
+    const r = parseAgentFile(text, "/x/a.md");
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("unreachable");
+    expect(r.manifest.toolFilter).toEqual({ names: ["read_file"], tags: undefined });
+  });
+});

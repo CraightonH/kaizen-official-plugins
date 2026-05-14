@@ -44,19 +44,32 @@ export function parseAgentFile(text: string, sourcePath: string): ParseResult {
 
   const toolNames = fields.tools;
   const tags = fields.tags;
+  const disallowedTools = fields.disallowedTools;
+  const disallowedTags = fields.disallowedTags;
   if (toolNames !== undefined && !isStringArray(toolNames)) {
     return { ok: false, error: `${sourcePath}: 'tools' must be an array of strings` };
   }
   if (tags !== undefined && !isStringArray(tags)) {
     return { ok: false, error: `${sourcePath}: 'tags' must be an array of strings` };
   }
+  if (disallowedTools !== undefined && !isStringArray(disallowedTools)) {
+    return { ok: false, error: `${sourcePath}: 'disallowedTools' must be an array of strings` };
+  }
+  if (disallowedTags !== undefined && !isStringArray(disallowedTags)) {
+    return { ok: false, error: `${sourcePath}: 'disallowedTags' must be an array of strings` };
+  }
   const modelOverride = fields.model;
   if (modelOverride !== undefined && typeof modelOverride !== "string") {
     return { ok: false, error: `${sourcePath}: 'model' must be a string` };
   }
 
-  const toolFilter = (toolNames || tags)
-    ? { names: toolNames as string[] | undefined, tags: tags as string[] | undefined }
+  const toolFilter = (toolNames !== undefined || tags !== undefined || disallowedTools !== undefined || disallowedTags !== undefined)
+    ? {
+        names: toolNames as string[] | undefined,
+        tags: tags as string[] | undefined,
+        excludeNames: disallowedTools as string[] | undefined,
+        excludeTags: disallowedTags as string[] | undefined,
+      }
     : undefined;
 
   return {
