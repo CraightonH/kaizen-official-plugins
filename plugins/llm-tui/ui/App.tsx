@@ -1,5 +1,6 @@
 import React, { useSyncExternalStore } from "react";
 import { Box, Static, Text, useInput } from "ink";
+import type { CopyResult } from "../clipboard.ts";
 import type { TuiStore, TranscriptLine } from "../state/store.ts";
 import type { CompletionRegistry } from "../completion/registry.ts";
 import type { TuiTheme } from "../theme/loader.ts";
@@ -23,9 +24,10 @@ export interface AppProps {
   onSubmit: (text: string) => void;
   onCancel?: () => void;
   onExit?: () => void;
+  copyToClipboard?: (text: string) => Promise<CopyResult>;
 }
 
-export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, triggers, theme, onSubmit, onCancel, onExit }) => {
+export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, triggers, theme, onSubmit, onCancel, onExit, copyToClipboard }) => {
   const snap = useSyncExternalStore(
     (cb) => store.subscribe(cb),
     () => store.snapshot(),
@@ -117,6 +119,7 @@ export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, trigge
             onSubmit={onSubmit}
             onCancel={onCancel}
             onExit={onExit}
+            copyToClipboard={copyToClipboard}
           />
           <StatusBar items={snap.status} color={theme.statusBarColor} />
         </>
