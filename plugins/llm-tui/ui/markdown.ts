@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import Table from "cli-table3";
 import { marked } from "marked";
 import { markedTerminal } from "marked-terminal";
 
@@ -17,6 +18,32 @@ const origCode = mtExt.renderer.code;
 mtExt.renderer.code = function (...args: unknown[]) {
   const out = origCode.apply(this, args);
   return typeof out === "string" ? out.replace(/^ {4}/gm, GUTTER + "  ") : out;
+};
+
+// marked-terminal's default table renderer hands a cli-table3 instance no
+// colWidths, so long cells overflow the terminal and the box-drawing border
+// wraps onto a new line — visually clobbering the table. We override it to
+// compute even per-column widths from the current terminal width and let
+// cli-table3 wrap inside each cell.
+mtExt.renderer.table = function (token: any) {
+  const parser = (this as any).parser;
+  const renderInline = (cell: any) =>
+    parser ? parser.parseInline(cell.tokens) : String(cell?.text ?? cell);
+
+  const header = (token.header ?? []).map(renderInline);
+  const rows = (token.rows ?? []).map((row: any[]) => row.map(renderInline));
+  const colCount = Math.max(header.length, 1);
+  const termCols = (process.stdout && process.stdout.columns) || 80;
+  // cli-table3 borders: 1 char per column boundary + 2 outer + 1 padding/side.
+  // Total fixed overhead ≈ 3 * colCount + 1. Leave a small right margin (2).
+  const overhead = 3 * colCount + 3;
+  const avail = Math.max(colCount * 6, termCols - overhead);
+  const perCol = Math.max(6, Math.floor(avail / colCount));
+  const colWidths = Array(colCount).fill(perCol);
+
+  const t = new Table({ head: header, colWidths, wordWrap: true, wrapOnWordBoundary: true });
+  for (const row of rows) t.push(row);
+  return "\n" + t.toString() + "\n\n";
 };
 
 marked.use(mtExt);
