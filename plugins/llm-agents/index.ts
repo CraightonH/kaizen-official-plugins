@@ -110,17 +110,15 @@ const plugin: KaizenPlugin = {
     // Slash commands for user-facing registry visibility (topo-hint optional).
     try {
       const slash = ctx.useService<SlashRegistryService>("slash:registry");
-      if (slash) {
-        const { listHandler, showHandler } = makeSlashHandlers({ registry: handle });
-        slashOffs.push(slash.register(
-          { name: "agents:list", description: "List registered agents.", source: "plugin" },
-          listHandler,
-        ));
-        slashOffs.push(slash.register(
-          { name: "agents:show", description: "Show full detail for one agent.", usage: "<name>", source: "plugin" },
-          showHandler,
-        ));
-      }
+      const { listHandler, showHandler } = makeSlashHandlers({ registry: handle });
+      slashOffs.push(slash.register(
+        { name: "agents:list", description: "List registered agents.", source: "plugin" },
+        listHandler,
+      ));
+      slashOffs.push(slash.register(
+        { name: "agents:show", description: "Show full detail for one agent.", usage: "<name>", source: "plugin" },
+        showHandler,
+      ));
     } catch { /* slash:registry not defined in this harness — skip */ }
 
     // Discovery in a microtask — does not block setup().
