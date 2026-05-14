@@ -21,7 +21,9 @@ export function renderMarkdown(src: string): string {
   if (chalk.level === 0) chalk.level = 1;
   try {
     const result = marked.parse(src);
-    return typeof result === "string" ? result : src;
+    // marked appends trailing newlines after block tokens; strip them so the
+    // rendered output occupies exactly the visual space its content needs.
+    return typeof result === "string" ? result.replace(/\s+$/, "") : src;
   } catch {
     return src;
   } finally {
