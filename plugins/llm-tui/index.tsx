@@ -1,7 +1,7 @@
 import React from "react";
 import { render } from "ink";
 import type { KaizenPlugin } from "kaizen/types";
-import type { UiChannelService, UiTheme, UiThemeService, UiStatusService, UiCompletionService, UiToolRendererService } from "llm-contracts/public";
+import type { UiChannelService, UiTheme, UiThemeService, UiStatusService, UiCompletionService, UiToolRendererService, WriteOptions } from "llm-contracts/public";
 import { TuiStore } from "./state/store.ts";
 import { makeCompletionRegistry } from "./completion/registry.ts";
 import { makeToolRendererRegistry } from "./tool-renderers/registry.ts";
@@ -252,9 +252,9 @@ export default plugin;
 export function createTuiChannel(store: TuiStore): UiChannelService {
   return {
     readInput: () => store.awaitInput(),
-    writeOutput: (chunk: string, opts?: { markdown?: boolean }) => store.appendOutput(chunk, opts),
-    writeNotice: (text: string, opts?: { markdown?: boolean }) => store.appendNotice(text, opts),
-    writeUser: (text: string, opts?: { markdown?: boolean }) => store.appendUser(text, opts),
+    writeOutput: (chunk: string, opts?: WriteOptions) => store.appendOutput(chunk, opts),
+    writeNotice: (text: string, opts?: WriteOptions) => store.appendNotice(text, opts),
+    writeUser: (text: string, opts?: WriteOptions) => store.appendUser(text, opts),
     setBusy: (busy: boolean, message?: string) => store.setBusy(busy, message),
     setBusyTiming: (startedAt: number) => store.setBusyTiming(startedAt),
     updateBusyTokens: (deltaTokens: number) => store.updateBusyTokens(deltaTokens),
