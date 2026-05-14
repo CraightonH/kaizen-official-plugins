@@ -76,13 +76,7 @@ export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, trigge
       // Render assistant output through marked-terminal. Ink's <Text>
       // honors embedded ANSI codes, so the styled string drops in directly.
       // Raw markdown stays in the store for the Ctrl+X copy shortcut.
-      // marginY=1 separates the response from the preceding thought block
-      // and the following spinner/timer message.
-      return (
-        <Box marginY={1}>
-          <Text color={theme.outputColor}>{renderMarkdown(e.text)}</Text>
-        </Box>
-      );
+      return <Text color={theme.outputColor}>{renderMarkdown(e.text)}</Text>;
     }
     return (
       <Text color={theme.noticeColor} dimColor>
@@ -99,7 +93,11 @@ export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, trigge
   return (
     <Box flexDirection="column">
       <Static items={snap.transcript}>
-        {(e: TranscriptLine) => <Box key={e.id}>{renderEntry(e)}</Box>}
+        {(e: TranscriptLine) => (
+          <Box key={e.id} marginBottom={1}>
+            {renderEntry(e)}
+          </Box>
+        )}
       </Static>
       {snap.viewMode === "history" ? (
         <HistoryView store={store} theme={theme} />
