@@ -132,12 +132,14 @@ const plugin: KaizenPlugin = {
       }
     });
     // Bridge system messages (slash command output, plugin notices) to the
-    // UI so /help and friends are actually visible. Uses moduleUi resolved
-    // in start() because kaizen forbids ctx.on registration past setup().
+    // UI so /help and friends are actually visible. Forwards the optional
+    // markdown flag so callers (e.g., ctx.print(text, { markdown: true }))
+    // get rendered output in the TUI.
     ctx.on("conversation:system-message", (payload: any) => {
       const text = payload?.message?.content;
       if (typeof text === "string" && text && moduleUi) {
-        moduleUi.writeNotice(text);
+        const opts = payload?.markdown === true ? { markdown: true } : undefined;
+        moduleUi.writeNotice(text, opts);
       }
     });
 

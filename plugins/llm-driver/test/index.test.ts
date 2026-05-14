@@ -222,3 +222,58 @@ describe("llm-driver index", () => {
     expect(startEv.payload.parentTurnId).toBe("turn_parent");
   });
 });
+
+describe("conversation:system-message bridge", () => {
+  // Helper: builds a ctx where readInput emits a conversation:system-message on the
+  // first call (so moduleUi is already set by start()), then returns "" to exit.
+  function makeSystemMsgCtx(payload: any) {
+    const noticeCalls: Array<{ text: string; opts: unknown }> = [];
+    let ctxRef: any;
+    let calls = 0;
+    const ui = {
+      readInput: async () => {
+        calls++;
+        if (calls === 1) {
+          // moduleUi is now set (start() assigned it before calling readInput)
+          await ctxRef.emit("conversation:system-message", payload);
+        }
+        return "";
+      },
+      setBusy: () => {},
+      setBusyTiming: () => {},
+      writeOutput: () => {},
+      writeUser: () => {},
+      writeNotice: (text: string, opts?: unknown) => { noticeCalls.push({ text, opts }); },
+    };
+    const llm = makeLlm([]);
+    const ctx = makeCtx({ ui, llm });
+    ctxRef = ctx;
+    return { ctx, noticeCalls };
+  }
+
+  it("forwards conversation:system-message markdown:true to writeNotice with { markdown: true }", async () => {
+    const { ctx, noticeCalls } = makeSystemMsgCtx({
+      message: { role: "system", content: "# md" },
+      markdown: true,
+    });
+    await plugin.setup!(ctx);
+    await plugin.start!(ctx);
+    // Filter only the notice calls from the system-message bridge (exclude done-message notice)
+    const bridgeCalls = noticeCalls.filter(c => c.text === "# md");
+    expect(bridgeCalls).toHaveLength(1);
+    expect(bridgeCalls[0]!.text).toBe("# md");
+    expect((bridgeCalls[0]!.opts as any)?.markdown).toBe(true);
+  });
+
+  it("forwards conversation:system-message without markdown as a plain writeNotice", async () => {
+    const { ctx, noticeCalls } = makeSystemMsgCtx({
+      message: { role: "system", content: "plain" },
+    });
+    await plugin.setup!(ctx);
+    await plugin.start!(ctx);
+    const bridgeCalls = noticeCalls.filter(c => c.text === "plain");
+    expect(bridgeCalls).toHaveLength(1);
+    expect(bridgeCalls[0]!.text).toBe("plain");
+    expect(bridgeCalls[0]!.opts).toBeUndefined();
+  });
+});
