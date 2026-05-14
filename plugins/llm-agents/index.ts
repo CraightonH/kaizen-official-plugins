@@ -4,6 +4,8 @@ import type { ToolsRegistryService } from "llm-tools-registry/public";
 import type { DriverService } from "llm-contracts/public";
 import type { SessionsStoreService } from "llm-contracts/public";
 import type { SystemPromptService } from "llm-contracts/public";
+import type { SlashRegistryService } from "llm-contracts/public";
+import { makeSlashHandlers } from "./slash.ts";
 import { loadConfig, realDeps } from "./config.ts";
 import { loadFromDirs } from "./loader.ts";
 import { makeRegistry, makeRegistryHandle } from "./registry.ts";
@@ -15,6 +17,7 @@ import { readdir, stat as fsStat, realpath as fsRealpath, readFile as fsReadFile
 // Module-scope handles for idempotent stop() cleanup. Reset every setup().
 let sectionHandle: { bumpGeneration(): void; unregister(): void } | undefined;
 let toolUnregister: (() => void) | undefined;
+let slashOffs: Array<() => void> = [];
 
 const plugin: KaizenPlugin = {
   name: "llm-agents",
@@ -35,6 +38,7 @@ const plugin: KaizenPlugin = {
       "sessions:store",
       "prompt:registry",
       "skills:registry",
+      "slash:registry",
     ],
   },
 
@@ -103,6 +107,22 @@ const plugin: KaizenPlugin = {
       void ctx.emit("harness:error", { message: "llm-agents: missing optional service prompt:registry; available-agents section disabled" });
     }
 
+    // Slash commands for user-facing registry visibility (topo-hint optional).
+    try {
+      const slash = ctx.useService<SlashRegistryService>("slash:registry");
+      if (slash) {
+        const { listHandler, showHandler } = makeSlashHandlers({ registry: handle });
+        slashOffs.push(slash.register(
+          { name: "agents:list", description: "List registered agents.", source: "plugin" },
+          listHandler,
+        ));
+        slashOffs.push(slash.register(
+          { name: "agents:show", description: "Show full detail for one agent.", usage: "<name>", source: "plugin" },
+          showHandler,
+        ));
+      }
+    } catch { /* slash:registry not defined in this harness — skip */ }
+
     // Discovery in a microtask — does not block setup().
     queueMicrotask(async () => {
       try {
@@ -135,6 +155,8 @@ const plugin: KaizenPlugin = {
     toolUnregister = undefined;
     try { sectionHandle?.unregister(); } catch { /* ignore */ }
     sectionHandle = undefined;
+    for (const off of slashOffs) { try { off(); } catch { /* ignore */ } }
+    slashOffs = [];
   },
 };
 
