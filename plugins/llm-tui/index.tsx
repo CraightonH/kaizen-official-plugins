@@ -8,6 +8,7 @@ import { makeToolRendererRegistry } from "./tool-renderers/registry.ts";
 import { defaultRenderers } from "./tool-renderers/defaults.tsx";
 import { loadTheme, realThemeDeps } from "./theme/loader.ts";
 import { App } from "./ui/App.tsx";
+import { copyToClipboard } from "./clipboard.ts";
 import { createFallbackChannel } from "./fallback.ts";
 
 const plugin: KaizenPlugin = {
@@ -176,6 +177,14 @@ const plugin: KaizenPlugin = {
       store.clearStatus(payload.key);
     });
 
+    // Advertise the copy keybind via the existing status:item-update event.
+    // The handler one block up writes it into the store, which the StatusBar
+    // renders. Never cleared — the hint is a fixed bottom-bar entry.
+    await ctx.emit("status:item-update", {
+      key: "tui:hint:copy",
+      value: "⌃X copy last",
+    });
+
     const isTTY = !!(process.stdout.isTTY && process.stdin.isTTY);
 
     if (!isTTY) {
@@ -218,6 +227,7 @@ const plugin: KaizenPlugin = {
         onSubmit={onSubmit}
         onCancel={onCancel}
         onExit={onExit}
+        copyToClipboard={copyToClipboard}
       />,
       { exitOnCtrlC: false },
     );

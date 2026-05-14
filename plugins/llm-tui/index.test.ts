@@ -114,4 +114,14 @@ describe("llm-tui plugin", () => {
     const t = (ctx.provided["ui:theme"] as any).current();
     expect(t.promptLabel).toBe("kaizen");
   });
+
+  it("setup emits status hint advertising Ctrl+X", async () => {
+    const ctx = makeCtx();
+    await plugin.setup(ctx);
+    const hint = ctx.emitted.find(
+      (e) => e.event === "status:item-update" && (e.payload as any)?.key === "tui:hint:copy",
+    );
+    expect(hint).toBeDefined();
+    expect((hint!.payload as any).value).toContain("⌃X");
+  });
 });
