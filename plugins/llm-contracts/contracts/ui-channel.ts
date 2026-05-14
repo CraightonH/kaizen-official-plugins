@@ -1,15 +1,29 @@
 export const CONTRACT_ID = "ui:channel";
 export const DESCRIPTION = "Pull-style chat I/O channel between driver and UI.";
 
+export interface WriteOptions {
+  /**
+   * Render `text` as markdown before display.
+   * Default depends on the method:
+   *   writeOutput → true  (back-compat with current always-on rendering)
+   *   writeNotice → false
+   *   writeUser   → false
+   * When false, text is rendered verbatim. When true, text is run through
+   * the TUI's markdown renderer (marked + marked-terminal) which emits ANSI
+   * suitable for Ink <Text> or stdout.
+   */
+  markdown?: boolean;
+}
+
 export interface UiChannelService {
-  writeOutput(chunk: string): void;
-  writeNotice(text: string): void;
+  writeOutput(chunk: string, opts?: WriteOptions): void;
+  writeNotice(text: string, opts?: WriteOptions): void;
   /**
    * Append a user-authored message to the transcript. Rendered with the
    * prompt accent (magenta `❯` gutter + subtle background highlight) so
    * it visually anchors the start of a turn against the assistant reply.
    */
-  writeUser(text: string): void;
+  writeUser(text: string, opts?: WriteOptions): void;
   setBusy(state: boolean, message?: string): void;
   /** Set the start time for the current busy period (called on turn:start). */
   setBusyTiming(startedAt: number): void;

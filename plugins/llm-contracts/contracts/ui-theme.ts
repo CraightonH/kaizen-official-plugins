@@ -8,6 +8,12 @@ export interface UiTheme {
   noticeColor: string;
   busyColor: string;
   statusBarColor: string;
+  /**
+   * Render expanded thoughts in HistoryView through the markdown renderer.
+   * The live ThinkingBox is always plain regardless of this flag.
+   * Default: true.
+   */
+  thoughtsMarkdown: boolean;
 }
 
 export interface UiThemeService {
