@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react";
 import type { TuiStore } from "../state/store.ts";
 import type { CompletionRegistry } from "../completion/registry.ts";
 import type { TuiTheme } from "../theme/loader.ts";
+import type { CopyResult } from "../clipboard.ts";
 import { CompletionPopup } from "./CompletionPopup.tsx";
 
 export interface InputBoxProps {
@@ -14,6 +15,8 @@ export interface InputBoxProps {
   onSubmit: (text: string) => void;
   onCancel?: () => void;
   onExit?: () => void;
+  /** Injected clipboard function; defaults to a no-op stub in non-TTY tests. */
+  copyToClipboard?: (text: string) => Promise<CopyResult>;
 }
 
 // Window during which a second Ctrl+C exits. After this, the next press
@@ -109,7 +112,7 @@ function snapCursor(s: string, pos: number, direction: -1 | 1): number {
   return direction < 0 ? ph.start : ph.end;
 }
 
-export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, theme, onSubmit, onCancel, onExit }) => {
+export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, theme, onSubmit, onCancel, onExit, copyToClipboard }) => {
   const snap = useSyncExternalStore(
     (cb) => store.subscribe(cb),
     () => store.snapshot(),
@@ -236,6 +239,23 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
     if (key.meta && !key.return && (input === "f" || input === "\x1bf")) {
       store.setInput(value, nextWordPos(value, cursor)); return;
     }
+    if (key.ctrl && input === "x") {
+      const text = store.latestOutputText();
+      if (!text) {
+        store.appendNotice("nothing to copy yet");
+        return;
+      }
+      if (!copyToClipboard) {
+        store.appendNotice("copy unavailable: no clipboard binding");
+        return;
+      }
+      void copyToClipboard(text).then((r) => {
+        if (r.ok) store.appendNotice(`copied ${text.length} chars · via ${r.via}`);
+        else store.appendNotice(`copy failed: ${r.error ?? "unknown"}`);
+      });
+      return;
+    }
+
     if (key.ctrl && input === "a") {
       store.setInput(value, lineStartPos(value, cursor)); return;
     }

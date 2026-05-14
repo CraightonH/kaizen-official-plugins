@@ -551,3 +551,68 @@ describe("InputBox", () => {
     expect(lastFrame()).toContain("first");
   });
 });
+
+describe("InputBox Ctrl+X copy", () => {
+  function harness(opts?: {
+    copyToClipboard?: (text: string) => Promise<{ ok: boolean; via: string; error?: string }>;
+  }) {
+    const ctx = setup();
+    const view = render(
+      <InputBox
+        store={ctx.store}
+        registry={ctx.reg}
+        triggers={ctx.triggers}
+        theme={DEFAULT_THEME}
+        onSubmit={ctx.onSubmit}
+        copyToClipboard={opts?.copyToClipboard}
+      />,
+    );
+    return { store: ctx.store, view };
+  }
+
+  it("posts 'nothing to copy yet' when no output exists", async () => {
+    const { store, view } = harness();
+    view.stdin.write("\x18"); // Ctrl+X
+    await tick();
+    const snap = store.snapshot();
+    const notices = snap.transcript.filter((e) => e.kind === "notice");
+    expect(notices.at(-1)?.text).toContain("nothing to copy");
+    view.unmount();
+  });
+
+  it("calls injected copyToClipboard with latest output text", async () => {
+    let received: string | undefined;
+    const fakeCopy = async (text: string) => {
+      received = text;
+      return { ok: true, via: "pbcopy" as const };
+    };
+    const { store, view } = harness({ copyToClipboard: fakeCopy });
+    store.appendOutput("the answer");
+    view.stdin.write("\x18");
+    await tick();
+    expect(received).toBe("the answer");
+    const notices = store.snapshot().transcript.filter((e) => e.kind === "notice");
+    expect(notices.at(-1)?.text).toMatch(/copied .* chars/);
+    view.unmount();
+  });
+
+  it("surfaces failure as a notice", async () => {
+    const fakeCopy = async () => ({ ok: false, via: "none" as const, error: "no clipboard mechanism" });
+    const { store, view } = harness({ copyToClipboard: fakeCopy });
+    store.appendOutput("ignored");
+    view.stdin.write("\x18");
+    await tick();
+    const notices = store.snapshot().transcript.filter((e) => e.kind === "notice");
+    expect(notices.at(-1)?.text).toContain("copy failed");
+    expect(notices.at(-1)?.text).toContain("no clipboard mechanism");
+    view.unmount();
+  });
+
+  it("Ctrl+X does not fall through to typing 'x'", async () => {
+    const { store, view } = harness();
+    view.stdin.write("\x18"); // Ctrl+X
+    await tick();
+    expect(store.snapshot().input.value).toBe("");
+    view.unmount();
+  });
+});
