@@ -12,15 +12,15 @@ export type ParseResult =
 
 const NAME_RE = /^[a-z0-9_-]+$/;
 
-export function parseAgentFile(text: string, sourcePath: string): ParseResult {
+export function parseAgentFile(text: string): ParseResult {
   // Frontmatter delimiter: file MUST start with "---\n"
   if (!text.startsWith("---\n")) {
-    return { ok: false, error: `${sourcePath}: missing YAML frontmatter (file must begin with '---')` };
+    return { ok: false, error: `missing YAML frontmatter (file must begin with '---')` };
   }
   const rest = text.slice(4);
   const endIdx = rest.indexOf("\n---");
   if (endIdx === -1) {
-    return { ok: false, error: `${sourcePath}: unterminated frontmatter (no closing '---')` };
+    return { ok: false, error: `unterminated frontmatter (no closing '---')` };
   }
   const yaml = rest.slice(0, endIdx);
   // Body starts after "\n---" and the next newline.
@@ -31,15 +31,15 @@ export function parseAgentFile(text: string, sourcePath: string): ParseResult {
 
   let fields: Record<string, unknown>;
   try { fields = parseStrictYaml(yaml); }
-  catch (err) { return { ok: false, error: `${sourcePath}: ${(err as Error).message}` }; }
+  catch (err) { return { ok: false, error: (err as Error).message }; }
 
   const name = fields.name;
   if (typeof name !== "string" || !NAME_RE.test(name)) {
-    return { ok: false, error: `${sourcePath}: 'name' is required and must match [a-z0-9_-]+` };
+    return { ok: false, error: `'name' is required and must match [a-z0-9_-]+` };
   }
   const description = fields.description;
   if (typeof description !== "string" || description.trim().length === 0) {
-    return { ok: false, error: `${sourcePath}: 'description' is required and must be a non-empty string` };
+    return { ok: false, error: `'description' is required and must be a non-empty string` };
   }
 
   const toolNames = fields.tools;
@@ -47,20 +47,20 @@ export function parseAgentFile(text: string, sourcePath: string): ParseResult {
   const disallowedTools = fields.disallowedTools;
   const disallowedTags = fields.disallowedTags;
   if (toolNames !== undefined && !isStringArray(toolNames)) {
-    return { ok: false, error: `${sourcePath}: 'tools' must be an array of strings` };
+    return { ok: false, error: `'tools' must be an array of strings` };
   }
   if (tags !== undefined && !isStringArray(tags)) {
-    return { ok: false, error: `${sourcePath}: 'tags' must be an array of strings` };
+    return { ok: false, error: `'tags' must be an array of strings` };
   }
   if (disallowedTools !== undefined && !isStringArray(disallowedTools)) {
-    return { ok: false, error: `${sourcePath}: 'disallowedTools' must be an array of strings` };
+    return { ok: false, error: `'disallowedTools' must be an array of strings` };
   }
   if (disallowedTags !== undefined && !isStringArray(disallowedTags)) {
-    return { ok: false, error: `${sourcePath}: 'disallowedTags' must be an array of strings` };
+    return { ok: false, error: `'disallowedTags' must be an array of strings` };
   }
   const modelOverride = fields.model;
   if (modelOverride !== undefined && typeof modelOverride !== "string") {
-    return { ok: false, error: `${sourcePath}: 'model' must be a string` };
+    return { ok: false, error: `'model' must be a string` };
   }
 
   const toolFilter = (toolNames !== undefined || tags !== undefined || disallowedTools !== undefined || disallowedTags !== undefined)

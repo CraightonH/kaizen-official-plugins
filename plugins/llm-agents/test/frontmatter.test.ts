@@ -16,7 +16,7 @@ Be terse.
 
 describe("parseAgentFile", () => {
   it("parses a valid file", () => {
-    const r = parseAgentFile(VALID, "/x/code-reviewer.md");
+    const r = parseAgentFile(VALID);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.manifest.name).toBe("code-reviewer");
@@ -28,13 +28,13 @@ describe("parseAgentFile", () => {
   });
 
   it("rejects body-only file (no frontmatter)", () => {
-    const r = parseAgentFile("just a body\n", "/x/a.md");
+    const r = parseAgentFile("just a body\n");
     expect(r.ok).toBe(false);
   });
 
   it("rejects missing required name", () => {
     const text = `---\ndescription: "x"\n---\nbody\n`;
-    const r = parseAgentFile(text, "/x/a.md");
+    const r = parseAgentFile(text);
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.error).toMatch(/name/i);
@@ -42,19 +42,19 @@ describe("parseAgentFile", () => {
 
   it("rejects missing required description", () => {
     const text = `---\nname: a\n---\nbody\n`;
-    const r = parseAgentFile(text, "/x/a.md");
+    const r = parseAgentFile(text);
     expect(r.ok).toBe(false);
   });
 
   it("rejects malformed YAML (unclosed array)", () => {
     const text = `---\nname: a\ndescription: "d"\ntools: [\n---\nbody\n`;
-    const r = parseAgentFile(text, "/x/a.md");
+    const r = parseAgentFile(text);
     expect(r.ok).toBe(false);
   });
 
   it("rejects invalid name characters", () => {
     const text = `---\nname: "Bad Name!"\ndescription: "d"\n---\nbody\n`;
-    const r = parseAgentFile(text, "/x/a.md");
+    const r = parseAgentFile(text);
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.error).toMatch(/name/i);
@@ -62,7 +62,7 @@ describe("parseAgentFile", () => {
 
   it("ignores tools/tags/model when absent", () => {
     const text = `---\nname: a\ndescription: "d"\n---\nbody\n`;
-    const r = parseAgentFile(text, "/x/a.md");
+    const r = parseAgentFile(text);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.manifest.toolFilter).toBeUndefined();
@@ -78,7 +78,7 @@ description: An agent.
 disallowedTools: ["edit_file", "write_file"]
 ---
 body`;
-    const r = parseAgentFile(text, "/x/a.md");
+    const r = parseAgentFile(text);
     expect(r.ok).toBe(true);
     if (!r.ok) throw new Error("unreachable");
     expect(r.manifest.toolFilter?.excludeNames).toEqual(["edit_file", "write_file"]);
@@ -91,7 +91,7 @@ description: An agent.
 disallowedTags: ["destructive", "network"]
 ---
 body`;
-    const r = parseAgentFile(text, "/x/a.md");
+    const r = parseAgentFile(text);
     expect(r.ok).toBe(true);
     if (!r.ok) throw new Error("unreachable");
     expect(r.manifest.toolFilter?.excludeTags).toEqual(["destructive", "network"]);
@@ -107,7 +107,7 @@ disallowedTools: ["edit_file"]
 disallowedTags: ["destructive"]
 ---
 body`;
-    const r = parseAgentFile(text, "/x/a.md");
+    const r = parseAgentFile(text);
     expect(r.ok).toBe(true);
     if (!r.ok) throw new Error("unreachable");
     expect(r.manifest.toolFilter).toEqual({
@@ -125,10 +125,10 @@ description: An agent.
 disallowedTools: "edit_file"
 ---
 body`;
-    const r = parseAgentFile(text, "/x/a.md");
+    const r = parseAgentFile(text);
     expect(r.ok).toBe(false);
     if (r.ok) throw new Error("unreachable");
-    expect(r.error).toBe("/x/a.md: 'disallowedTools' must be an array of strings");
+    expect(r.error).toBe("'disallowedTools' must be an array of strings");
   });
 
   it("rejects malformed disallowedTags (non-string element)", () => {
@@ -138,7 +138,7 @@ description: An agent.
 disallowedTags: ["ok", 42]
 ---
 body`;
-    const r = parseAgentFile(text, "/x/a.md");
+    const r = parseAgentFile(text);
     expect(r.ok).toBe(false);
     if (r.ok) throw new Error("unreachable");
     expect(r.error).toMatch(/disallowedTags|array items must be strings/);
@@ -151,7 +151,7 @@ description: An agent.
 tools: ["read_file"]
 ---
 body`;
-    const r = parseAgentFile(text, "/x/a.md");
+    const r = parseAgentFile(text);
     expect(r.ok).toBe(true);
     if (!r.ok) throw new Error("unreachable");
     expect(r.manifest.toolFilter).toEqual({ names: ["read_file"], tags: undefined });

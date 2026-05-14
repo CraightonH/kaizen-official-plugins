@@ -107,7 +107,7 @@ async function loadOneScope(
     let text: string;
     try { text = await deps.readFile(fullPath); }
     catch (err: any) { errors.push({ path: fullPath, message: `read failed: ${err?.message ?? err}` }); continue; }
-    const parsed = parseAgentFile(text, fullPath);
+    const parsed = parseAgentFile(text);
     if (!parsed.ok) { errors.push({ path: fullPath, message: parsed.error }); continue; }
     if (seenNames.has(parsed.manifest.name)) {
       errors.push({ path: fullPath, message: `duplicate agent name '${parsed.manifest.name}' within ${scope} scope; lexicographic-first wins; this file skipped` });
