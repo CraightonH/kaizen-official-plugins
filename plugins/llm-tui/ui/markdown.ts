@@ -4,7 +4,22 @@ import { markedTerminal } from "marked-terminal";
 
 // One-time configuration. marked-terminal installs a custom renderer that
 // emits ANSI-styled strings instead of HTML.
-marked.use(markedTerminal() as any);
+const GUTTER = chalk.gray("│ ");
+
+const mtExt = markedTerminal({
+  codespan: chalk.bgAnsi256(236).yellow,
+}) as any;
+
+// Replace the 4-space indent that marked-terminal prepends to fenced code
+// blocks with a gray gutter ("│ ") + 2 spaces (same visual width). Scoped to
+// renderer.code so blockquote indents and other 4-space prefixes are untouched.
+const origCode = mtExt.renderer.code;
+mtExt.renderer.code = function (...args: unknown[]) {
+  const out = origCode.apply(this, args);
+  return typeof out === "string" ? out.replace(/^ {4}/gm, GUTTER + "  ") : out;
+};
+
+marked.use(mtExt);
 
 /**
  * Render a markdown source string as an ANSI-styled string suitable for
