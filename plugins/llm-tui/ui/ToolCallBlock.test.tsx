@@ -12,6 +12,7 @@ const theme = {
   noticeColor: "gray",
   busyColor: "yellow",
   statusBarColor: "blue",
+  thoughtsMarkdown: true,
 } as const;
 
 const entry = (patch: Partial<ToolCallEntry> = {}): ToolCallEntry => ({

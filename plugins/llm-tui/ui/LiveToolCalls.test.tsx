@@ -11,6 +11,7 @@ const theme = {
   noticeColor: "gray",
   busyColor: "yellow",
   statusBarColor: "blue",
+  thoughtsMarkdown: true,
 } as const;
 
 test("renders nothing when no live tool calls exist", () => {
