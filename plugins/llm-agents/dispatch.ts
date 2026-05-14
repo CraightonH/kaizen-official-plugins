@@ -86,10 +86,16 @@ export function makeDispatchTool(deps: DispatchDeps): { schema: ToolSchema; hand
     // Build merged tool filter: manifest names + always-on (dispatch_agent, optionally load_skill); manifest tags pass through.
     const manifestNames = internal.toolFilter?.names ?? [];
     const manifestTags = internal.toolFilter?.tags ?? [];
+    const manifestExcludeNames = internal.toolFilter?.excludeNames ?? [];
+    const manifestExcludeTags = internal.toolFilter?.excludeTags ?? [];
     const alwaysOn: string[] = ["dispatch_agent"];
     if (deps.hasSkills()) alwaysOn.push("load_skill");
     const mergedNames = Array.from(new Set([...manifestNames, ...alwaysOn]));
-    const toolFilter = { names: mergedNames, tags: manifestTags };
+    // Strip always-on tool names from the denylist — the always-on invariant
+    // says these cannot be opted out of, even by an explicit disallowedTools entry.
+    const alwaysOnSet = new Set(alwaysOn);
+    const excludeNames = manifestExcludeNames.filter((n) => !alwaysOnSet.has(n));
+    const toolFilter = { names: mergedNames, tags: manifestTags, excludeNames, excludeTags: manifestExcludeTags };
 
     const childId = args.session_id ?? `oneshot-${randomUUID().slice(0, 8)}`;
     if (!/^[A-Za-z0-9_.-]+$/.test(childId) || childId === "..") {

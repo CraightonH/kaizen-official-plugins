@@ -251,3 +251,78 @@ describe("dispatch_agent", () => {
     expect(existsCalled).toBe(false);
   });
 });
+
+describe("dispatch exclude pass-through and always-on strip", () => {
+  it("passes excludeNames and excludeTags through to the driver", async () => {
+    const driverCalls: any[] = [];
+    const fakeDriver = { runConversation: async (input: any) => { driverCalls.push(input); return { finalMessage: { role: "assistant" as const, content: "" }, usage: { promptTokens: 0, completionTokens: 0 } }; } };
+    const reg = makeRegistryHandle(makeRegistry([m("agent-with-deny")]));
+    (reg.getInternal("agent-with-deny") as any).toolFilter = {
+      names: ["read_file"],
+      excludeNames: ["edit_file"],
+      excludeTags: ["destructive"],
+    };
+    const tracker = makeTurnTracker();
+    tracker.onTurnStart({ turnId: "t-parent", trigger: "user" });
+    const dispatch = makeDispatchTool({
+      registry: reg,
+      tracker,
+      driver: fakeDriver as any,
+      sessions: makeSessions(),
+      maxDepth: 4,
+      hasSkills: () => false,
+      emit: async () => {},
+    });
+    await dispatch.handler({ agent_name: "agent-with-deny", prompt: "hi" }, makeCtx());
+    expect(driverCalls).toHaveLength(1);
+    const passedFilter = driverCalls[0].toolFilter;
+    expect(passedFilter.excludeNames).toEqual(["edit_file"]);
+    expect(passedFilter.excludeTags).toEqual(["destructive"]);
+  });
+
+  it("strips always-on tool names from excludeNames before passing to driver", async () => {
+    const driverCalls: any[] = [];
+    const fakeDriver = { runConversation: async (input: any) => { driverCalls.push(input); return { finalMessage: { role: "assistant" as const, content: "" }, usage: { promptTokens: 0, completionTokens: 0 } }; } };
+    const reg = makeRegistryHandle(makeRegistry([m("self-denying")]));
+    (reg.getInternal("self-denying") as any).toolFilter = {
+      excludeNames: ["dispatch_agent", "load_skill", "edit_file"],
+    };
+    const tracker = makeTurnTracker();
+    tracker.onTurnStart({ turnId: "t-parent", trigger: "user" });
+    const dispatch = makeDispatchTool({
+      registry: reg,
+      tracker,
+      driver: fakeDriver as any,
+      sessions: makeSessions(),
+      maxDepth: 4,
+      hasSkills: () => true,
+      emit: async () => {},
+    });
+    await dispatch.handler({ agent_name: "self-denying", prompt: "hi" }, makeCtx());
+    const passedFilter = driverCalls[0].toolFilter;
+    expect(passedFilter.excludeNames).toEqual(["edit_file"]);
+    expect(passedFilter.names).toContain("dispatch_agent");
+    expect(passedFilter.names).toContain("load_skill");
+  });
+
+  it("defaults excludeNames/excludeTags to empty arrays when the manifest declares none", async () => {
+    const driverCalls: any[] = [];
+    const fakeDriver = { runConversation: async (input: any) => { driverCalls.push(input); return { finalMessage: { role: "assistant" as const, content: "" }, usage: { promptTokens: 0, completionTokens: 0 } }; } };
+    const reg = makeRegistryHandle(makeRegistry([m("plain")]));
+    const tracker = makeTurnTracker();
+    tracker.onTurnStart({ turnId: "t-parent", trigger: "user" });
+    const dispatch = makeDispatchTool({
+      registry: reg,
+      tracker,
+      driver: fakeDriver as any,
+      sessions: makeSessions(),
+      maxDepth: 4,
+      hasSkills: () => false,
+      emit: async () => {},
+    });
+    await dispatch.handler({ agent_name: "plain", prompt: "hi" }, makeCtx());
+    const passedFilter = driverCalls[0].toolFilter;
+    expect(passedFilter.excludeNames).toEqual([]);
+    expect(passedFilter.excludeTags).toEqual([]);
+  });
+});
