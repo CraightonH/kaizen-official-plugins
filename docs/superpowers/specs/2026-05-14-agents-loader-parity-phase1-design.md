@@ -1,7 +1,7 @@
 # Agents Loader Parity with Claude Code — Phase 1
 
 **Status:** approved design, awaiting plan
-**Scope:** `plugins/llm-agents` plus one additive contract change in `plugins/llm-contracts`. No driver, TUI, or session-manager changes.
+**Scope:** `plugins/llm-agents` plus one additive contract change in `plugins/llm-contracts` plus a small additive filter extension in `plugins/llm-tools-registry`. No driver, TUI, or session-manager changes.
 **Companion:** see `docs/superpowers/specs/2026-05-14-agents-slash-command-design.md` for the `/agents:list` / `/agents:show` UX that this spec extends.
 
 ## Goal
@@ -44,10 +44,17 @@ Phase 1 keeps the existing plugin shape:
 
 - `llm-contracts` gains two optional fields on `AgentManifest.toolFilter` —
   purely additive, no provider has to change.
-- `llm-agents` extends three pure modules (`frontmatter.ts`, `loader.ts`,
-  `tool-filter.ts`), the registry handle (`registry.ts`), and the slash
-  renderer (`slash.ts`). The plugin's pure-factory boundary is preserved —
-  only `index.ts` continues to touch `ctx`.
+- `llm-agents` extends two pure modules (`frontmatter.ts`, `loader.ts`),
+  the registry handle (`registry.ts`), the dispatch builder (`dispatch.ts`),
+  and the slash renderer (`slash.ts`). The plugin's pure-factory boundary is
+  preserved — only `index.ts` continues to touch `ctx`.
+- `llm-tools-registry` extends `matchesFilter` in `registry.ts` to honor
+  optional `excludeNames` / `excludeTags` on the filter object passed to
+  `list()` / `listRegistrations()`. This is where tool filtering actually
+  runs (driver's `loop.ts` calls `tools.registry.list(input.toolFilter)`);
+  `plugins/llm-agents/tool-filter.ts` is an unused-at-runtime helper module
+  whose `toolMatches` function is referenced only by its own unit tests, so
+  it is intentionally left untouched.
 - No new modules. The recursive walk lives inside `loader.ts` (approach A
   from brainstorm; `walker.ts` extraction rejected for ceremony cost vs. ~30
   net new lines).
@@ -62,8 +69,18 @@ Phase 1 keeps the existing plugin shape:
 - **Modify** `plugins/llm-agents/loader.ts` — recursive depth-first walk with
   hidden-dir skip, directory symlink-cycle guard, depth cap 8, lex-sorted
   flat result.
-- **Modify** `plugins/llm-agents/tool-filter.ts` — add denylist branch;
-  `toolPasses(tool, filter)` evaluates allowlist AND `NOT denylist`.
+- **Modify** `plugins/llm-tools-registry/registry.ts` — extend
+  `matchesFilter` to filter out entries whose name matches any
+  `excludeNames` pattern (glob via the existing match approach) or whose
+  tags intersect `excludeTags`. Purely additive: filters without the new
+  keys behave identically.
+- **Modify** `plugins/llm-agents/dispatch.ts` — extend the merged
+  `toolFilter` it passes to the driver to include `excludeNames` /
+  `excludeTags` from `internal.toolFilter`. Always-on tools (`dispatch_agent`,
+  `load_skill`) continue to be force-included via `mergedNames`; even if a
+  manifest's denylist includes those names, the registry will still emit them
+  because they're in the allowlist `names` list and `matchesFilter` short-
+  circuits there. See "Always-on tool invariant" below.
 - **Modify** `plugins/llm-agents/registry.ts` — `RegistryHandle` gains a
   `getErrors()` accessor backed by an errors slot updated through
   `setInner(next, errors, onChange?)`.
@@ -147,40 +164,108 @@ deterministically — the agent whose full path sorts lex-first wins.
 
 ### Tool filter denylist
 
-`tool-filter.ts`:
+Implementation lives in `plugins/llm-tools-registry/registry.ts`, inside
+the existing `matchesFilter` function used by `list()` and
+`listRegistrations()`. The filter shape is an inline structural type on
+those methods; extending it is purely additive.
+
+Updated `matchesFilter`:
 
 ```ts
-function matchesAllowlist(tool, filter): boolean
-function matchesDenylist(tool, filter): boolean   // NEW
-export function toolPasses(tool, filter): boolean // renamed from toolMatches
+function matchesFilter(
+  entry: Entry,
+  filter?: {
+    tags?: string[]; names?: string[]; sources?: ToolSource["kind"][];
+    excludeTags?: string[]; excludeNames?: string[];   // NEW
+  },
+): boolean {
+  if (!filter) return true;
+  const { tags, names, sources, excludeTags, excludeNames } = filter;
+  if (names && !new Set(names).has(entry.schema.name)) return false;
+  if (sources && !new Set(sources).has(entry.source.kind)) return false;
+  if (tags) {
+    const tagSet = new Set(tags);
+    const schemaTags = entry.schema.tags ?? [];
+    let any = false;
+    for (const t of schemaTags) if (tagSet.has(t)) { any = true; break; }
+    if (!any) return false;
+  }
+  if (excludeNames && new Set(excludeNames).has(entry.schema.name)) return false; // NEW
+  if (excludeTags) {                                                              // NEW
+    const exTagSet = new Set(excludeTags);
+    const schemaTags = entry.schema.tags ?? [];
+    for (const t of schemaTags) if (exTagSet.has(t)) return false;
+  }
+  return true;
+}
 ```
 
-`toolPasses` returns `matchesAllowlist(tool, filter) && !matchesDenylist(tool, filter)`.
+**Matching is by exact name**, mirroring the existing allowlist behavior in
+`matchesFilter`. Glob expansion is not implemented for either allowlist or
+denylist today — `plugins/llm-agents/tool-filter.ts`'s `matchesGlob` is
+unused at runtime. Adding glob support is a separate concern (a real
+pre-existing bug, since manifests in this repo use glob-style patterns) and
+is out of Phase 1 scope.
 
-`matchesAllowlist` keeps current behavior: returns `true` when both
-`filter.names` and `filter.tags` are absent or empty (no allowlist =
-everything passes the allow gate).
+If a tool appears in both `names` and `excludeNames`, the allowlist gate
+passes but the denylist gate rejects — net `return false`. Denylist wins.
 
-`matchesDenylist` returns `true` iff any pattern in `filter.excludeNames`
-glob-matches `tool.name`, or any string in `filter.excludeTags` matches a
-member of `tool.tags`. Absent/empty denylist returns `false` (nothing
-denied).
+`dispatch.ts` extends the merged `toolFilter` it passes to the driver:
 
-If a tool appears in both the allow and deny lists, `toolPasses` returns
-`false` (denylist wins). This matches the intuitive "subtract from the
-allowed set" semantic.
+```ts
+const manifestNames = internal.toolFilter?.names ?? [];
+const manifestTags = internal.toolFilter?.tags ?? [];
+const excludeNames = internal.toolFilter?.excludeNames ?? [];          // NEW
+const excludeTags = internal.toolFilter?.excludeTags ?? [];            // NEW
+const alwaysOn: string[] = ["dispatch_agent"];
+if (deps.hasSkills()) alwaysOn.push("load_skill");
+const mergedNames = Array.from(new Set([...manifestNames, ...alwaysOn]));
+const toolFilter = { names: mergedNames, tags: manifestTags, excludeNames, excludeTags };
+```
 
-Renaming `toolMatches` → `toolPasses` is internal — the function isn't
-exported as a public contract. Search-and-replace in `dispatch.ts` and tests.
+The `tool-filter.ts` module in `llm-agents` is left untouched.
 
 ### Always-on tool invariant
 
-`dispatch.ts` merges `dispatch_agent` and (when `skills:registry` is present)
-`load_skill` *after* `toolPasses` filters the parent tool list. The
-post-filter merge means a manifest cannot deny away the always-on tools —
-even an explicit `disallowedTools: ["dispatch_agent"]` is a no-op. This is
-the existing invariant; the only change is to add an explicit regression
-test for the denylist case.
+The always-on tools (`dispatch_agent`, and when `skills:registry` is
+present, `load_skill`) are force-merged into `toolFilter.names` by
+`dispatch.ts` regardless of what the manifest declares. With exact-name
+allowlist semantics, this means:
+
+- A tool whose `schema.name === "dispatch_agent"` always matches the
+  allowlist gate (it's in `mergedNames`).
+- The same name in `excludeNames` would cause `matchesFilter` to return
+  `false` for that tool — denying away the always-on tool.
+
+To preserve the invariant, `dispatch.ts` must subtract the always-on names
+from the `excludeNames` array before passing the filter through. The
+updated assembly:
+
+```ts
+const alwaysOnSet = new Set(alwaysOn);
+const filteredExcludeNames = excludeNames.filter((n) => !alwaysOnSet.has(n));
+const toolFilter = {
+  names: mergedNames,
+  tags: manifestTags,
+  excludeNames: filteredExcludeNames,
+  excludeTags,
+};
+```
+
+This keeps the rule "always-on tools cannot be opted out of, even by
+denylist." Tags-based denial of always-on tools is also possible in
+principle (e.g., if `dispatch_agent` were tagged `meta` and a manifest
+said `disallowedTags: ["meta"]`) — but `dispatch_agent` and `load_skill`
+ship with no tags today, so it's a non-issue. We do not strip tags from
+`excludeTags`; any future always-on tool that introduces tags must
+self-tag conservatively.
+
+Regression test in `dispatch.test.ts` exercises both:
+1. `disallowedTools: ["dispatch_agent"]` — the tool still appears in the
+   resulting `toolFilter` (verifying the strip happens).
+2. `disallowedTags: ["future-meta-tag"]` where `dispatch_agent` has no
+   tags — the tool still appears (verifying no accidental denial via
+   absent tags).
 
 ### Registry handle errors slot
 
@@ -269,7 +354,7 @@ No agents registered.
 name: code-reviewer
 description: >-
   Use when the user wants a focused review of a diff or specific file.
-tools: ["read_file", "list_files", "grep*"]
+tools: ["read_file", "list_files"]
 tags: ["read-only"]
 disallowedTools: ["edit_file", "write_file"]
 disallowedTags: ["destructive"]
@@ -281,13 +366,17 @@ You are a focused code reviewer. ...
 Tool-filter worked example. Tool registry exposes `edit_file` with tags
 `["fs", "destructive"]`:
 
-- Agent with `tools: ["read_*"]`, no denylist → `edit_file` filtered (not in
-  allowlist).
-- Agent with `tools: ["edit_*"]`, `disallowedTools: ["edit_file"]` → filtered
-  (denylist wins over allowlist).
+- Agent with `tools: ["read_file"]`, no denylist → `edit_file` filtered
+  (not in allowlist).
+- Agent with `tools: ["edit_file"]`, `disallowedTools: ["edit_file"]` →
+  filtered (denylist wins over allowlist).
 - Agent with no allowlist, `disallowedTags: ["destructive"]` → filtered
   (denied by tag).
 - Agent with no allowlist, no denylist → passes (existing behavior).
+
+Note: matching is exact-name. Glob patterns like `read_*` are not honored
+by `matchesFilter` today; this is a pre-existing bug across both
+allowlist and denylist and is out of Phase 1 scope.
 
 ## Error handling
 
@@ -332,13 +421,16 @@ discovery microtask window (before `setInner` runs), `getErrors()` returns
 - Per-file failures (size cap, parse) inside subdirs still produce error
   records.
 
-**`tool-filter.test.ts`** (extend):
+**`plugins/llm-tools-registry/test/registry.test.ts`** (extend) — owns the
+runtime filter:
 
-- `excludeNames` filters a tool that the allowlist would have admitted.
-- `excludeTags` filters a tool whose tag matches.
-- Tool only in denylist (no allowlist) is filtered.
+- `excludeNames` filters out a tool that the allowlist would have admitted
+  (allow=[a, b], excludeNames=[b] → only `a` returned).
+- `excludeTags` filters out a tool whose schema tag is in the denylist.
+- Tool only in denylist (no allowlist defined) is filtered out.
 - Empty `excludeNames` / `excludeTags` arrays behave identically to absent.
-- Allow + deny same name → denied (intersection).
+- Filter without any exclude fields still works exactly as before
+  (backwards-compat regression).
 
 **`frontmatter.test.ts`** (extend):
 
@@ -361,18 +453,30 @@ discovery microtask window (before `setInner` runs), `getErrors()` returns
 - No footer when errors empty (existing tests pass unchanged).
 - Errors render in source order.
 
-**`dispatch.test.ts`** (add one):
+**`dispatch.test.ts`** (extend):
 
-- Always-on tools (`dispatch_agent`, `load_skill`) are merged in even when
-  the manifest's `disallowedTools` lists them — regression guard.
+- The merged `toolFilter` passed to the driver carries `excludeNames` and
+  `excludeTags` from `internal.toolFilter`.
+- Always-on tool names (`dispatch_agent`, `load_skill`) are stripped from
+  `excludeNames` before the filter is built — regression guard. Spec case:
+  manifest sets `disallowedTools: ["dispatch_agent"]`; verify the resulting
+  `toolFilter.excludeNames` does NOT contain `dispatch_agent` and
+  `toolFilter.names` still does.
+- A manifest with no `disallowedTools` / `disallowedTags` produces a
+  `toolFilter` with `excludeNames: []` and `excludeTags: []` (or those
+  fields absent — pick one and pin it in the test).
 
 No driver-runtime or harness-integration tests; the surface is per-module
 and the manual smoke is covered in the local-deploy step.
 
 ## Local deploy
 
-`llm-contracts` MUST be rebuilt and redeployed before `llm-agents`, because
-the contract module is loaded first at boot:
+Three plugins must be redeployed in dependency order: `llm-contracts` (the
+contract change), `llm-tools-registry` (the filter extension), then
+`llm-agents` (the loader/dispatch/registry/slash changes).
+
+`llm-contracts` MUST be rebuilt and redeployed first, because the contract
+module is loaded before any provider at boot:
 
 ```sh
 PLUGIN=llm-contracts
@@ -384,7 +488,19 @@ cp plugins/$PLUGIN/dist/index.js "$INSTALL_DIR/dist/index.js"
 rsync -a --exclude='node_modules' --exclude='dist' plugins/$PLUGIN/ "$INSTALL_DIR/"
 ```
 
-Then `llm-agents`:
+Then `llm-tools-registry`:
+
+```sh
+PLUGIN=llm-tools-registry
+VERSION=$(jq -r .version plugins/$PLUGIN/package.json)
+INSTALL_DIR=~/.kaizen/marketplaces/official/plugins/${PLUGIN}@${VERSION}
+(cd plugins/$PLUGIN && bun build --target=bun --outfile=dist/index.js index.ts)
+mkdir -p "$INSTALL_DIR/dist"
+cp plugins/$PLUGIN/dist/index.js "$INSTALL_DIR/dist/index.js"
+rsync -a --exclude='node_modules' --exclude='dist' plugins/$PLUGIN/ "$INSTALL_DIR/"
+```
+
+Finally `llm-agents`:
 
 ```sh
 PLUGIN=llm-agents
