@@ -1,5 +1,6 @@
 import readline from "node:readline";
 import type { UiChannelService } from "llm-contracts/public";
+import { renderMarkdown } from "./ui/markdown.ts";
 
 export function createFallbackChannel(): UiChannelService {
   let queued: string[] = [];
@@ -21,9 +22,20 @@ export function createFallbackChannel(): UiChannelService {
   }
 
   return {
-    writeOutput(chunk) { process.stdout.write(chunk); },
-    writeNotice(text) { process.stderr.write(`${text}\n`); },
-    writeUser(text) { process.stdout.write(`> ${text}\n`); },
+    // output defaults markdown:true (back-compat: was always rendered in TTY mode)
+    writeOutput(chunk, opts) {
+      const md = opts?.markdown !== false;
+      process.stdout.write(md ? renderMarkdown(chunk) : chunk);
+    },
+    // notice/user default markdown:false (plain unless caller opts in)
+    writeNotice(text, opts) {
+      const md = opts?.markdown === true;
+      process.stderr.write(`${md ? renderMarkdown(text) : text}\n`);
+    },
+    writeUser(text, opts) {
+      const md = opts?.markdown === true;
+      process.stdout.write(`> ${md ? renderMarkdown(text) : text}\n`);
+    },
     setBusy() { /* no-op in non-TTY mode */ },
     setBusyTiming() { /* no-op in non-TTY mode */ },
     updateBusyTokens() { /* no-op in non-TTY mode */ },

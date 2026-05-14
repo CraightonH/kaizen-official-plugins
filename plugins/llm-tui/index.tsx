@@ -234,9 +234,9 @@ const plugin: KaizenPlugin = {
 
     const channel: UiChannelService = {
       readInput: () => store.awaitInput(),
-      writeOutput: (chunk: string) => store.appendOutput(chunk),
-      writeNotice: (text: string) => store.appendNotice(text),
-      writeUser: (text: string) => store.appendUser(text),
+      writeOutput: (chunk: string, opts?: { markdown?: boolean }) => store.appendOutput(chunk, opts),
+      writeNotice: (text: string, opts?: { markdown?: boolean }) => store.appendNotice(text, opts),
+      writeUser: (text: string, opts?: { markdown?: boolean }) => store.appendUser(text, opts),
       setBusy: (busy: boolean, message?: string) => store.setBusy(busy, message),
       setBusyTiming: (startedAt: number) => store.setBusyTiming(startedAt),
       updateBusyTokens: (deltaTokens: number) => store.updateBusyTokens(deltaTokens),

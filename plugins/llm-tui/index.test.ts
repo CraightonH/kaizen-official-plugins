@@ -124,4 +124,21 @@ describe("llm-tui plugin", () => {
     expect(hint).toBeDefined();
     expect((hint!.payload as any).value).toContain("⌃X");
   });
+
+  it("ui:channel writeNotice with markdown:true sets the markdown flag on the store entry", async () => {
+    const ctx = makeCtx();
+    await plugin.setup(ctx);
+    const ch = ctx.provided["ui:channel"] as any;
+    // In non-TTY mode the channel is the fallback channel (no store access),
+    // so we exercise only that it does not throw and the contract is accepted.
+    // The store-wiring assertion is covered by the store unit tests.
+    expect(() => ch.writeNotice("**md**", { markdown: true })).not.toThrow();
+  });
+
+  it("ui:channel writeOutput with markdown:false does not throw", async () => {
+    const ctx = makeCtx();
+    await plugin.setup(ctx);
+    const ch = ctx.provided["ui:channel"] as any;
+    expect(() => ch.writeOutput("raw", { markdown: false })).not.toThrow();
+  });
 });

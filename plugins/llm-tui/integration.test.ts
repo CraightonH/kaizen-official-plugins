@@ -93,6 +93,32 @@ describe("llm-tui integration (non-TTY)", () => {
   });
 });
 
+describe("integration: WriteOptions forwarded by store (verifies channel delegation target)", () => {
+  it("appendNotice with markdown:true sets entry.markdown === true", () => {
+    const store = new TuiStore();
+    store.appendNotice("**md**", { markdown: true });
+    const e = store.snapshot().transcript.at(-1)! as any;
+    expect(e.kind).toBe("notice");
+    expect(e.markdown).toBe(true);
+  });
+
+  it("appendOutput with markdown:false sets entry.markdown === false", () => {
+    const store = new TuiStore();
+    store.appendOutput("raw", { markdown: false });
+    const e = store.snapshot().transcript.at(-1)! as any;
+    expect(e.kind).toBe("output");
+    expect(e.markdown).toBe(false);
+  });
+
+  it("appendNotice without opts leaves markdown undefined", () => {
+    const store = new TuiStore();
+    store.appendNotice("plain");
+    const e = store.snapshot().transcript.at(-1)! as any;
+    expect(e.kind).toBe("notice");
+    expect(e.markdown).toBeUndefined();
+  });
+});
+
 describe("integration: Ctrl+X copies latest output", () => {
   it("store accessor returns the most recent assistant message text", () => {
     const store = new TuiStore();
