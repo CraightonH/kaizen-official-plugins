@@ -49,10 +49,20 @@ export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, trigge
     }
   });
 
+  // Whether a transcript entry should be rendered through marked-terminal.
+  // output defaults true (back-compat); notice/user default false; thoughts/tool_call
+  // always false here (HistoryView handles thoughts; tool_call has its own renderer).
+  const shouldRenderMarkdown = (e: TranscriptLine): boolean => {
+    if (e.kind === "output") return e.markdown !== false;
+    if (e.kind === "notice" || e.kind === "user") return e.markdown === true;
+    return false;
+  };
+
   // Render the committed transcript entry. Pulled out so <Static> can call it
   // per item; React keys are owned by Static itself.
   const renderEntry = (e: TranscriptLine) => {
     if (e.kind === "user") {
+      const body = shouldRenderMarkdown(e) ? renderMarkdown(e.text) : e.text;
       return (
         <Text>
           {e.handoffFrom && (
@@ -61,7 +71,7 @@ export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, trigge
             </Text>
           )}
           <Text color={theme.promptColor} bold>{"❯ "}</Text>
-          <Text color={theme.outputColor} backgroundColor="#2a2a2a">{e.text}</Text>
+          <Text color={theme.outputColor} backgroundColor="#2a2a2a">{body}</Text>
         </Text>
       );
     }
@@ -73,14 +83,18 @@ export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, trigge
       return <ToolCallBlock entry={e} registry={toolRenderers} theme={theme} />;
     }
     if (e.kind === "output") {
-      // Render assistant output through marked-terminal. Ink's <Text>
-      // honors embedded ANSI codes, so the styled string drops in directly.
+      // Render assistant output through marked-terminal by default. Caller can
+      // opt out with { markdown: false } (e.g., raw stdout passthrough).
       // Raw markdown stays in the store for the Ctrl+X copy shortcut.
-      return <Text color={theme.outputColor}>{renderMarkdown(e.text)}</Text>;
+      const body = shouldRenderMarkdown(e) ? renderMarkdown(e.text) : e.text;
+      return <Text color={theme.outputColor}>{body}</Text>;
     }
+    // notice
+    const isMd = shouldRenderMarkdown(e);
+    const body = isMd ? renderMarkdown(e.text) : e.text;
     return (
-      <Text color={theme.noticeColor} dimColor>
-        {e.text}
+      <Text color={theme.noticeColor} dimColor={!isMd}>
+        {body}
       </Text>
     );
   };

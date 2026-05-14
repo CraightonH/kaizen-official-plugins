@@ -99,4 +99,59 @@ describe("App", () => {
     await tick(60);
     expect(lastFrame()).toContain("/help");
   });
+
+  it("output entry without markdown flag renders through renderMarkdown (default true)", async () => {
+    const s = new TuiStore();
+    s.appendOutput("**bold**");
+    const { lastFrame } = render(
+      <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} triggers={new Set()} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+    );
+    await tick();
+    const frame = lastFrame() ?? "";
+    expect(frame.includes("**bold**")).toBe(false);
+    expect(frame.includes("bold")).toBe(true);
+  });
+
+  it("output entry with markdown: false renders raw", async () => {
+    const s = new TuiStore();
+    s.appendOutput("**bold**", { markdown: false });
+    const { lastFrame } = render(
+      <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} triggers={new Set()} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+    );
+    await tick();
+    expect((lastFrame() ?? "").includes("**bold**")).toBe(true);
+  });
+
+  it("notice entry without markdown flag renders raw with dim", async () => {
+    const s = new TuiStore();
+    s.appendNotice("**plain**");
+    const { lastFrame } = render(
+      <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} triggers={new Set()} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+    );
+    await tick();
+    expect((lastFrame() ?? "").includes("**plain**")).toBe(true);
+  });
+
+  it("notice entry with markdown: true renders through renderMarkdown (no dim)", async () => {
+    const s = new TuiStore();
+    s.appendNotice("**md**", { markdown: true });
+    const { lastFrame } = render(
+      <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} triggers={new Set()} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+    );
+    await tick();
+    const frame = lastFrame() ?? "";
+    expect(frame.includes("**md**")).toBe(false);
+    expect(frame.includes("md")).toBe(true);
+  });
+
+  it("user entry with markdown: true renders through renderMarkdown", async () => {
+    const s = new TuiStore();
+    s.appendUser("**hi**", { markdown: true });
+    const { lastFrame } = render(
+      <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} triggers={new Set()} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+    );
+    await tick();
+    const frame = lastFrame() ?? "";
+    expect(frame.includes("**hi**")).toBe(false);
+  });
 });
