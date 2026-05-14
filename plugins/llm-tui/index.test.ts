@@ -1,5 +1,6 @@
 import { describe, it, expect, mock } from "bun:test";
-import plugin from "./index.tsx";
+import plugin, { createTuiChannel } from "./index.tsx";
+import { TuiStore } from "./state/store.ts";
 
 function makeCtx(overrides: { config?: Record<string, unknown> } = {}) {
   const provided: Record<string, unknown> = {};
@@ -125,20 +126,40 @@ describe("llm-tui plugin", () => {
     expect((hint!.payload as any).value).toContain("⌃X");
   });
 
-  it("ui:channel writeNotice with markdown:true sets the markdown flag on the store entry", async () => {
-    const ctx = makeCtx();
-    await plugin.setup(ctx);
-    const ch = ctx.provided["ui:channel"] as any;
-    // In non-TTY mode the channel is the fallback channel (no store access),
-    // so we exercise only that it does not throw and the contract is accepted.
-    // The store-wiring assertion is covered by the store unit tests.
-    expect(() => ch.writeNotice("**md**", { markdown: true })).not.toThrow();
-  });
+  describe("createTuiChannel — WriteOptions forwarded to store", () => {
+    it("writeNotice with markdown:true sets entry.markdown === true", () => {
+      const store = new TuiStore();
+      const ch = createTuiChannel(store);
+      ch.writeNotice("**bold**", { markdown: true });
+      const entry = store.snapshot().transcript.at(-1) as any;
+      expect(entry.text).toBe("**bold**");
+      expect(entry.markdown).toBe(true);
+    });
 
-  it("ui:channel writeOutput with markdown:false does not throw", async () => {
-    const ctx = makeCtx();
-    await plugin.setup(ctx);
-    const ch = ctx.provided["ui:channel"] as any;
-    expect(() => ch.writeOutput("raw", { markdown: false })).not.toThrow();
+    it("writeOutput with markdown:false sets entry.markdown === false", () => {
+      const store = new TuiStore();
+      const ch = createTuiChannel(store);
+      ch.writeOutput("raw output", { markdown: false });
+      const entry = store.snapshot().transcript.at(-1) as any;
+      expect(entry.text).toBe("raw output");
+      expect(entry.markdown).toBe(false);
+    });
+
+    it("writeOutput with no opts leaves entry.markdown === undefined", () => {
+      const store = new TuiStore();
+      const ch = createTuiChannel(store);
+      ch.writeOutput("bare output");
+      const entry = store.snapshot().transcript.at(-1) as any;
+      expect(entry.text).toBe("bare output");
+      expect(entry.markdown).toBeUndefined();
+    });
+
+    it("writeUser with markdown:true sets entry.markdown === true", () => {
+      const store = new TuiStore();
+      const ch = createTuiChannel(store);
+      ch.writeUser!("user msg", { markdown: true });
+      const entry = store.snapshot().transcript.at(-1) as any;
+      expect(entry.markdown).toBe(true);
+    });
   });
 });

@@ -232,20 +232,7 @@ const plugin: KaizenPlugin = {
       { exitOnCtrlC: false },
     );
 
-    const channel: UiChannelService = {
-      readInput: () => store.awaitInput(),
-      writeOutput: (chunk: string, opts?: { markdown?: boolean }) => store.appendOutput(chunk, opts),
-      writeNotice: (text: string, opts?: { markdown?: boolean }) => store.appendNotice(text, opts),
-      writeUser: (text: string, opts?: { markdown?: boolean }) => store.appendUser(text, opts),
-      setBusy: (busy: boolean, message?: string) => store.setBusy(busy, message),
-      setBusyTiming: (startedAt: number) => store.setBusyTiming(startedAt),
-      updateBusyTokens: (deltaTokens: number) => store.updateBusyTokens(deltaTokens),
-      incrementBusyTokens: (n?: number) => store.incrementBusyTokens(n),
-      appendReasoning: (delta: string) => store.appendReasoning(delta),
-      finalizeReasoning: () => store.finalizeReasoning(),
-      clearLiveThinking: () => store.clearLiveThinking(),
-      setInputDraft: (text: string) => store.setInput(text, text.length),
-    };
+    const channel = createTuiChannel(store);
     ctx.provideService<UiChannelService>("ui:channel", channel);
 
     (plugin as any).__ink = inkApp;
@@ -260,6 +247,24 @@ const plugin: KaizenPlugin = {
 };
 
 export default plugin;
+
+/** Exported for unit tests: builds the store-wired UiChannelService without mounting Ink. */
+export function createTuiChannel(store: TuiStore): UiChannelService {
+  return {
+    readInput: () => store.awaitInput(),
+    writeOutput: (chunk: string, opts?: { markdown?: boolean }) => store.appendOutput(chunk, opts),
+    writeNotice: (text: string, opts?: { markdown?: boolean }) => store.appendNotice(text, opts),
+    writeUser: (text: string, opts?: { markdown?: boolean }) => store.appendUser(text, opts),
+    setBusy: (busy: boolean, message?: string) => store.setBusy(busy, message),
+    setBusyTiming: (startedAt: number) => store.setBusyTiming(startedAt),
+    updateBusyTokens: (deltaTokens: number) => store.updateBusyTokens(deltaTokens),
+    incrementBusyTokens: (n?: number) => store.incrementBusyTokens(n),
+    appendReasoning: (delta: string) => store.appendReasoning(delta),
+    finalizeReasoning: () => store.finalizeReasoning(),
+    clearLiveThinking: () => store.clearLiveThinking(),
+    setInputDraft: (text: string) => store.setInput(text, text.length),
+  };
+}
 
 function safeJson(v: unknown): string {
   try { return JSON.stringify(v); } catch { return String(v); }
