@@ -11,6 +11,7 @@ import { ThoughtsBlock } from "./ThoughtsBlock.tsx";
 import { HistoryView } from "./HistoryView.tsx";
 import { ToolCallBlock } from "./ToolCallBlock.tsx";
 import { LiveToolCalls } from "./LiveToolCalls.tsx";
+import { renderMarkdown } from "./markdown.ts";
 import type { ToolRendererRegistry } from "../tool-renderers/registry.ts";
 
 export interface AppProps {
@@ -69,8 +70,14 @@ export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, trigge
     if (e.kind === "tool_call") {
       return <ToolCallBlock entry={e} registry={toolRenderers} theme={theme} />;
     }
+    if (e.kind === "output") {
+      // Render assistant output through marked-terminal. Ink's <Text>
+      // honors embedded ANSI codes, so the styled string drops in directly.
+      // Raw markdown stays in the store for the Ctrl+X copy shortcut.
+      return <Text color={theme.outputColor}>{renderMarkdown(e.text)}</Text>;
+    }
     return (
-      <Text color={e.kind === "notice" ? theme.noticeColor : theme.outputColor} dimColor={e.kind === "notice"}>
+      <Text color={theme.noticeColor} dimColor>
         {e.text}
       </Text>
     );
