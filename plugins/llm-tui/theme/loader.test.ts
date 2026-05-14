@@ -70,4 +70,28 @@ describe("loadTheme", () => {
     }));
     expect(readPath).toBe("/etc/llm-tui.json");
   });
+
+  it("DEFAULT_THEME has thoughtsMarkdown: true", () => {
+    expect(DEFAULT_THEME.thoughtsMarkdown).toBe(true);
+  });
+
+  it("user config can disable thoughtsMarkdown", async () => {
+    const theme = await loadTheme({
+      home: "/h",
+      env: { KAIZEN_LLM_TUI_CONFIG: "/cfg.json" },
+      readFile: async () => JSON.stringify({ theme: { thoughtsMarkdown: false } }),
+      log: () => {},
+    });
+    expect(theme.thoughtsMarkdown).toBe(false);
+  });
+
+  it("non-boolean thoughtsMarkdown in user config is ignored (falls back to default)", async () => {
+    const theme = await loadTheme({
+      home: "/h",
+      env: { KAIZEN_LLM_TUI_CONFIG: "/cfg.json" },
+      readFile: async () => JSON.stringify({ theme: { thoughtsMarkdown: "yes" } }),
+      log: () => {},
+    });
+    expect(theme.thoughtsMarkdown).toBe(true);
+  });
 });

@@ -12,6 +12,7 @@ export const DEFAULT_THEME: UiTheme = Object.freeze({
   noticeColor: "yellow",
   busyColor: "magenta",
   statusBarColor: "gray",
+  thoughtsMarkdown: true,
 });
 
 export interface ThemeDeps {
@@ -51,6 +52,7 @@ function pickValid(input: Record<string, unknown> | undefined, fallback: UiTheme
   if (isValidColor(input.noticeColor)) out.noticeColor = input.noticeColor;
   if (isValidColor(input.busyColor)) out.busyColor = input.busyColor;
   if (isValidColor(input.statusBarColor)) out.statusBarColor = input.statusBarColor;
+  if (typeof input.thoughtsMarkdown === "boolean") out.thoughtsMarkdown = input.thoughtsMarkdown;
   return out;
 }
 
