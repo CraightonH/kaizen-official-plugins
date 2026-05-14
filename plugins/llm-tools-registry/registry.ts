@@ -45,10 +45,16 @@ export function makeRegistry(emit: Emit): ToolsRegistryService {
 
   function matchesFilter(
     entry: Entry,
-    filter?: { tags?: string[]; names?: string[]; sources?: ToolSource["kind"][] },
+    filter?: {
+      tags?: string[];
+      names?: string[];
+      sources?: ToolSource["kind"][];
+      excludeTags?: string[];
+      excludeNames?: string[];
+    },
   ): boolean {
     if (!filter) return true;
-    const { tags, names, sources } = filter;
+    const { tags, names, sources, excludeTags, excludeNames } = filter;
     if (names && !new Set(names).has(entry.schema.name)) return false;
     if (sources && !new Set(sources).has(entry.source.kind)) return false;
     if (tags) {
@@ -58,10 +64,16 @@ export function makeRegistry(emit: Emit): ToolsRegistryService {
       for (const t of schemaTags) if (tagSet.has(t)) { any = true; break; }
       if (!any) return false;
     }
+    if (excludeNames && new Set(excludeNames).has(entry.schema.name)) return false;
+    if (excludeTags) {
+      const exTagSet = new Set(excludeTags);
+      const schemaTags = entry.schema.tags ?? [];
+      for (const t of schemaTags) if (exTagSet.has(t)) return false;
+    }
     return true;
   }
 
-  function list(filter?: { tags?: string[]; names?: string[]; sources?: ToolSource["kind"][] }): ToolSchema[] {
+  function list(filter?: { tags?: string[]; names?: string[]; sources?: ToolSource["kind"][]; excludeTags?: string[]; excludeNames?: string[] }): ToolSchema[] {
     const out: ToolSchema[] = [];
     for (const entry of entries.values()) {
       if (matchesFilter(entry, filter)) out.push(entry.schema);
@@ -69,7 +81,7 @@ export function makeRegistry(emit: Emit): ToolsRegistryService {
     return out;
   }
 
-  function listRegistrations(filter?: { tags?: string[]; names?: string[]; sources?: ToolSource["kind"][] }): ToolRegistration[] {
+  function listRegistrations(filter?: { tags?: string[]; names?: string[]; sources?: ToolSource["kind"][]; excludeTags?: string[]; excludeNames?: string[] }): ToolRegistration[] {
     const out: ToolRegistration[] = [];
     for (const entry of entries.values()) {
       if (matchesFilter(entry, filter)) {

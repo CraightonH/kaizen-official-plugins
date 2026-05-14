@@ -202,6 +202,47 @@ describe("makeRegistry — invoke", () => {
 
 import type { ToolSource, ToolRegistration } from "../public";
 
+describe("matchesFilter denylist", () => {
+  it("excludeNames removes a tool the allowlist would have admitted", () => {
+    const r = makeRegistry(captureEmit().emit as any);
+    r.register({ name: "a", description: "A", parameters: { type: "object", properties: {}, additionalProperties: false } as any }, async () => ({}));
+    r.register({ name: "b", description: "B", parameters: { type: "object", properties: {}, additionalProperties: false } as any }, async () => ({}));
+    const list = r.list({ names: ["a", "b"], excludeNames: ["b"] });
+    expect(list.map((t) => t.name).sort()).toEqual(["a"]);
+  });
+
+  it("excludeTags removes a tool whose schema tag matches", () => {
+    const r = makeRegistry(captureEmit().emit as any);
+    r.register({ name: "read_file", description: "", parameters: { type: "object", properties: {}, additionalProperties: false } as any, tags: ["fs", "read-only"] }, async () => ({}));
+    r.register({ name: "edit_file", description: "", parameters: { type: "object", properties: {}, additionalProperties: false } as any, tags: ["fs", "destructive"] }, async () => ({}));
+    const list = r.list({ excludeTags: ["destructive"] });
+    expect(list.map((t) => t.name).sort()).toEqual(["read_file"]);
+  });
+
+  it("tool present only in excludeNames is filtered (no allowlist)", () => {
+    const r = makeRegistry(captureEmit().emit as any);
+    r.register({ name: "a", description: "", parameters: { type: "object", properties: {}, additionalProperties: false } as any }, async () => ({}));
+    r.register({ name: "b", description: "", parameters: { type: "object", properties: {}, additionalProperties: false } as any }, async () => ({}));
+    const list = r.list({ excludeNames: ["a"] });
+    expect(list.map((t) => t.name).sort()).toEqual(["b"]);
+  });
+
+  it("empty excludeNames / excludeTags arrays behave identically to absent", () => {
+    const r = makeRegistry(captureEmit().emit as any);
+    r.register({ name: "a", description: "", parameters: { type: "object", properties: {}, additionalProperties: false } as any, tags: ["fs"] }, async () => ({}));
+    expect(r.list({ excludeNames: [] }).map((t) => t.name)).toEqual(["a"]);
+    expect(r.list({ excludeTags: [] }).map((t) => t.name)).toEqual(["a"]);
+  });
+
+  it("filter without exclude fields still works (backwards-compat regression)", () => {
+    const r = makeRegistry(captureEmit().emit as any);
+    r.register({ name: "a", description: "", parameters: { type: "object", properties: {}, additionalProperties: false } as any }, async () => ({}));
+    r.register({ name: "b", description: "", parameters: { type: "object", properties: {}, additionalProperties: false } as any }, async () => ({}));
+    expect(r.list({ names: ["a"] }).map((t) => t.name)).toEqual(["a"]);
+    expect(r.list().map((t) => t.name).sort()).toEqual(["a", "b"]);
+  });
+});
+
 describe("public types — ToolSource", () => {
   it("admits all spec'd source kinds", () => {
     const a: ToolSource = { kind: "local" };
