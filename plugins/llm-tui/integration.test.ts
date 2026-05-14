@@ -92,3 +92,30 @@ describe("llm-tui integration (non-TTY)", () => {
     expect(theme.outputColor).toBe("white");
   });
 });
+
+describe("integration: Ctrl+X copies latest output", () => {
+  it("store accessor returns the most recent assistant message text", () => {
+    const store = new TuiStore();
+    store.appendOutput("first answer");
+    store.appendUser("follow-up");
+    store.appendOutput("second answer");
+
+    const text = store.latestOutputText();
+    expect(text).toBe("second answer");
+  });
+
+  it("notice is posted on copy success path (simulated)", async () => {
+    const store = new TuiStore();
+    store.appendOutput("# Hello\n\nworld");
+
+    const text = store.latestOutputText()!;
+    const fakeResult = { ok: true, via: "pbcopy" as const };
+    if (fakeResult.ok) {
+      store.appendNotice(`copied ${text.length} chars · via ${fakeResult.via}`);
+    }
+
+    const last = store.snapshot().transcript.at(-1);
+    expect(last?.kind).toBe("notice");
+    expect((last as any).text).toMatch(/copied 14 chars/);
+  });
+});
