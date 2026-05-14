@@ -10,6 +10,9 @@ index.ts        Plugin lifecycle: provides the tools:registry service (defineSer
                 The only file that touches `ctx`.
 registry.ts     makeRegistry(emit) → ToolsRegistryService. Pure logic. Owns the
                 Map<name, { schema, handler }> and the invoke() event sequencing.
+                list()/listRegistrations() accept an optional filter with
+                names/tags/sources allowlist halves and excludeNames/excludeTags
+                denylist halves (exact-name match for names/excludeNames).
 public.d.ts     Re-exports contract types from llm-contracts/public only. All public
                 types (ToolsRegistryService, ToolHandler, ToolExecutionContext,
                 ToolSchema, ToolCall, ChatMessage, CANCEL_TOOL) live in
@@ -33,6 +36,7 @@ Boundaries:
 - **`unregister` is reference-scoped and idempotent.** Use the entry reference, not the name, to decide whether to delete from the map. Second call is a no-op. A same-named replacement registered after the original `unregister` ran must survive a stale unregister call.
 - **`list()` returns a fresh array.** Tests mutate the returned array and re-call `list()` to confirm registry state is intact. Don't optimize this away.
 - **No internal subscriptions.** This plugin only emits. It never calls `ctx.on(...)`. If you find yourself wanting to subscribe inside the registry, the feature belongs in a peer plugin.
+- **Filter is allow-then-deny.** `matchesFilter` first applies the allowlist halves (names, sources, tags) — if any allowlist gate rejects, the entry is out. Then it applies the denylist halves (excludeNames, excludeTags) — any match denies. A tool in both `names` and `excludeNames` is denied (denylist wins). Matching is by exact tool name (`Set.has`), not glob; this is consistent across both halves.
 
 ## Adding a tool from another plugin
 

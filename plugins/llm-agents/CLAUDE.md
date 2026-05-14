@@ -13,13 +13,14 @@ index.ts        Plugin lifecycle: loads config, wires registry handle, turn trac
 config.ts       loadConfig({ home, cwd, env, readFile, log }) → AgentsConfig.
                 Resolves config path, expands ~ and relatives, validates maxDepth.
 loader.ts       loadFromDirs({ userDir, projectDir, deps }) → { manifests, errors }.
-                Per-scope load with size cap (64 KiB), symlink-cycle guard, lex-first dedupe.
-                Project shadows user; shadowing emits an error record.
+                Depth-first recursive walk per scope (max depth 8). Hidden dirs (dot-prefix)
+                skipped. Per-scope dedupe by lex-first full path. Directory symlink-cycle
+                guard via realpath + seenRealPaths.
 frontmatter.ts  parseAgentFile(text, sourcePath) → ParseResult. Strict YAML subset
                 (scalars, integers, flow arrays, folded `>-` block scalars). No external YAML lib.
-registry.ts     makeRegistry(initial) and makeRegistryHandle(initial). The handle is a stable
-                wrapper that lets index.ts swap the inner registry once discovery completes.
-                Public list() strips internal fields; register() restricts to `runtime:` names.
+registry.ts     makeRegistry(initial) and makeRegistryHandle(initial). The handle exposes
+                service/getInternal/getErrors and lets index.ts swap the inner registry and
+                load-errors slot via setInner(next, errors?, onChange?).
 turn-tracker.ts makeTurnTracker() — Map<turnId, TurnRecord> driven by turn:start / turn:end.
                 Source of truth for depth and "is top-level".
 injector.ts     makeInjector({ ctx, registry, tracker }) — subscribes to turn:start/end to
@@ -35,9 +36,9 @@ dispatch.ts     makeDispatchTool({ registry, tracker, driver, sessions, maxDepth
                 from llm-tools-registry/public (the narrowest stable owner re-exports it).
                 Status events go through the injected `emit` dep — ToolExecutionContext has
                 no emit hook, so the plugin captures `ctx.emit` at setup time.
-slash.ts        makeSlashHandlers({ registry }) → { listHandler, showHandler } for the
-                /agents:list and /agents:show plugin-source slash commands. Pure factory;
-                no `ctx`. Reads via registry.service.list() and registry.getInternal().
+slash.ts        makeSlashHandlers({ registry }) → { listHandler, showHandler }. Pure factory;
+                no ctx. listHandler renders agents from registry.service.list() and appends
+                a parse-error footer from registry.getErrors() when non-empty.
 public.d.ts     Owns AgentManifest and AgentsRegistryService for this plugin. The service
                 name `agents:registry` is owned by llm-agents (defined and provided here);
                 the event vocab in events:vocabulary does NOT define this contract.
@@ -60,6 +61,9 @@ Boundaries:
 - **Programmatic agents are namespaced.** `register()` requires the `runtime:` prefix. This keeps file-loaded and synthetic agents in disjoint namespaces.
 - **Frontmatter parser is strict-subset on purpose.** Only scalars, integers, flow arrays, and `>-` folded block scalars. Don't pull in a real YAML lib — the test surface depends on the deterministic error messages.
 - **Slash registration is topo-hint optional.** `slash:registry` is in `services.consumes` so kaizen orders `llm-slash-commands` first when present, but the lookup is guarded with `try`/`catch`. A harness without slash commands still boots — the dispatch tool, registry, and prompt section all work; only the `/agents:list` and `/agents:show` user-facing commands are absent.
+- **Recursive walk has a depth cap.** `loader.ts` walks each scope depth-first with a hard cap of 8 levels. Entries beyond the cap emit a `directory depth exceeds 8; skipped` error and do not load. Hidden entries (names starting with `.`) are skipped entirely. This bound exists to fail loud on accidental symlink loops or misplaced agent roots.
+- **Identity comes from frontmatter `name`, not path.** Two files at different paths declaring the same `name` collide; lex-first full path wins, the other emits `duplicate agent name 'X'`. Subdir layout is purely organizational.
+- **Tool denylist cannot strip always-on tools.** `dispatch.ts` removes always-on tool names (`dispatch_agent`, `load_skill`) from a manifest's `excludeNames` before constructing the merged `toolFilter`. A manifest cannot opt out of these via `disallowedTools`.
 
 ## Adding an agent file
 
