@@ -57,6 +57,7 @@ Boundaries:
 - **Fallback channel matches TTY channel shape.** Adding a method to `UiChannelService` requires adding a (possibly no-op) implementation to `fallback.ts` in the same change.
 - **Status bar has no public mutator.** All updates go through `status:item-update` / `status:item-clear`. Adding a method bypassing the event bus breaks the decoupling guarantee.
 - **Reasoning lifecycle is tri-state.** `llm:reasoning` deltas accumulate; `llm:done` finalizes into a Thoughts block; `turn:end` clears unfinalized buffers. All three handlers must remain symmetric or the thinking box leaks across turns.
+- **Markdown rendering is per-entry, render-time.** Output entries default `markdown: true`; notice/user default `false`. Caller passes `{ markdown: bool }` on the write to override. Thoughts ignore the per-entry flag and are governed by `theme.thoughtsMarkdown` (default true); the live `ThinkingBox` is always plain regardless. `dimColor` is dropped for markdown notices and rendered thoughts.
 
 ## Adding a completion source from another plugin
 

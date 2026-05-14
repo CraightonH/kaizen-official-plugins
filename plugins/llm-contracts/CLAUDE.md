@@ -32,6 +32,9 @@ references it, it stays in the plugin's own `public.d.ts`.
 | `llm-mcp-bridge` | `ResolvedServerConfig` | Implementation-internal config shape. |
 | `llm-tui` | Internal Ink/render state types | Contract types (`UiChannelService`, `UiTheme`, `UiToolRenderer`, etc.) live here. |
 
+- `ui-channel` now exposes `WriteOptions { markdown?: boolean }`; opts is additive on `writeOutput` / `writeNotice` / `writeUser`. Per-method default is consumer-side (`llm-tui`), not encoded in the contract.
+- `ui-theme` now includes `thoughtsMarkdown: boolean` (default `true`); read by `llm-tui/HistoryView` to gate markdown rendering of expanded thought blocks.
+
 ## Adding a contract
 
 1. Create `contracts/<topic>.ts` with the interface(s), an exported
