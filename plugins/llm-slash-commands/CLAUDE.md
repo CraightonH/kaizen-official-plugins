@@ -75,6 +75,8 @@ const off = slash.register(
 // On teardown: off();
 ```
 
+**Markdown output.** `cmdCtx.print(text, { markdown: true })` forwards a `markdown: true` marker on the `conversation:system-message` payload; the driver bridges that into `writeNotice(text, { markdown: true })`, and `llm-tui` renders the body through marked-terminal (and drops `dimColor`). Omit the opt for plain notices.
+
 The service lookup is optional — guard with try/catch and no-op if the registry is absent so your plugin still loads in harnesses without slash commands.
 
 ## Editing file-loader behavior
