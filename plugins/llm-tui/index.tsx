@@ -9,7 +9,7 @@ import { defaultRenderers } from "./tool-renderers/defaults.tsx";
 import { loadTheme, realThemeDeps } from "./theme/loader.ts";
 import { App } from "./ui/App.tsx";
 import { copyToClipboard } from "./clipboard.ts";
-import { createFallbackChannel } from "./fallback.ts";
+import { createFallbackChannel, createFallbackPrompt } from "./fallback.ts";
 
 const plugin: KaizenPlugin = {
   name: "llm-tui",
@@ -207,6 +207,7 @@ const plugin: KaizenPlugin = {
     if (!isTTY) {
       const channel = createFallbackChannel();
       ctx.provideService<UiChannelService>("ui:channel", channel);
+      ctx.provideService<UiPromptService>("ui:prompt", createFallbackPrompt());
       return;
     }
 

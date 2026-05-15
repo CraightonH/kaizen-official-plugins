@@ -1,5 +1,5 @@
 import readline from "node:readline";
-import type { UiChannelService } from "llm-contracts/public";
+import type { UiChannelService, UiPromptService } from "llm-contracts/public";
 import { renderMarkdown } from "./ui/markdown.ts";
 
 export function createFallbackChannel(): UiChannelService {
@@ -51,6 +51,21 @@ export function createFallbackChannel(): UiChannelService {
         return Promise.resolve(next);
       }
       return new Promise<string>((resolve) => { pending = resolve; });
+    },
+  };
+}
+
+export function createFallbackPrompt(): UiPromptService {
+  return {
+    async requestOption(req) {
+      const cancelId = req.cancelId ?? req.options.at(-1)?.id;
+      if (cancelId === undefined) {
+        return { id: "" };
+      }
+      return { id: cancelId };
+    },
+    async requestText() {
+      return "";
     },
   };
 }

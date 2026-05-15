@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
-import { createFallbackChannel } from "./fallback.ts";
+import { createFallbackChannel, createFallbackPrompt } from "./fallback.ts";
+import type { UiPromptService } from "llm-contracts/public";
 
 describe("createFallbackChannel", () => {
   it("writeNotice without opts writes raw text to stderr", () => {
@@ -70,5 +71,33 @@ describe("createFallbackChannel", () => {
     expect(() => ch.finalizeReasoning()).not.toThrow();
     expect(() => ch.clearLiveThinking()).not.toThrow();
     expect(() => ch.setInputDraft("text")).not.toThrow();
+  });
+});
+
+describe("fallback ui:prompt", () => {
+  it("requestOption resolves to cancelId if set", async () => {
+    const svc: UiPromptService = createFallbackPrompt();
+    const out = await svc.requestOption({
+      title: "T",
+      body: "B",
+      options: [{ id: "a", label: "A" }, { id: "b", label: "B" }],
+      cancelId: "a",
+    });
+    expect(out).toEqual({ id: "a" });
+  });
+
+  it("requestOption falls back to last option when cancelId absent", async () => {
+    const svc = createFallbackPrompt();
+    const out = await svc.requestOption({
+      title: "T",
+      body: "B",
+      options: [{ id: "a", label: "A" }, { id: "b", label: "B" }],
+    });
+    expect(out).toEqual({ id: "b" });
+  });
+
+  it("requestText resolves to empty string", async () => {
+    const svc = createFallbackPrompt();
+    await expect(svc.requestText({ title: "T" })).resolves.toBe("");
   });
 });

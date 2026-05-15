@@ -137,19 +137,19 @@ describe("llm-tui plugin", () => {
     expect(typeof promptService.requestText).toBe("function");
   });
 
-  it("ui:prompt.requestOption opens the store slice and resolves on submit", async () => {
+  it("ui:prompt.requestOption resolves immediately to cancelId in non-TTY fallback", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
     const promptService = ctx.useService<UiPromptService>("ui:prompt");
-    const store: TuiStore = ctx._testStore;
-    const pending = promptService.requestOption({
-      title: "T",
-      body: "B",
-      options: [{ id: "ok", label: "OK" }],
-    });
-    expect(store.snapshot().prompt).not.toBeNull();
-    store.submitPrompt({ id: "ok" });
-    await expect(pending).resolves.toEqual({ id: "ok" });
+    // In non-TTY mode the fallback impl is used: resolves to cancelId immediately.
+    await expect(
+      promptService.requestOption({
+        title: "T",
+        body: "B",
+        options: [{ id: "ok", label: "OK" }, { id: "cancel", label: "Cancel" }],
+        cancelId: "cancel",
+      }),
+    ).resolves.toEqual({ id: "cancel" });
   });
 
   describe("createTuiChannel — WriteOptions forwarded to store", () => {
