@@ -1,0 +1,19 @@
+{
+  "name": "llm-tool-approval",
+  "version": "0.1.0",
+  "description": "Per-tool-call approval gate. Prompts the user (Approve Once / Always / Domain Always / Deny) before any tool call runs.",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "keywords": [
+    "kaizen-plugin"
+  ],
+  "dependencies": {
+    "llm-contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.4.0"
+  }
+}

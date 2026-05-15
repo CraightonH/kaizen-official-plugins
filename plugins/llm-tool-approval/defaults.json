@@ -1,0 +1,10 @@
+{
+  "allow": [
+    "execute_typescript",
+    "llm-skills:*",
+    "llm-memory:get",
+    "llm-memory:list",
+    "llm-memory:search"
+  ],
+  "deny": []
+}
