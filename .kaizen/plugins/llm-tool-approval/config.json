@@ -1,0 +1,7 @@
+{
+  "allow": [
+    "bash",
+    "glob"
+  ],
+  "deny": []
+}
