@@ -88,7 +88,7 @@ const plugin: KaizenPlugin = {
       } catch { /* ignore */ }
 
       const setStatus = (value: "request" | "paused") => {
-        void ctx.emit("status:item-update", { key: "approval", value: `approval: ${value}` });
+        void ctx.emit("status:item-update", { key: "approval", value });
       };
       setStatus("request");
 
