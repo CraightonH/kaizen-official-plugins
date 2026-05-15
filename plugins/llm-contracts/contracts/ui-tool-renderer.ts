@@ -19,4 +19,11 @@ export interface UiToolRenderer {
 
 export interface UiToolRendererService {
   register(renderer: UiToolRenderer): () => void;
+  /**
+   * Human-readable one-line (or short multi-line) summary of a tool call.
+   * If a renderer is registered for `name`, returns its `collapsedSummary(args)`.
+   * Otherwise returns `name + "\n" + JSON.stringify(args, null, 2)` truncated to
+   * roughly 1500 chars with a `… (N more chars)` suffix.
+   */
+  summarize(name: string, args: unknown): string;
 }
