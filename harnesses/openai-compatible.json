@@ -18,6 +18,7 @@
     "official/llm-codemode@0.3.0",
     "official/llm-agents@0.2.1",
     "official/llm-status-items@0.1.1",
-    "official/llm-hooks-shell@0.1.1"
+    "official/llm-hooks-shell@0.1.1",
+    "official/llm-tool-approval@0.1.0"
   ]
 }
