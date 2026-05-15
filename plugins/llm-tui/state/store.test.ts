@@ -590,6 +590,101 @@ describe("TuiStore — prompt slice (navigation)", () => {
   });
 });
 
+describe("TuiStore — prompt slice (submit/escape)", () => {
+  it("submitPrompt resolves with result and clears the slice", () => {
+    const s = new TuiStore();
+    let resolved: any = null;
+    s.openOptionsPrompt(
+      { title: "Approve?", body: "B", options: [{ id: "ok", label: "OK" }] },
+      (r) => { resolved = r; },
+    );
+    s.submitPrompt({ id: "ok" });
+    expect(resolved).toEqual({ id: "ok" });
+    expect(s.snapshot().prompt).toBeNull();
+  });
+
+  it("submitPrompt for options appends a notice transcript entry", () => {
+    const s = new TuiStore();
+    s.openOptionsPrompt(
+      { title: "Approve?", body: "B", options: [{ id: "ok", label: "OK" }] },
+      () => {},
+    );
+    s.submitPrompt({ id: "ok" });
+    const entries = s.snapshot().transcript.filter((e) => e.kind === "notice");
+    const last = entries.at(-1)!;
+    expect((last as any).text).toBe("? Approve? → OK");
+  });
+
+  it("submitPrompt for options with text appends '<label>: <text>'", () => {
+    const s = new TuiStore();
+    s.openOptionsPrompt(
+      {
+        title: "Approve?",
+        body: "B",
+        options: [{ id: "deny", label: "Deny", expandsTo: { kind: "text" } }],
+      },
+      () => {},
+    );
+    s.submitPrompt({ id: "deny", text: "looks dangerous" });
+    const entries = s.snapshot().transcript.filter((e) => e.kind === "notice");
+    const last = entries.at(-1)!;
+    expect((last as any).text).toBe("? Approve? → Deny: looks dangerous");
+  });
+
+  it("submitPrompt for text appends '<text>' or '(skipped)'", () => {
+    const s1 = new TuiStore();
+    s1.openTextPrompt({ title: "Reason?" }, () => {});
+    s1.submitPrompt("because");
+    const t1 = s1.snapshot().transcript.filter((e) => e.kind === "notice").at(-1)!;
+    expect((t1 as any).text).toBe("? Reason? → because");
+
+    const s2 = new TuiStore();
+    s2.openTextPrompt({ title: "Reason?" }, () => {});
+    s2.submitPrompt("");
+    const t2 = s2.snapshot().transcript.filter((e) => e.kind === "notice").at(-1)!;
+    expect((t2 as any).text).toBe("? Reason? → (skipped)");
+  });
+
+  it("submitPrompt is a no-op when no prompt is active", () => {
+    const s = new TuiStore();
+    const before = s.snapshot();
+    s.submitPrompt({ id: "x" } as any);
+    expect(s.snapshot()).toBe(before);
+  });
+
+  it("escapePrompt resolves options with cancelId (or last option) and clears", () => {
+    const s = new TuiStore();
+    let resolved: any = null;
+    s.openOptionsPrompt(
+      { title: "T", body: "B", options: [{ id: "a", label: "A" }, { id: "b", label: "B" }] },
+      (r) => { resolved = r; },
+    );
+    s.escapePrompt();
+    expect(resolved).toEqual({ id: "b" });
+    expect(s.snapshot().prompt).toBeNull();
+  });
+
+  it("escapePrompt honors explicit cancelId on options request", () => {
+    const s = new TuiStore();
+    let resolved: any = null;
+    s.openOptionsPrompt(
+      { title: "T", body: "B", options: [{ id: "a", label: "A" }, { id: "b", label: "B" }], cancelId: "a" },
+      (r) => { resolved = r; },
+    );
+    s.escapePrompt();
+    expect(resolved).toEqual({ id: "a" });
+  });
+
+  it("escapePrompt resolves text with empty string", () => {
+    const s = new TuiStore();
+    let resolved: string | null = null;
+    s.openTextPrompt({ title: "T", defaultValue: "x" }, (t) => { resolved = t; });
+    s.escapePrompt();
+    expect(resolved).toBe("");
+    expect(s.snapshot().prompt).toBeNull();
+  });
+});
+
 describe("TuiStore.latestOutputText", () => {
   it("returns null on empty transcript", () => {
     const s = new TuiStore();

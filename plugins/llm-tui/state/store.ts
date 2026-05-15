@@ -507,6 +507,47 @@ export class TuiStore {
     this._emit();
   }
 
+  submitPrompt(result: { id: string; text?: string } | string): void {
+    const p = this._prompt;
+    if (!p) return;
+    let noticeText: string;
+    if (p.kind === "options") {
+      if (typeof result === "string") return;
+      const opt = p.request.options.find((o) => o.id === result.id);
+      const label = opt?.label ?? result.id;
+      noticeText = result.text
+        ? `? ${p.request.title} → ${label}: ${result.text}`
+        : `? ${p.request.title} → ${label}`;
+      const resolve = p.resolve;
+      this._prompt = null;
+      this.appendNotice(noticeText, { markdown: false });
+      resolve(result);
+    } else {
+      if (typeof result !== "string") return;
+      noticeText = `? ${p.request.title} → ${result === "" ? "(skipped)" : result}`;
+      const resolve = p.resolve;
+      this._prompt = null;
+      this.appendNotice(noticeText, { markdown: false });
+      resolve(result);
+    }
+  }
+
+  escapePrompt(): void {
+    const p = this._prompt;
+    if (!p) return;
+    if (p.kind === "options") {
+      const cancelId = p.request.cancelId ?? p.request.options.at(-1)?.id;
+      if (cancelId === undefined) {
+        this._prompt = null;
+        this._emit();
+        return;
+      }
+      this.submitPrompt({ id: cancelId });
+    } else {
+      this.submitPrompt("");
+    }
+  }
+
   private _build(): TuiSnapshot {
     return {
       transcript: this._transcript,
