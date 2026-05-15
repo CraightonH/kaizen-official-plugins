@@ -52,10 +52,8 @@ const plugin: KaizenPlugin = {
 
     let lastEmitted = {
       model: null as string | null,
-      tokensIn: null as string | null,
-      tokensOut: null as string | null,
+      io: null as string | null,
       tokensPerSec: null as string | null,
-      turnState: null as string | null,
       cost: null as string | null,
       ctx: null as string | null,
       session: null as string | null,
@@ -128,33 +126,28 @@ const plugin: KaizenPlugin = {
       }
       // model
       if (state.model && state.model !== lastEmitted.model) {
-        await ctx.emit(vocab.STATUS_ITEM_UPDATE, { key: "model", value: state.model });
+        await ctx.emit(vocab.STATUS_ITEM_UPDATE, { key: "_model", value: state.model });
         lastEmitted.model = state.model;
       }
-      // tokens — show in / out separately. Total was redundant (the user can
-      // sum two numbers) and cluttered the bar; the ctx item now carries the
-      // signal about how much room is left in the window.
-      const inV = String(state.promptTokens);
-      const outV = String(state.completionTokens);
+      // tokens — single labelless item rendering `<in> ↑ <out> ↓`. The arrows
+      // self-label the values (↑ sent, ↓ received), saving the `in `/`out `
+      // prefixes that previously ate two label widths on the bar.
+      const ioV = `${state.promptTokens} ↑ ${state.completionTokens} ↓`;
       // Once we've initialized (after harness:start), surface zeros too —
       // an empty status line is worse than visible defaults.
       const haveTokens = initialized || state.promptTokens > 0 || state.completionTokens > 0;
       if (state.cleared) {
-        for (const key of ["in", "out", "tok/s"] as const) {
-          const slot = key === "in" ? "tokensIn" : key === "out" ? "tokensOut" : "tokensPerSec";
+        for (const key of ["_io", "tok/s"] as const) {
+          const slot = key === "_io" ? "io" : "tokensPerSec";
           if (lastEmitted[slot] !== null) {
             await ctx.emit(vocab.STATUS_ITEM_CLEAR, { key });
           }
         }
-        lastEmitted.tokensIn = lastEmitted.tokensOut = lastEmitted.tokensPerSec = null;
+        lastEmitted.io = lastEmitted.tokensPerSec = null;
       } else if (haveTokens) {
-        if (inV !== lastEmitted.tokensIn) {
-          await ctx.emit(vocab.STATUS_ITEM_UPDATE, { key: "in", value: inV });
-          lastEmitted.tokensIn = inV;
-        }
-        if (outV !== lastEmitted.tokensOut) {
-          await ctx.emit(vocab.STATUS_ITEM_UPDATE, { key: "out", value: outV });
-          lastEmitted.tokensOut = outV;
+        if (ioV !== lastEmitted.io) {
+          await ctx.emit(vocab.STATUS_ITEM_UPDATE, { key: "_io", value: ioV });
+          lastEmitted.io = ioV;
         }
       }
       // tok/s — show 0 before the first measurement so the slot is visible.
@@ -166,11 +159,6 @@ const plugin: KaizenPlugin = {
       if (tpsValue !== null && tpsValue !== lastEmitted.tokensPerSec) {
         await ctx.emit(vocab.STATUS_ITEM_UPDATE, { key: "tok/s", value: tpsValue });
         lastEmitted.tokensPerSec = tpsValue;
-      }
-      // turn-state
-      if (state.turnState !== lastEmitted.turnState) {
-        await ctx.emit(vocab.STATUS_ITEM_UPDATE, { key: "turn-state", value: state.turnState });
-        lastEmitted.turnState = state.turnState;
       }
       // context window — only renderable once we know the ceiling AND have
       // a prompt-token sample. State.cleared resets both, so the cleared

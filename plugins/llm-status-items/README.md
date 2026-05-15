@@ -1,6 +1,6 @@
 # llm-status-items
 
-Status-bar items for the OpenAI-compatible LLM session — model name, token counters, throughput, turn state, context-window fill, and (optionally) a running cost estimate.
+Status-bar items for the OpenAI-compatible LLM session — model name, token counters, throughput, context-window fill, and (optionally) a running cost estimate.
 
 ## What it does
 
@@ -10,11 +10,9 @@ Items emitted:
 
 | Key | Source | Value | Notes |
 |-----|--------|-------|-------|
-| `model` | `llm:before-call` (or runtime-loaded fallback) | `gpt-4.1-mini` | Falls back to the provider's loaded model id when the request omits `model`. |
-| `in` | `llm:done` | cumulative prompt tokens | Reset to `0` on `conversation:cleared` (cleared via `status:item-clear`). |
-| `out` | `llm:done` | cumulative completion tokens | Same clear semantics as `in`. |
+| `_model` | `llm:before-call` (or runtime-loaded fallback) | `gpt-4.1-mini` | Labelless; model name is self-describing. Falls back to the provider's loaded model id when the request omits `model`. |
+| `_io` | `llm:done` | `<prompt> ↑ <completion> ↓` cumulative tokens | Labelless; ↑ = sent, ↓ = received. Reset to `0 ↑ 0 ↓` on `conversation:cleared`. |
 | `tok/s` | `turn:end` | completion tokens / second for the last turn | `0` until first measurement; cleared on `conversation:cleared`. |
-| `turn-state` | turn/tool events | `ready` / `thinking` / `calling <tool>` | Always present. |
 | `_ctx` | `llm:done` + provider metadata | `13.2k/32k [████░░░░░░] 41%` | Denominated against the *most recent* prompt size, not session totals. Hidden when ceiling unknown. |
 | `cost-estimate` | `llm:done` | `$0.0123` | Only emitted when a rate table is present and the active model is in it. |
 | `session` | `session:active-changed` / `session:renamed` | full session id, optionally `id (alias)` | Cleared when no session is active. |
@@ -23,7 +21,7 @@ Other behaviors:
 - On `harness:start` the plugin renders zero-valued counters and the empty context bar so the status line is populated before any turn runs.
 - The context-window ceiling is resolved lazily via `llm:complete.listModels()` and cached per model id; when the driver leaves `model` unset, the single runtime-loaded model (`loadedContextLength`) is used as both the ceiling and the displayed `model` value.
 - All emissions are diffed — repeat events with unchanged values do not re-emit.
-- `conversation:cleared` zeros tokens, throughput, cost, and the context bar; `model` and `turn-state` persist.
+- `conversation:cleared` zeros tokens, throughput, cost, and the context bar; `_model` persists.
 
 ## Wiring
 
@@ -59,7 +57,7 @@ snapshot used by `/status:show`.
 ### Events emitted
 
 - `status:item-update` — `{ key, value }`. Emitted per item, only when `value` changes.
-- `status:item-clear` — `{ key }`. Emitted on `conversation:cleared` for the items that the clear semantics apply to (`in`, `out`, `tok/s`, `_ctx`, and `cost-estimate` if active).
+- `status:item-clear` — `{ key }`. Emitted on `conversation:cleared` for the items that the clear semantics apply to (`_io`, `tok/s`, `_ctx`, and `cost-estimate` if active).
 
 Both events belong to the `llm-events` VOCAB; this plugin emits them but does not define them.
 

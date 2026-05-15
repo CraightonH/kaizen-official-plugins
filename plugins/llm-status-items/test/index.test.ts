@@ -132,7 +132,7 @@ describe("llm-status-items setup", () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
     await ctx.handlers["llm:before-call"]!({ request: { model: "gpt-4.1-mini", messages: [] } });
-    const modelEmit = ctx.emits.find((e: Emit) => e.event === "status:item-update" && e.payload?.key === "model");
+    const modelEmit = ctx.emits.find((e: Emit) => e.event === "status:item-update" && e.payload?.key === "_model");
     expect(modelEmit?.payload.value).toBe("gpt-4.1-mini");
   });
 
@@ -141,10 +141,8 @@ describe("llm-status-items setup", () => {
     await plugin.setup(ctx);
     await ctx.handlers["llm:done"]!({ response: { content: "", finishReason: "stop", usage: { promptTokens: 100, completionTokens: 50 } } });
     await ctx.handlers["llm:done"]!({ response: { content: "", finishReason: "stop", usage: { promptTokens: 300, completionTokens: 150 } } });
-    const lastIn = [...ctx.emits].reverse().find((e: Emit) => e.event === "status:item-update" && e.payload?.key === "in");
-    const lastOut = [...ctx.emits].reverse().find((e: Emit) => e.event === "status:item-update" && e.payload?.key === "out");
-    expect(lastIn?.payload.value).toBe("400");
-    expect(lastOut?.payload.value).toBe("200");
+    const lastIo = [...ctx.emits].reverse().find((e: Emit) => e.event === "status:item-update" && e.payload?.key === "_io");
+    expect(lastIo?.payload.value).toBe("400 ↑ 200 ↓");
   });
 
   it("conversation:cleared emits status:item-clear for token items (and cost-estimate if active)", async () => {
@@ -154,22 +152,19 @@ describe("llm-status-items setup", () => {
     await ctx.handlers["llm:done"]!({ response: { content: "", finishReason: "stop", usage: { promptTokens: 100, completionTokens: 50 } } });
     await ctx.handlers["conversation:cleared"]!({});
     const clears = ctx.emits.filter((e: Emit) => e.event === "status:item-clear").map((e: Emit) => e.payload.key);
-    expect(clears).toContain("in");
-    expect(clears).toContain("out");
+    expect(clears).toContain("_io");
     expect(clears).toContain("cost-estimate");
   });
 
-  it("turn-state transitions: thinking → calling bash → thinking → ready", async () => {
+  it("does not emit a turn-state item (the spinner reflects in-flight state)", async () => {
     const ctx = makeCtx();
     await plugin.setup(ctx);
     await ctx.handlers["turn:start"]!({ turnId: "t-1" });
     await ctx.handlers["tool:before-execute"]!({ name: "bash", args: {}, callId: "c1" });
     await ctx.handlers["tool:result"]!({ callId: "c1", result: "ok" });
     await ctx.handlers["turn:end"]!({ turnId: "t-1", reason: "complete" });
-    const turnStateValues = ctx.emits
-      .filter((e: Emit) => e.event === "status:item-update" && e.payload?.key === "turn-state")
-      .map((e: Emit) => e.payload.value);
-    expect(turnStateValues).toEqual(["thinking", "calling bash", "thinking", "ready"]);
+    const turnStateEmits = ctx.emits.filter((e: Emit) => e.payload?.key === "turn-state");
+    expect(turnStateEmits).toEqual([]);
   });
 
   it("cost: with rate table, two llm:done emits the formatted dollar string", async () => {
@@ -205,7 +200,7 @@ describe("llm-status-items setup", () => {
     await plugin.setup(ctx);
     // Pretend an upstream subscriber already mutated request.model.
     await ctx.handlers["llm:before-call"]!({ request: { model: "memory-injected-model", messages: [] } });
-    const modelEmit = ctx.emits.find((e: Emit) => e.event === "status:item-update" && e.payload?.key === "model");
+    const modelEmit = ctx.emits.find((e: Emit) => e.event === "status:item-update" && e.payload?.key === "_model");
     expect(modelEmit?.payload.value).toBe("memory-injected-model");
   });
 });
