@@ -1,15 +1,17 @@
 import { describe, it, expect, mock } from "bun:test";
 import plugin, { createTuiChannel } from "./index.tsx";
 import { TuiStore } from "./state/store.ts";
+import type { UiPromptService } from "llm-contracts/public";
 
 function makeCtx(overrides: { config?: Record<string, unknown> } = {}) {
   const provided: Record<string, unknown> = {};
   const subs: Record<string, Function[]> = {};
   const emitted: Array<{ event: string; payload?: unknown }> = [];
-  return {
+  const ctx = {
     provided,
     subs,
     emitted,
+    _testStore: null as TuiStore | null,
     log: mock(() => {}),
     config: overrides.config ?? {},
     defineEvent: mock(() => {}),
@@ -18,9 +20,10 @@ function makeCtx(overrides: { config?: Record<string, unknown> } = {}) {
     defineService: mock(() => {}),
     provideService: mock((name: string, impl: unknown) => { provided[name] = impl; }),
     consumeService: mock(() => {}),
-    useService: mock(() => undefined),
+    useService: mock((name: string) => provided[name]),
     secrets: { get: mock(async () => undefined), refresh: mock(async () => undefined) },
   } as any;
+  return ctx;
 }
 
 describe("llm-tui plugin", () => {
@@ -124,6 +127,29 @@ describe("llm-tui plugin", () => {
     );
     expect(hint).toBeDefined();
     expect((hint!.payload as any).value).toContain("⌃X");
+  });
+
+  it("provides ui:prompt service", async () => {
+    const ctx = makeCtx();
+    await plugin.setup(ctx);
+    const promptService = ctx.useService<UiPromptService>("ui:prompt");
+    expect(typeof promptService.requestOption).toBe("function");
+    expect(typeof promptService.requestText).toBe("function");
+  });
+
+  it("ui:prompt.requestOption opens the store slice and resolves on submit", async () => {
+    const ctx = makeCtx();
+    await plugin.setup(ctx);
+    const promptService = ctx.useService<UiPromptService>("ui:prompt");
+    const store: TuiStore = ctx._testStore;
+    const pending = promptService.requestOption({
+      title: "T",
+      body: "B",
+      options: [{ id: "ok", label: "OK" }],
+    });
+    expect(store.snapshot().prompt).not.toBeNull();
+    store.submitPrompt({ id: "ok" });
+    await expect(pending).resolves.toEqual({ id: "ok" });
   });
 
   describe("createTuiChannel — WriteOptions forwarded to store", () => {

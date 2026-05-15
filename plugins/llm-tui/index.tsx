@@ -1,7 +1,7 @@
 import React from "react";
 import { render } from "ink";
 import type { KaizenPlugin } from "kaizen/types";
-import type { UiChannelService, UiTheme, UiThemeService, UiStatusService, UiCompletionService, UiToolRendererService, WriteOptions } from "llm-contracts/public";
+import type { UiChannelService, UiTheme, UiThemeService, UiStatusService, UiCompletionService, UiToolRendererService, UiPromptService, WriteOptions } from "llm-contracts/public";
 import { TuiStore } from "./state/store.ts";
 import { makeCompletionRegistry } from "./completion/registry.ts";
 import { makeToolRendererRegistry } from "./tool-renderers/registry.ts";
@@ -16,7 +16,7 @@ const plugin: KaizenPlugin = {
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
   services: {
-    provides: ["ui:channel", "ui:completion-source", "ui:status", "ui:theme", "ui:tool-renderer"],
+    provides: ["ui:channel", "ui:completion-source", "ui:status", "ui:theme", "ui:tool-renderer", "ui:prompt"],
     consumes: ["events:vocabulary"],
   },
 
@@ -45,10 +45,27 @@ const plugin: KaizenPlugin = {
 
     // Store + completion registry are shared between the channel + UI.
     const store = new TuiStore();
+    // Expose store for unit tests via the fake ctx sentinel field.
+    if ("_testStore" in (ctx as any)) (ctx as any)._testStore = store;
     const registry = makeCompletionRegistry();
     ctx.provideService<UiCompletionService>("ui:completion-source", registry.service);
     const toolRenderers = makeToolRendererRegistry();
     ctx.provideService<UiToolRendererService>("ui:tool-renderer", toolRenderers.service);
+
+    const uiPrompt: UiPromptService = {
+      requestOption(req) {
+        return new Promise((resolve) => {
+          store.openOptionsPrompt(req, resolve);
+        });
+      },
+      requestText(req) {
+        return new Promise((resolve) => {
+          store.openTextPrompt(req, resolve);
+        });
+      },
+    };
+    ctx.provideService<UiPromptService>("ui:prompt", uiPrompt);
+
     // Built-in opt-in renderers for common local tools (edit, write, create,
     // bash). Each provides a verbose result view rendered inline below the
     // one-line summary. External tools can override by registering their own
