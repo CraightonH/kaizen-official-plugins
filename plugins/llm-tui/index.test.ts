@@ -11,7 +11,6 @@ function makeCtx(overrides: { config?: Record<string, unknown> } = {}) {
     provided,
     subs,
     emitted,
-    _testStore: null as TuiStore | null,
     log: mock(() => {}),
     config: overrides.config ?? {},
     defineEvent: mock(() => {}),

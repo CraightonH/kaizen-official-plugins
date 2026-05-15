@@ -45,26 +45,10 @@ const plugin: KaizenPlugin = {
 
     // Store + completion registry are shared between the channel + UI.
     const store = new TuiStore();
-    // Expose store for unit tests via the fake ctx sentinel field.
-    if ("_testStore" in (ctx as any)) (ctx as any)._testStore = store;
     const registry = makeCompletionRegistry();
     ctx.provideService<UiCompletionService>("ui:completion-source", registry.service);
     const toolRenderers = makeToolRendererRegistry();
     ctx.provideService<UiToolRendererService>("ui:tool-renderer", toolRenderers.service);
-
-    const uiPrompt: UiPromptService = {
-      requestOption(req) {
-        return new Promise((resolve) => {
-          store.openOptionsPrompt(req, resolve);
-        });
-      },
-      requestText(req) {
-        return new Promise((resolve) => {
-          store.openTextPrompt(req, resolve);
-        });
-      },
-    };
-    ctx.provideService<UiPromptService>("ui:prompt", uiPrompt);
 
     // Built-in opt-in renderers for common local tools (edit, write, create,
     // bash). Each provides a verbose result view rendered inline below the
@@ -252,6 +236,20 @@ const plugin: KaizenPlugin = {
 
     const channel = createTuiChannel(store);
     ctx.provideService<UiChannelService>("ui:channel", channel);
+
+    const uiPrompt: UiPromptService = {
+      requestOption(req) {
+        return new Promise((resolve) => {
+          store.openOptionsPrompt(req, resolve);
+        });
+      },
+      requestText(req) {
+        return new Promise((resolve) => {
+          store.openTextPrompt(req, resolve);
+        });
+      },
+    };
+    ctx.provideService<UiPromptService>("ui:prompt", uiPrompt);
 
     (plugin as any).__ink = inkApp;
   },
