@@ -492,6 +492,104 @@ describe("TuiStore — prompt slice (open)", () => {
   });
 });
 
+describe("TuiStore — prompt slice (navigation)", () => {
+  const openTwo = (s: TuiStore) => {
+    s.openOptionsPrompt(
+      {
+        title: "T",
+        body: "B",
+        options: [
+          { id: "a", label: "A" },
+          { id: "b", label: "B", expandsTo: { kind: "text", placeholder: "p" } },
+        ],
+      },
+      () => {},
+    );
+  };
+
+  it("moveSelection clamps to [0, length-1]", () => {
+    const s = new TuiStore();
+    openTwo(s);
+    s.moveSelection(-1);
+    expect(s.snapshot().prompt!.kind === "options" && s.snapshot().prompt!.selectedIndex).toBe(0);
+    s.moveSelection(1);
+    expect(s.snapshot().prompt!.kind === "options" && s.snapshot().prompt!.selectedIndex).toBe(1);
+    s.moveSelection(1);
+    expect(s.snapshot().prompt!.kind === "options" && s.snapshot().prompt!.selectedIndex).toBe(1);
+  });
+
+  it("moveSelection is a no-op when prompt is text or null", () => {
+    const s = new TuiStore();
+    s.moveSelection(1);
+    expect(s.snapshot().prompt).toBeNull();
+    s.openTextPrompt({ title: "T" }, () => {});
+    s.moveSelection(1);
+    expect(s.snapshot().prompt!.kind).toBe("text");
+  });
+
+  it("tabExpand only expands when selected option has expandsTo", () => {
+    const s = new TuiStore();
+    openTwo(s);
+    s.tabExpand();
+    expect(s.snapshot().prompt!.kind === "options" && s.snapshot().prompt!.expanded).toBeNull();
+    s.moveSelection(1);
+    s.tabExpand();
+    const slice = s.snapshot().prompt;
+    expect(slice!.kind === "options" && slice!.expanded).toEqual({ id: "b", text: "" });
+  });
+
+  it("tabExpand uses defaultValue when expandsTo provides one", () => {
+    const s = new TuiStore();
+    s.openOptionsPrompt(
+      {
+        title: "T",
+        body: "B",
+        options: [{ id: "x", label: "X", expandsTo: { kind: "text", defaultValue: "seed" } }],
+      },
+      () => {},
+    );
+    s.tabExpand();
+    const slice = s.snapshot().prompt;
+    expect(slice!.kind === "options" && slice!.expanded).toEqual({ id: "x", text: "seed" });
+  });
+
+  it("collapseExpansion clears expanded (discarding text)", () => {
+    const s = new TuiStore();
+    openTwo(s);
+    s.moveSelection(1);
+    s.tabExpand();
+    s.setExpandedText("typed");
+    s.collapseExpansion();
+    const slice = s.snapshot().prompt;
+    expect(slice!.kind === "options" && slice!.expanded).toBeNull();
+  });
+
+  it("setExpandedText replaces the expanded text", () => {
+    const s = new TuiStore();
+    openTwo(s);
+    s.moveSelection(1);
+    s.tabExpand();
+    s.setExpandedText("new");
+    const slice = s.snapshot().prompt;
+    expect(slice!.kind === "options" && slice!.expanded?.text).toBe("new");
+  });
+
+  it("setExpandedText is a no-op when not expanded", () => {
+    const s = new TuiStore();
+    openTwo(s);
+    s.setExpandedText("ignored");
+    const slice = s.snapshot().prompt;
+    expect(slice!.kind === "options" && slice!.expanded).toBeNull();
+  });
+
+  it("setStandaloneText replaces text in text mode", () => {
+    const s = new TuiStore();
+    s.openTextPrompt({ title: "T" }, () => {});
+    s.setStandaloneText("hello");
+    expect(s.snapshot().prompt!.kind === "text" && s.snapshot().prompt!.text).toBe("hello");
+  });
+});
+
 describe("TuiStore.latestOutputText", () => {
   it("returns null on empty transcript", () => {
     const s = new TuiStore();

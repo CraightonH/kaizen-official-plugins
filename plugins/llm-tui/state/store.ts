@@ -463,6 +463,50 @@ export class TuiStore {
     this._emit();
   }
 
+  moveSelection(delta: number): void {
+    const p = this._prompt;
+    if (!p || p.kind !== "options") return;
+    const len = p.request.options.length;
+    if (len === 0) return;
+    const next = Math.max(0, Math.min(len - 1, p.selectedIndex + delta));
+    if (next === p.selectedIndex) return;
+    this._prompt = { ...p, selectedIndex: next };
+    this._emit();
+  }
+
+  tabExpand(): void {
+    const p = this._prompt;
+    if (!p || p.kind !== "options") return;
+    const opt = p.request.options[p.selectedIndex];
+    if (!opt?.expandsTo) return;
+    this._prompt = {
+      ...p,
+      expanded: { id: opt.id, text: opt.expandsTo.defaultValue ?? "" },
+    };
+    this._emit();
+  }
+
+  collapseExpansion(): void {
+    const p = this._prompt;
+    if (!p || p.kind !== "options" || !p.expanded) return;
+    this._prompt = { ...p, expanded: null };
+    this._emit();
+  }
+
+  setExpandedText(text: string): void {
+    const p = this._prompt;
+    if (!p || p.kind !== "options" || !p.expanded) return;
+    this._prompt = { ...p, expanded: { ...p.expanded, text } };
+    this._emit();
+  }
+
+  setStandaloneText(text: string): void {
+    const p = this._prompt;
+    if (!p || p.kind !== "text") return;
+    this._prompt = { ...p, text };
+    this._emit();
+  }
+
   private _build(): TuiSnapshot {
     return {
       transcript: this._transcript,
