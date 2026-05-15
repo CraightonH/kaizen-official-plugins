@@ -12,7 +12,7 @@ export type {
   LLMCompleteService,
 } from "./contracts/llm-complete";
 export type { SessionsStoreService, SessionRecord, TurnHandle, EventLogEntry } from "./contracts/sessions-store";
-export type { ToolsRegistryService, ToolHandler, ToolExecutionContext } from "./contracts/tools-registry";
+export type { ToolsRegistryService, ToolHandler, ToolExecutionContext, ToolBeforeExecutePayload } from "./contracts/tools-registry";
 export { CANCEL_TOOL } from "./contracts/tools-registry";
 export type { SystemPromptService, SystemPromptSection, RegisteredSection } from "./contracts/prompt-registry";
 export type {

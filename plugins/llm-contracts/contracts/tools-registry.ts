@@ -8,6 +8,26 @@ export interface ToolExecutionContext {
   log: (msg: string) => void;
 }
 
+export interface ToolBeforeExecutePayload {
+  name: string;
+  /**
+   * Subscribers may overwrite to mutate the args the handler sees, or set
+   * to `CANCEL_TOOL` (`Symbol.for("kaizen.cancel")`) to cancel the call.
+   */
+  args: unknown;
+  callId: string;
+  turnId?: string;
+  sessionId?: string;
+  /**
+   * Optional human-readable cancellation reason. When `args === CANCEL_TOOL`,
+   * the registry emits `tool:error` with this string as the message
+   * (defaulting to `"cancelled by subscriber"` when absent) and rejects with
+   * an `AbortError` whose `.message` matches. Additive: existing subscribers
+   * that don't set this field see no behavior change.
+   */
+  cancelReason?: string;
+}
+
 export type ToolHandler = (args: unknown, ctx: ToolExecutionContext) => Promise<unknown>;
 
 export interface ToolsRegistryService {
