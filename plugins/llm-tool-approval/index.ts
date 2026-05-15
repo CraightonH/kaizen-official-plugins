@@ -16,7 +16,7 @@ import {
   appendAllowAtomic,
   type ConfigFile,
 } from "./config.ts";
-import { makeSubscriber } from "./subscriber.ts";
+import { makeSubscriber, type Subscriber } from "./subscriber.ts";
 import { registerSlashCommands, type SlashRegistryLike, type ApprovalState } from "./slash.ts";
 
 const plugin: KaizenPlugin = {
@@ -57,6 +57,12 @@ const plugin: KaizenPlugin = {
     const writeTarget = () => pickWriteTarget({ cwd, home });
 
     let teardowns: Array<() => void> = [];
+
+    // Subscriber is registered now (setup is the only window where ctx.on is
+    // allowed). Until harness:start resolves services, it no-ops; the brief
+    // window before harness:start should not see any tool calls anyway.
+    let handler: Subscriber = async (_p) => { /* not ready yet */ };
+    ctx.on("tool:before-execute", ((payload: ToolBeforeExecutePayload) => handler(payload)) as (payload?: unknown) => Promise<void>);
 
     ctx.on("harness:start", async () => {
       let uiPrompt: UiPromptService | null = null;
@@ -110,20 +116,19 @@ const plugin: KaizenPlugin = {
         log: ctx.log,
       });
 
-      const wrapped = uiPrompt
+      handler = uiPrompt
         ? subscriber
         : async (p: ToolBeforeExecutePayload) => {
             if (p.args === CANCEL_TOOL) return;
             p.args = CANCEL_TOOL;
             p.cancelReason = "approval gate misconfigured: no ui:prompt service";
           };
-
-      ctx.on("tool:before-execute", wrapped as (payload?: unknown) => Promise<void>);
     });
 
     ctx.on("harness:end", async () => {
       for (const off of teardowns) { try { off(); } catch { /* ignore */ } }
       teardowns = [];
+      handler = async (_p) => { /* not ready */ };
       void ctx.emit("status:item-clear", { id: "approval" });
     });
   },
