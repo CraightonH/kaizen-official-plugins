@@ -119,6 +119,48 @@ describe("integration: WriteOptions forwarded by store (verifies channel delegat
   });
 });
 
+describe("prompt keystroke gating", () => {
+  it("Up/Down navigate options; Enter submits with id; transcript echo lands", async () => {
+    const store = new TuiStore();
+    let resolved: any = null;
+    store.openOptionsPrompt(
+      {
+        title: "Approve?",
+        body: "fs:read_file",
+        options: [
+          { id: "once", label: "Approve Once" },
+          { id: "deny", label: "Deny", expandsTo: { kind: "text" } },
+        ],
+        defaultId: "once",
+      },
+      (r) => { resolved = r; },
+    );
+    store.moveSelection(1);
+    store.submitPrompt({ id: "deny" });
+    expect(resolved).toEqual({ id: "deny" });
+    expect(store.snapshot().prompt).toBeNull();
+    const last = store.snapshot().transcript.filter((e) => e.kind === "notice").at(-1)!;
+    expect((last as any).text).toBe("? Approve? → Deny");
+  });
+
+  it("Tab on expandsTo option opens text; typing + Enter resolves with text", async () => {
+    const store = new TuiStore();
+    let resolved: any = null;
+    store.openOptionsPrompt(
+      {
+        title: "Approve?",
+        body: "fs:read_file",
+        options: [{ id: "deny", label: "Deny", expandsTo: { kind: "text" } }],
+      },
+      (r) => { resolved = r; },
+    );
+    store.tabExpand();
+    store.setExpandedText("no");
+    store.submitPrompt({ id: "deny", text: "no" });
+    expect(resolved).toEqual({ id: "deny", text: "no" });
+  });
+});
+
 describe("integration: Ctrl+X copies latest output", () => {
   it("store accessor returns the most recent assistant message text", () => {
     const store = new TuiStore();

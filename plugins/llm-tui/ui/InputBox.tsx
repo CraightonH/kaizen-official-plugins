@@ -206,6 +206,50 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
   });
 
   useInput((input, key) => {
+    const prompt = snap.prompt;
+    if (prompt) {
+      if (prompt.kind === "options" && !prompt.expanded) {
+        if (key.upArrow) { store.moveSelection(-1); return; }
+        if (key.downArrow) { store.moveSelection(1); return; }
+        if (key.return) {
+          store.submitPrompt({ id: prompt.request.options[prompt.selectedIndex]!.id });
+          return;
+        }
+        if (key.tab) { store.tabExpand(); return; }
+        if (key.escape) { store.escapePrompt(); return; }
+        return;
+      }
+      if (prompt.kind === "options" && prompt.expanded) {
+        if (key.return) {
+          store.submitPrompt({ id: prompt.expanded.id, text: prompt.expanded.text });
+          return;
+        }
+        if (key.escape) { store.collapseExpansion(); return; }
+        if (key.backspace || key.delete) {
+          store.setExpandedText(prompt.expanded.text.slice(0, -1));
+          return;
+        }
+        if (input && !key.ctrl && !key.meta) {
+          store.setExpandedText(prompt.expanded.text + input);
+          return;
+        }
+        return;
+      }
+      if (prompt.kind === "text") {
+        if (key.return) { store.submitPrompt(prompt.text); return; }
+        if (key.escape) { store.submitPrompt(""); return; }
+        if (key.backspace || key.delete) {
+          store.setStandaloneText(prompt.text.slice(0, -1));
+          return;
+        }
+        if (input && !key.ctrl && !key.meta) {
+          store.setStandaloneText(prompt.text + input);
+          return;
+        }
+        return;
+      }
+    }
+    // existing input handling continues below unchanged
     // Ctrl+C: two-step exit, modeled on Claude Code. First press shows a
     // hint (and cancels any in-flight turn / clears a non-empty buffer);
     // a second press within CTRL_C_EXIT_WINDOW_MS unmounts and exits.

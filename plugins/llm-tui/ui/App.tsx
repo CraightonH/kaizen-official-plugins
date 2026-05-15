@@ -12,6 +12,7 @@ import { ThoughtsBlock } from "./ThoughtsBlock.tsx";
 import { HistoryView } from "./HistoryView.tsx";
 import { ToolCallBlock } from "./ToolCallBlock.tsx";
 import { LiveToolCalls } from "./LiveToolCalls.tsx";
+import { PromptBox } from "./PromptBox.tsx";
 import { renderMarkdown } from "./markdown.ts";
 import type { ToolRendererRegistry } from "../tool-renderers/registry.ts";
 
@@ -129,6 +130,7 @@ export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, trigge
               deltaTokens={snap.busy.deltaTokens}
             />
           )}
+          <PromptBox store={store} theme={theme} />
           <InputBox
             store={store}
             registry={registry}
