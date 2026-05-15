@@ -48,7 +48,7 @@ export function makeSubscriber(deps: SubscriberDeps): Subscriber {
         : []),
       {
         id: "deny",
-        label: `Deny                  (Tab for reason)`,
+        label: `Deny`,
         expandsTo: { kind: "text" as const, placeholder: "Reason (optional)" },
       },
     ];
