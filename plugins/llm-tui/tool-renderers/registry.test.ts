@@ -1,4 +1,4 @@
-import { test, expect } from "bun:test";
+import { test, expect, describe, it } from "bun:test";
 import { makeToolRendererRegistry } from "./registry.ts";
 
 test("register and lookup return the registered renderer", () => {
@@ -26,4 +26,41 @@ test("re-register replaces the prior renderer", () => {
   reg.service.register(r1);
   reg.service.register(r2);
   expect(reg.lookup("x")).toBe(r2);
+});
+
+describe("makeToolRendererRegistry — summarize", () => {
+  it("uses registered renderer's collapsedSummary", () => {
+    const reg = makeToolRendererRegistry();
+    reg.service.register({
+      toolName: "fs:read_file",
+      collapsedSummary: (args: any) => `read ${args.path}`,
+    });
+    expect(reg.service.summarize("fs:read_file", { path: "/tmp/foo" })).toBe("read /tmp/foo");
+  });
+
+  it("falls back to name + JSON for unregistered tools", () => {
+    const reg = makeToolRendererRegistry();
+    const out = reg.service.summarize("mcp:github:list_issues", { state: "open" });
+    expect(out).toContain("mcp:github:list_issues");
+    expect(out).toContain(`"state": "open"`);
+  });
+
+  it("truncates long args with a suffix", () => {
+    const reg = makeToolRendererRegistry();
+    const big = "x".repeat(5000);
+    const out = reg.service.summarize("noop", { big });
+    expect(out.length).toBeLessThan(1700); // 1500 + name + suffix
+    expect(out).toMatch(/… \(\d+ more chars\)/);
+  });
+
+  it("handles errors in collapsedSummary by falling back to JSON", () => {
+    const reg = makeToolRendererRegistry();
+    reg.service.register({
+      toolName: "boom",
+      collapsedSummary: () => { throw new Error("bad"); },
+    });
+    const out = reg.service.summarize("boom", { x: 1 });
+    expect(out).toContain("boom");
+    expect(out).toContain(`"x": 1`);
+  });
 });
