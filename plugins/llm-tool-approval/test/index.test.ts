@@ -81,9 +81,9 @@ describe("llm-tool-approval plugin", () => {
     const { ctx, emitted } = makeFakeCtx();
     await plugin.setup(ctx);
     await ctx.emit("harness:start", {});
-    const statusUpdate = emitted.find((e) => e.event === "status:item-update" && e.payload?.id === "approval");
+    const statusUpdate = emitted.find((e) => e.event === "status:item-update" && e.payload?.key === "approval");
     expect(statusUpdate).toBeDefined();
-    expect(statusUpdate!.payload.text).toMatch(/approval: (request|paused)/);
+    expect(statusUpdate!.payload.value).toMatch(/approval: (request|paused)/);
   });
 
   it("registers three slash commands", async () => {

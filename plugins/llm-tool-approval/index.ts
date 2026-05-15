@@ -88,7 +88,7 @@ const plugin: KaizenPlugin = {
       } catch { /* ignore */ }
 
       const setStatus = (value: "request" | "paused") => {
-        void ctx.emit("status:item-update", { id: "approval", text: `approval: ${value}`, priority: 50 });
+        void ctx.emit("status:item-update", { key: "approval", value: `approval: ${value}` });
       };
       setStatus("request");
 
@@ -129,7 +129,7 @@ const plugin: KaizenPlugin = {
       for (const off of teardowns) { try { off(); } catch { /* ignore */ } }
       teardowns = [];
       handler = async (_p) => { /* not ready */ };
-      void ctx.emit("status:item-clear", { id: "approval" });
+      void ctx.emit("status:item-clear", { key: "approval" });
     });
   },
 };
