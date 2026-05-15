@@ -1,4 +1,24 @@
-import type { ToolCallStatus } from "llm-contracts/public";
+import type {
+  ToolCallStatus,
+  UiPromptOptionsRequest,
+  UiPromptTextRequest,
+} from "llm-contracts/public";
+
+export type PromptSlice =
+  | null
+  | {
+      kind: "options";
+      request: UiPromptOptionsRequest;
+      selectedIndex: number;
+      expanded: { id: string; text: string } | null;
+      resolve: (result: { id: string; text?: string }) => void;
+    }
+  | {
+      kind: "text";
+      request: UiPromptTextRequest;
+      text: string;
+      resolve: (text: string) => void;
+    };
 export type { ToolCallStatus };
 export type TranscriptKind = "output" | "notice" | "user" | "thoughts" | "tool_call";
 
@@ -78,6 +98,7 @@ export interface TuiSnapshot {
   liveToolCalls: ReadonlyMap<string, ToolCallEntry>;
   viewMode: ViewMode;
   historyView: HistoryViewState;
+  prompt: PromptSlice;
 }
 
 export class TuiStore {
@@ -91,6 +112,7 @@ export class TuiStore {
   private _liveToolCalls: Map<string, ToolCallEntry> = new Map();
   private _viewMode: ViewMode = "chat";
   private _historyView: HistoryViewState = { focusIdx: -1, expanded: new Set() };
+  private _prompt: PromptSlice = null;
   private _seq = 0;
 
   // Bracketed-paste registry: pasted content is stored here keyed by id; the
@@ -423,6 +445,24 @@ export class TuiStore {
     }
   }
 
+  openOptionsPrompt(
+    request: UiPromptOptionsRequest,
+    resolve: (result: { id: string; text?: string }) => void,
+  ): void {
+    const defaultId = request.defaultId ?? request.options[0]?.id;
+    const idx = Math.max(0, request.options.findIndex((o) => o.id === defaultId));
+    this._prompt = { kind: "options", request, selectedIndex: idx, expanded: null, resolve };
+    this._emit();
+  }
+
+  openTextPrompt(
+    request: UiPromptTextRequest,
+    resolve: (text: string) => void,
+  ): void {
+    this._prompt = { kind: "text", request, text: request.defaultValue ?? "", resolve };
+    this._emit();
+  }
+
   private _build(): TuiSnapshot {
     return {
       transcript: this._transcript,
@@ -435,6 +475,7 @@ export class TuiStore {
       liveToolCalls: new Map(this._liveToolCalls),
       viewMode: this._viewMode,
       historyView: this._historyView,
+      prompt: this._prompt,
     };
   }
 

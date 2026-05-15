@@ -428,6 +428,70 @@ describe("TuiStore", () => {
   });
 });
 
+describe("TuiStore — prompt slice (open)", () => {
+  it("starts with prompt = null", () => {
+    const s = new TuiStore();
+    expect(s.snapshot().prompt).toBeNull();
+  });
+
+  it("openOptionsPrompt sets the slice with defaults", () => {
+    const s = new TuiStore();
+    let resolved: any = null;
+    s.openOptionsPrompt(
+      {
+        title: "T",
+        body: "B",
+        options: [{ id: "a", label: "A" }, { id: "b", label: "B" }],
+      },
+      (r) => { resolved = r; },
+    );
+    const slice = s.snapshot().prompt;
+    expect(slice).not.toBeNull();
+    expect(slice!.kind).toBe("options");
+    if (slice!.kind === "options") {
+      expect(slice!.selectedIndex).toBe(0);
+      expect(slice!.expanded).toBeNull();
+      expect(slice!.request.options.length).toBe(2);
+    }
+    expect(resolved).toBeNull(); // open does not resolve
+  });
+
+  it("openOptionsPrompt honors defaultId", () => {
+    const s = new TuiStore();
+    s.openOptionsPrompt(
+      { title: "T", body: "B", options: [{ id: "a", label: "A" }, { id: "b", label: "B" }], defaultId: "b" },
+      () => {},
+    );
+    const slice = s.snapshot().prompt;
+    expect(slice!.kind === "options" && slice!.selectedIndex).toBe(1);
+  });
+
+  it("openTextPrompt sets kind=text with defaultValue", () => {
+    const s = new TuiStore();
+    s.openTextPrompt({ title: "T", defaultValue: "hello" }, () => {});
+    const slice = s.snapshot().prompt;
+    expect(slice!.kind).toBe("text");
+    if (slice!.kind === "text") {
+      expect(slice!.text).toBe("hello");
+    }
+  });
+
+  it("openTextPrompt defaults text to empty string", () => {
+    const s = new TuiStore();
+    s.openTextPrompt({ title: "T" }, () => {});
+    const slice = s.snapshot().prompt;
+    expect(slice!.kind === "text" && slice!.text).toBe("");
+  });
+
+  it("snapshot identity changes when prompt opens", () => {
+    const s = new TuiStore();
+    const a = s.snapshot();
+    s.openOptionsPrompt({ title: "T", body: "B", options: [{ id: "a", label: "A" }] }, () => {});
+    const b = s.snapshot();
+    expect(b).not.toBe(a);
+  });
+});
+
 describe("TuiStore.latestOutputText", () => {
   it("returns null on empty transcript", () => {
     const s = new TuiStore();
