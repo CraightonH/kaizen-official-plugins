@@ -3,6 +3,7 @@ import type {
   ToolsRegistryService,
   ToolHandler,
   ToolExecutionContext,
+  ToolBeforeExecutePayload,
 } from "llm-contracts/public";
 import { CANCEL_TOOL } from "llm-contracts/public";
 
@@ -103,17 +104,11 @@ export function makeRegistry(emit: Emit): ToolsRegistryService {
       throw new Error(message);
     }
 
-    const beforePayload: {
-      name: string;
-      args: unknown;
-      callId: string;
-      turnId?: string;
-      sessionId?: string;
-    } = { name, args, callId: ctx.callId, ...scoped };
+    const beforePayload: ToolBeforeExecutePayload = { name, args, callId: ctx.callId, ...scoped };
     await emit("tool:before-execute", beforePayload);
 
     if (beforePayload.args === CANCEL_TOOL) {
-      const message = "cancelled by subscriber";
+      const message = beforePayload.cancelReason ?? "cancelled by subscriber";
       await emit("tool:error", { name, callId: ctx.callId, message, ...scoped });
       const err = new Error(message);
       (err as any).name = "AbortError";

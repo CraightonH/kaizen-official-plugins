@@ -169,6 +169,35 @@ describe("makeRegistry — invoke", () => {
     expect(events.map((e) => e.name)).toEqual(["tools:registered", "tool:before-execute", "tool:error"]);
   });
 
+  it("uses payload.cancelReason as the tool:error message when set", async () => {
+    const { emit, on, events } = captureEmit();
+    const r = makeRegistry(emit as any);
+    on("tool:before-execute", (p) => {
+      p.args = CANCEL_TOOL;
+      p.cancelReason = "user denied: not yet";
+    });
+    r.register(SCHEMA("a"), async () => "should not run");
+    await expect(r.invoke("a", { x: 1 }, ctx())).rejects.toMatchObject({
+      name: "AbortError",
+      message: "user denied: not yet",
+    });
+    const errEvent = events.find((e) => e.name === "tool:error")!;
+    expect(errEvent.payload).toMatchObject({ name: "a", message: "user denied: not yet" });
+  });
+
+  it("falls back to 'cancelled by subscriber' when cancelReason is absent", async () => {
+    const { emit, on, events } = captureEmit();
+    const r = makeRegistry(emit as any);
+    on("tool:before-execute", (p) => { p.args = CANCEL_TOOL; });
+    r.register(SCHEMA("a"), async () => "");
+    await expect(r.invoke("a", {}, ctx())).rejects.toMatchObject({
+      name: "AbortError",
+      message: "cancelled by subscriber",
+    });
+    const errEvent = events.find((e) => e.name === "tool:error")!;
+    expect(errEvent.payload.message).toBe("cancelled by subscriber");
+  });
+
   it("handler throw emits tool:error and re-rejects with original error", async () => {
     const { emit, events } = captureEmit();
     const r = makeRegistry(emit as any);
