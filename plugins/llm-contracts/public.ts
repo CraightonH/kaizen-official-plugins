@@ -34,4 +34,10 @@ export type { UiTheme, UiThemeService } from "./contracts/ui-theme";
 export type { UiStatusService } from "./contracts/ui-status";
 export type { UiCompletionService, CompletionItem, CompletionSource } from "./contracts/ui-completion";
 export type { UiToolRenderer, UiToolRendererService, ToolCallStatus } from "./contracts/ui-tool-renderer";
+export type {
+  UiPromptService,
+  UiPromptOption,
+  UiPromptOptionsRequest,
+  UiPromptTextRequest,
+} from "./contracts/ui-prompt";
 export type { DriverService, RunConversationInput, RunConversationOutput } from "./contracts/driver";
