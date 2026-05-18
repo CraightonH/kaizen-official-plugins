@@ -34,10 +34,20 @@
     },
     {
       "kind": "plugin",
+      "name": "llm-config",
+      "description": "Harness-scoped plugin configuration store. Provides config:store.",
+      "categories": ["foundation", "config"],
+      "versions": [
+        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-config" } }
+      ]
+    },
+    {
+      "kind": "plugin",
       "name": "llm-contracts",
       "description": "Service contract definitions for the openai-compatible harness. Pure types + defineService; no runtime behavior.",
       "categories": ["foundation", "contracts"],
       "versions": [
+        { "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-contracts" } },
         { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-contracts" } }
       ]
     },

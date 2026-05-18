@@ -1,6 +1,7 @@
 {
   "plugins": [
-    "official/llm-contracts@0.1.0",
+    "official/llm-contracts@0.2.0",
+    "official/llm-config@0.1.0",
     "official/llm-events@0.7.0",
     "official/llm-session-manager@0.1.1",
     "official/llm-tools-registry@0.3.0",
