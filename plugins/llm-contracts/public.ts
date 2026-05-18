@@ -41,3 +41,11 @@ export type {
   UiPromptTextRequest,
 } from "./contracts/ui-prompt";
 export type { DriverService, RunConversationInput, RunConversationOutput } from "./contracts/driver";
+export type {
+  ConfigStoreService,
+  ConfigSpec,
+  ConfigSchema,
+  ConfigScope,
+  ConfigStatus,
+  FieldSchema,
+} from "./contracts/config-store";
