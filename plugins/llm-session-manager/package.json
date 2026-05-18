@@ -1,6 +1,6 @@
 {
   "name": "llm-session-manager",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Persistent session store and per-session execution trace for the openai-compatible harness.",
   "type": "module",
   "exports": {
@@ -11,6 +11,7 @@
     "kaizen-plugin"
   ],
   "dependencies": {
+    "llm-config": "workspace:*",
     "llm-contracts": "workspace:*",
     "llm-events": "workspace:*"
   },

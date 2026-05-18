@@ -7,8 +7,20 @@ import plugin from "../index";
 function makeCtx() {
   const services = new Map<string, any>();
   const subs = new Map<string, Array<(payload: any) => void | Promise<void>>>();
+  const sessionsBase = mkdtempSync(join(tmpdir(), "lifecycle-"));
+  let registered: any = null;
+  const cfgStore = {
+    register: (spec: any) => { registered = spec; },
+    get: (<T,>(_plugin: string): T => {
+      const d = registered?.defaults ?? { sessionsBase };
+      return { ...d } as unknown as T;
+    }),
+    set: async () => {},
+    watch: () => () => {},
+    list: () => [],
+  };
+  services.set("config:store", cfgStore);
   return {
-    config: { sessionsBase: mkdtempSync(join(tmpdir(), "lifecycle-")) },
     harness: { ref: "official/openai-compatible@0.1.0" },
     log: () => {},
     defineService: () => {},

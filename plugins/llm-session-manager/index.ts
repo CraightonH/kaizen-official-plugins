@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import pkg from "./package.json" with { type: "json" };
 import { harnessKey } from "./harness-key";
-import type { SessionsStoreService } from "llm-contracts/public";
+import type { SessionsStoreService, ConfigStoreService } from "llm-contracts/public";
 import { makeStore } from "./store";
 import { makeTraceSubscriber } from "./trace-subscriber";
 import { makeCommands } from "./commands.ts";
@@ -47,14 +47,21 @@ const plugin: KaizenPlugin = {
     events: { subscribe: [...TRACE_EVENTS, ...LIFECYCLE_EVENTS] },
   },
   services: {
-    consumes: ["events:vocabulary"],
+    consumes: ["events:vocabulary", "config:store"],
     provides: ["sessions:store"],
   },
 
   async setup(ctx) {
     ctx.consumeService("events:vocabulary");
-    const config = (ctx.config ?? {}) as SessionManagerConfig;
-    const sessionsBase = config.sessionsBase ?? join(homedir(), ".kaizen", "sessions");
+    ctx.consumeService("config:store");
+    const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
+    cfgSvc.register({
+      plugin: "llm-session-manager",
+      defaults: { sessionsBase: join(homedir(), ".kaizen", "sessions") },
+      schema: { sessionsBase: { type: "string", min: 1 } },
+    });
+    const config = cfgSvc.get<SessionManagerConfig>("llm-session-manager");
+    const sessionsBase = config.sessionsBase;
     // ctx.harness is a Kaizen runtime extension not yet on PluginContext.
     const key = harnessKey((ctx as { harness?: import("./harness-key").HarnessIdentity }).harness ?? {});
     const store = makeStore({
