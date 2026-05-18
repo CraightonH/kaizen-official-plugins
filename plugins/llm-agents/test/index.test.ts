@@ -14,9 +14,23 @@ function makeSessions() {
   };
 }
 
-function makeCtx(opts: { tools?: any; driver?: any; sessions?: any; promptSystem?: any; readFile?: any } = {}) {
+function makeConfigStore(initial: Record<string, unknown> = {}) {
+  const stored: Record<string, unknown> = { ...initial };
+  return {
+    register: mock((spec: { plugin: string; defaults: unknown }) => {
+      if (!(spec.plugin in stored)) stored[spec.plugin] = spec.defaults;
+    }),
+    get: mock(<T,>(plugin: string): T => (stored[plugin] ?? {}) as unknown as T),
+    set: mock(async () => {}),
+    watch: mock(() => () => {}),
+    list: mock(() => Object.keys(stored).map((plugin) => ({ plugin }))),
+  };
+}
+
+function makeCtx(opts: { tools?: any; driver?: any; sessions?: any; promptSystem?: any; readFile?: any; configStore?: any } = {}) {
   const subs: Record<string, ((p: any) => any)[]> = {};
   const provided: Record<string, unknown> = {};
+  const configStore = opts.configStore ?? makeConfigStore();
   return {
     subs, provided,
     log: mock(() => {}),
@@ -32,6 +46,7 @@ function makeCtx(opts: { tools?: any; driver?: any; sessions?: any; promptSystem
       if (name === "driver:run-conversation") return opts.driver;
       if (name === "sessions:store") return opts.sessions ?? makeSessions();
       if (name === "prompt:registry") return opts.promptSystem;
+      if (name === "config:store") return configStore;
       return undefined;
     },
     secrets: { get: async () => undefined, refresh: async () => undefined },
@@ -83,6 +98,7 @@ describe("llm-agents plugin", () => {
     // sessions:store, prompt:system) are not declared as hard consumes —
     // the plugin emits harness:error and degrades when they're absent.
     expect(plugin.services?.consumes).toContain("events:vocabulary");
+    expect(plugin.services?.consumes).toContain("config:store");
     expect(plugin.services?.consumes).not.toContain("prompt:system");
   });
 

@@ -52,8 +52,9 @@
     },
     "plugins/llm-agents": {
       "name": "llm-agents",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "dependencies": {
+        "llm-config": "workspace:*",
         "llm-contracts": "workspace:*",
         "llm-driver": "workspace:*",
         "llm-events": "workspace:*",

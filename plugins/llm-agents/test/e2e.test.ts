@@ -1,10 +1,21 @@
 import { describe, it, expect, mock } from "bun:test";
-import { mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import plugin from "../index.ts";
 
-function makeCtx(opts: { tools?: any; driver?: any } = {}) {
+function makeConfigStore(initial: Record<string, unknown> = {}) {
+  const stored: Record<string, unknown> = { ...initial };
+  return {
+    register: mock((spec: { plugin: string; defaults: unknown }) => {
+      if (!(spec.plugin in stored)) stored[spec.plugin] = spec.defaults;
+    }),
+    get: mock(<T,>(plugin: string): T => (stored[plugin] ?? {}) as unknown as T),
+    set: mock(async () => {}),
+    watch: mock(() => () => {}),
+    list: mock(() => Object.keys(stored).map((plugin) => ({ plugin }))),
+  };
+}
+
+function makeCtx(opts: { tools?: any; driver?: any; configStore?: any } = {}) {
   const subs: Record<string, ((p: any) => any)[]> = {};
   const provided: Record<string, unknown> = {};
   let registeredTool: any = null;
@@ -55,6 +66,7 @@ function makeCtx(opts: { tools?: any; driver?: any } = {}) {
         list: () => [],
         generation: () => 0,
       };
+      if (name === "config:store") return opts.configStore;
       return undefined;
     },
     secrets: { get: async () => undefined, refresh: async () => undefined },
@@ -63,15 +75,14 @@ function makeCtx(opts: { tools?: any; driver?: any } = {}) {
 
 describe("llm-agents E2E", () => {
   it("discovers fixtures, lists agents, dispatches with manifest system prompt", async () => {
-    const tmp = await mkdtemp(join(tmpdir(), "llm-agents-e2e-"));
-    const cfgPath = join(tmp, "config.json");
     const fixturesRoot = new URL("./fixtures", import.meta.url).pathname;
-    await writeFile(cfgPath, JSON.stringify({
-      maxDepth: 3,
-      userDir: join(fixturesRoot, "agents-user"),
-      projectDir: join(fixturesRoot, "agents-project"),
-    }));
-    process.env.KAIZEN_LLM_AGENTS_CONFIG = cfgPath;
+    const configStore = makeConfigStore({
+      "llm-agents": {
+        maxDepth: 3,
+        userDir: join(fixturesRoot, "agents-user"),
+        projectDir: join(fixturesRoot, "agents-project"),
+      },
+    });
 
     let captured: any = null;
     const driver = {
@@ -80,7 +91,7 @@ describe("llm-agents E2E", () => {
         return { finalMessage: { role: "assistant", content: "DONE" }, usage: { promptTokens: 1, completionTokens: 1 } };
       }),
     };
-    const ctx = makeCtx({ driver });
+    const ctx = makeCtx({ driver, configStore });
     await plugin.setup(ctx);
     await new Promise((r) => setTimeout(r, 50));
 
@@ -104,7 +115,5 @@ describe("llm-agents E2E", () => {
     expect(captured.userMessage).toEqual({ role: "user", content: "review file X" });
     expect(captured.toolFilter.names).toContain("dispatch_agent");
     expect(captured.toolFilter.names).toContain("read_file");
-
-    delete process.env.KAIZEN_LLM_AGENTS_CONFIG;
   });
 });

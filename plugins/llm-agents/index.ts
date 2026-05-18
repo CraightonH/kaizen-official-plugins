@@ -1,17 +1,20 @@
 import type { KaizenPlugin } from "kaizen/types";
 import type { AgentsRegistryService } from "llm-contracts/public";
 import type { ToolsRegistryService } from "llm-tools-registry/public";
+import type { ConfigStoreService } from "llm-contracts/public";
 import type { DriverService } from "llm-contracts/public";
 import type { SessionsStoreService } from "llm-contracts/public";
 import type { SystemPromptService } from "llm-contracts/public";
 import type { SlashRegistryService } from "llm-contracts/public";
+import type { AgentsConfigFile } from "./public.d.ts";
 import { makeSlashHandlers } from "./slash.ts";
-import { loadConfig, realDeps } from "./config.ts";
+import { resolveDir } from "./paths.ts";
 import { loadFromDirs } from "./loader.ts";
 import { makeRegistry, makeRegistryHandle } from "./registry.ts";
 import { makeTurnTracker } from "./turn-tracker.ts";
 import { makeInjector, buildAgentsBlock } from "./injector.ts";
 import { makeDispatchTool } from "./dispatch.ts";
+import { homedir } from "node:os";
 import { readdir, stat as fsStat, realpath as fsRealpath, readFile as fsReadFile } from "node:fs/promises";
 
 // Module-scope handles for idempotent stop() cleanup. Reset every setup().
@@ -39,13 +42,35 @@ const plugin: KaizenPlugin = {
       "prompt:registry",
       "skills:registry",
       "slash:registry",
+      "config:store",
     ],
   },
 
   async setup(ctx) {
     ctx.consumeService("events:vocabulary");
+    ctx.consumeService("config:store");
     const log = (m: string) => ctx.log(m);
-    const config = await loadConfig(realDeps(log));
+
+    const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
+    cfgSvc.register<AgentsConfigFile>({
+      plugin: "llm-agents",
+      defaults: {
+        maxDepth: 3,
+        userDir: "~/.kaizen/agents",
+        projectDir: ".kaizen/agents",
+      },
+      schema: {
+        maxDepth: { type: "number", integer: true, min: 1 },
+        userDir: { type: "string", min: 1 },
+        projectDir: { type: "string", min: 1 },
+      },
+    });
+    const cfg = cfgSvc.get<AgentsConfigFile>("llm-agents");
+    const home = homedir();
+    const cwd = process.cwd();
+    const resolvedUserDir = resolveDir(cfg.userDir!, home, cwd);
+    const resolvedProjectDir = resolveDir(cfg.projectDir!, home, cwd);
+    const maxDepth = cfg.maxDepth!;
 
     // bumpGeneration callback — closure-captured so both the initial empty
     // registry and the post-discovery registry can call it without knowing
@@ -82,7 +107,7 @@ const plugin: KaizenPlugin = {
         tracker,
         driver,
         sessions,
-        maxDepth: config.maxDepth,
+        maxDepth,
         hasSkills: () => !!ctx.useService("skills:registry"),
         emit: async (event, payload) => { await ctx.emit(event, payload); },
       });
@@ -125,8 +150,8 @@ const plugin: KaizenPlugin = {
     queueMicrotask(async () => {
       try {
         const result = await loadFromDirs({
-          userDir: config.resolvedUserDir,
-          projectDir: config.resolvedProjectDir,
+          userDir: resolvedUserDir,
+          projectDir: resolvedProjectDir,
           deps: {
             readDir: (p) => readdir(p),
             stat: (p) => fsStat(p) as any,
