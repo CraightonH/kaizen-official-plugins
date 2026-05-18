@@ -1,4 +1,4 @@
-import type { ConfigFile } from "./config.ts";
+import type { ConfigStoreService } from "llm-contracts/public";
 
 export interface SlashCommandManifestLike {
   name: string;
@@ -16,12 +16,18 @@ export interface SlashRegistryLike {
 
 export interface ApprovalState { paused: boolean; }
 
+export interface ToolApprovalRuleSet {
+  allow: string[];
+  deny: string[];
+}
+
 export interface SlashDeps {
   state: ApprovalState;
   setStatus: (value: "request" | "paused") => void;
-  rulesBySource: () => { defaults: ConfigFile; global: ConfigFile; project: ConfigFile };
-  writeTarget: () => string;
+  cfgSvc: Pick<ConfigStoreService, "get" | "list">;
 }
+
+const PLUGIN = "llm-tool-approval";
 
 export function registerSlashCommands(slash: SlashRegistryLike, deps: SlashDeps): Array<() => void> {
   const offs: Array<() => void> = [];
@@ -45,29 +51,32 @@ export function registerSlashCommands(slash: SlashRegistryLike, deps: SlashDeps)
   ));
 
   offs.push(slash.register(
-    { name: "approval:status", description: "Show approval-gate pause state, per-source rule counts, effective rules, and the next write target.", source: "plugin" },
+    { name: "approval:status", description: "Show approval-gate pause state, effective rules, resolution per field, and the write target.", source: "plugin" },
     async (ctx) => {
-      const src = deps.rulesBySource();
-      const counts = (cfg: ConfigFile) => `${cfg.allow.length} allow, ${cfg.deny.length} deny`;
-      const allow = dedupe([...src.defaults.allow, ...src.global.allow, ...src.project.allow]);
-      const deny = dedupe([...src.defaults.deny, ...src.global.deny, ...src.project.deny]);
+      const effective = deps.cfgSvc.get<ToolApprovalRuleSet>(PLUGIN);
+      const allow = Array.isArray(effective?.allow) ? effective.allow : [];
+      const deny = Array.isArray(effective?.deny) ? effective.deny : [];
+
+      const status = deps.cfgSvc.list().find((s) => s.plugin === PLUGIN);
+      const allowSrc = status?.resolution?.allow ?? "default";
+      const denySrc = status?.resolution?.deny ?? "default";
+      const writeTarget = status?.projectPath ?? "(project config path unknown)";
+
       const lines = [
         `paused: ${deps.state.paused}`,
         `sources:`,
-        `  defaults: ${counts(src.defaults)}`,
-        `  global: ${counts(src.global)}`,
-        `  project: ${counts(src.project)}`,
-        `effective allow: ${allow.join(", ") || "(none)"}`,
-        `effective deny: ${deny.join(", ") || "(none)"}`,
-        `next write target: ${deps.writeTarget()}`,
+        `  home: ${status?.homeExists ? status.homePath : "(none)"}`,
+        `  project: ${status?.projectExists ? status.projectPath : "(none)"}`,
+        `resolution:`,
+        `  allow: ${allowSrc}`,
+        `  deny: ${denySrc}`,
+        `effective allow (${allow.length}): ${allow.join(", ") || "(none)"}`,
+        `effective deny (${deny.length}): ${deny.join(", ") || "(none)"}`,
+        `next write target: ${writeTarget}`,
       ];
       await ctx.print(lines.join("\n"));
     },
   ));
 
   return offs;
-}
-
-function dedupe(arr: string[]): string[] {
-  return [...new Set(arr)].sort();
 }

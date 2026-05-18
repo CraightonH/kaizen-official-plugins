@@ -282,8 +282,9 @@
     },
     "plugins/llm-tool-approval": {
       "name": "llm-tool-approval",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "dependencies": {
+        "llm-config": "workspace:*",
         "llm-contracts": "workspace:*",
         "llm-events": "workspace:*",
       },

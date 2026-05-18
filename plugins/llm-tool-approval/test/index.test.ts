@@ -1,14 +1,36 @@
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "../index.ts";
-import type { ToolBeforeExecutePayload, UiPromptService, UiToolRendererService, UiChannelService } from "llm-contracts/public";
+import type { ToolBeforeExecutePayload, UiPromptService, UiToolRendererService, UiChannelService, ConfigStoreService, ConfigSpec } from "llm-contracts/public";
 
-function makeFakeCtx(opts: { hasPrompt?: boolean; hasRenderer?: boolean; hasChannel?: boolean; hasSlash?: boolean } = {}) {
+function makeFakeCtx(opts: { hasPrompt?: boolean; hasRenderer?: boolean; hasChannel?: boolean; hasSlash?: boolean; hasConfig?: boolean } = {}) {
   const services = new Map<string, any>();
   const handlers: Record<string, ((p: any) => any)[]> = {};
   const emitted: { event: string; payload: any }[] = [];
   const statusEvents: any[] = [];
   const logs: string[] = [];
   const slashRegistered: any[] = [];
+
+  if (opts.hasConfig !== false) {
+    let registered: ConfigSpec<any> | null = null;
+    const store: ConfigStoreService = {
+      register: (spec) => { registered = spec as ConfigSpec<any>; },
+      get: (<T,>(_plugin: string): T => {
+        const d = (registered?.defaults ?? { allow: [], deny: [] }) as any;
+        return { allow: [...(d.allow ?? [])], deny: [...(d.deny ?? [])] } as unknown as T;
+      }) as ConfigStoreService["get"],
+      set: async () => {},
+      watch: () => () => {},
+      list: () => [{
+        plugin: "llm-tool-approval",
+        homePath: "/home/u/.kaizen/harnesses/openai-compatible/config.json",
+        projectPath: "/proj/.kaizen/harnesses/openai-compatible/config.json",
+        homeExists: false,
+        projectExists: false,
+        resolution: { allow: "default", deny: "default" },
+      }],
+    };
+    services.set("config:store", store);
+  }
 
   if (opts.hasPrompt !== false) {
     const prompt: UiPromptService = {
@@ -61,16 +83,30 @@ describe("llm-tool-approval plugin", () => {
   it("has plugin metadata", () => {
     expect(plugin.name).toBe("llm-tool-approval");
     expect(plugin.services?.consumes).toEqual(expect.arrayContaining([
-      "ui:prompt", "ui:tool-renderer", "ui:channel", "ui:status", "slash:registry",
+      "ui:prompt", "ui:tool-renderer", "ui:channel", "ui:status", "slash:registry", "config:store",
     ]));
   });
 
+  it("registers its config spec on setup", async () => {
+    const { ctx, services } = makeFakeCtx();
+    const store = services.get("config:store") as ConfigStoreService;
+    const registerSpy = mock(store.register);
+    (store as any).register = registerSpy;
+    await plugin.setup(ctx);
+    expect(registerSpy).toHaveBeenCalled();
+    const spec = (registerSpy.mock.calls[0] as any[])[0];
+    expect(spec.plugin).toBe("llm-tool-approval");
+    expect(Array.isArray(spec.defaults.allow)).toBe(true);
+    expect(Array.isArray(spec.defaults.deny)).toBe(true);
+  });
+
   it("subscribes to tool:before-execute and prompts when no rule matches", async () => {
-    const { ctx, services, handlers, emitted } = makeFakeCtx();
+    const { ctx, services, handlers } = makeFakeCtx();
     await plugin.setup(ctx);
     await ctx.emit("harness:start", {});
     const sub = handlers["tool:before-execute"]?.[0];
     expect(sub).toBeDefined();
+    // pick a name that does NOT match any shipped default (defaults include execute_typescript, llm-skills:*, etc.)
     const payload: ToolBeforeExecutePayload = { name: "mcp:github:list_issues", args: { state: "open" }, callId: "c1" };
     await sub(payload);
     const prompt = services.get("ui:prompt") as any;

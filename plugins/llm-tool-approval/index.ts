@@ -5,26 +5,23 @@ import type {
   UiPromptService,
   UiToolRendererService,
   UiChannelService,
+  ConfigStoreService,
 } from "llm-contracts/public";
-import { join } from "node:path";
-import { homedir } from "node:os";
 import defaultsRaw from "./defaults.json" with { type: "json" };
-import {
-  loadSource,
-  mergeRules,
-  pickWriteTarget,
-  appendAllowAtomic,
-  type ConfigFile,
-} from "./config.ts";
 import { makeSubscriber, type Subscriber } from "./subscriber.ts";
 import { registerSlashCommands, type SlashRegistryLike, type ApprovalState } from "./slash.ts";
+
+export interface ToolApprovalConfig {
+  allow: string[];
+  deny: string[];
+}
 
 const plugin: KaizenPlugin = {
   name: "llm-tool-approval",
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
   services: {
-    consumes: ["ui:prompt", "ui:tool-renderer", "ui:channel", "ui:status", "slash:registry"],
+    consumes: ["ui:prompt", "ui:tool-renderer", "ui:channel", "ui:status", "slash:registry", "config:store"],
   },
 
   async setup(ctx) {
@@ -32,29 +29,39 @@ const plugin: KaizenPlugin = {
     ctx.consumeService("ui:tool-renderer");
     ctx.consumeService("ui:channel");
     ctx.consumeService("slash:registry");
+    ctx.consumeService("config:store");
+
+    const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
+    cfgSvc.register<ToolApprovalConfig>({
+      plugin: "llm-tool-approval",
+      defaults: {
+        allow: Array.isArray((defaultsRaw as any).allow) ? ((defaultsRaw as any).allow as string[]) : [],
+        deny: Array.isArray((defaultsRaw as any).deny) ? ((defaultsRaw as any).deny as string[]) : [],
+      },
+      schema: {
+        allow: { type: "array", items: { type: "string" } },
+        deny: { type: "array", items: { type: "string" } },
+      },
+    });
 
     const state: ApprovalState = { paused: false };
 
-    const home = homedir();
-    const cwd = process.cwd();
-    const globalPath = join(home, ".kaizen", "plugins", "llm-tool-approval", "config.json");
-    const projectPath = join(cwd, ".kaizen", "plugins", "llm-tool-approval", "config.json");
-
-    const defaultsCfg: ConfigFile = {
-      allow: Array.isArray((defaultsRaw as any).allow) ? ((defaultsRaw as any).allow as string[]) : [],
-      deny: Array.isArray((defaultsRaw as any).deny) ? ((defaultsRaw as any).deny as string[]) : [],
-    };
-    let globalCfg = loadSource(globalPath, ctx.log);
-    let projectCfg = loadSource(projectPath, ctx.log);
-
-    const reloadSources = () => {
-      globalCfg = loadSource(globalPath, ctx.log);
-      projectCfg = loadSource(projectPath, ctx.log);
+    const rules = (): ToolApprovalConfig => {
+      const v = cfgSvc.get<ToolApprovalConfig>("llm-tool-approval");
+      return {
+        allow: Array.isArray(v?.allow) ? v.allow : [],
+        deny: Array.isArray(v?.deny) ? v.deny : [],
+      };
     };
 
-    const rulesBySource = () => ({ defaults: defaultsCfg, global: globalCfg, project: projectCfg });
-    const rules = () => mergeRules([defaultsCfg, globalCfg, projectCfg]);
-    const writeTarget = () => pickWriteTarget({ cwd, home });
+    const persistAllow = async (entry: string): Promise<void> => {
+      const current = rules();
+      await cfgSvc.set<ToolApprovalConfig>(
+        "llm-tool-approval",
+        { allow: dedupeSort([...current.allow, entry]) },
+        "project",
+      );
+    };
 
     let teardowns: Array<() => void> = [];
 
@@ -94,7 +101,7 @@ const plugin: KaizenPlugin = {
 
       try {
         const slash = ctx.useService<SlashRegistryLike>("slash:registry");
-        const offs = registerSlashCommands(slash, { state, setStatus, rulesBySource, writeTarget });
+        const offs = registerSlashCommands(slash, { state, setStatus, cfgSvc });
         teardowns.push(...offs);
       } catch (err) {
         ctx.log(`llm-tool-approval: slash:registry unavailable — slash commands not registered. (${(err as Error).message})`);
@@ -108,10 +115,7 @@ const plugin: KaizenPlugin = {
           requestOption: async (_req) => ({ id: "__missing__" }),
           requestText: async () => "",
         },
-        persistAllow: (entry) => {
-          appendAllowAtomic(writeTarget(), entry);
-          reloadSources();
-        },
+        persistAllow,
         writeNotice,
         log: ctx.log,
       });
@@ -136,6 +140,10 @@ const plugin: KaizenPlugin = {
 
 function safeJsonStringify(v: unknown): string {
   try { return JSON.stringify(v, null, 2); } catch { return String(v); }
+}
+
+function dedupeSort(arr: string[]): string[] {
+  return [...new Set(arr)].sort();
 }
 
 export default plugin;

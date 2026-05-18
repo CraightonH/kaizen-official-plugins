@@ -5,14 +5,18 @@ import type {
   UiPromptService,
 } from "llm-contracts/public";
 import { deriveDomain, matchesAny } from "./matcher.ts";
-import type { ConfigFile } from "./config.ts";
+
+export interface RuleSet {
+  allow: string[];
+  deny: string[];
+}
 
 export interface SubscriberDeps {
   isPaused: () => boolean;
-  rules: () => ConfigFile;
+  rules: () => RuleSet;
   summarize: (name: string, args: unknown) => string;
   prompt: Pick<UiPromptService, "requestOption" | "requestText">;
-  persistAllow: (entry: string) => void;
+  persistAllow: (entry: string) => void | Promise<void>;
   writeNotice: (text: string) => void;
   log: (msg: string) => void;
 }
@@ -65,7 +69,7 @@ export function makeSubscriber(deps: SubscriberDeps): Subscriber {
       case "approve-once":
         return;
       case "approve-always":
-        tryPersist(deps, payload.name);
+        await tryPersist(deps, payload.name);
         return;
       case "approve-domain-always": {
         if (!domain) {
@@ -74,7 +78,7 @@ export function makeSubscriber(deps: SubscriberDeps): Subscriber {
           );
           return;
         }
-        tryPersist(deps, domain);
+        await tryPersist(deps, domain);
         return;
       }
       case "deny": {
@@ -93,9 +97,9 @@ export function makeSubscriber(deps: SubscriberDeps): Subscriber {
   };
 }
 
-function tryPersist(deps: SubscriberDeps, entry: string): void {
+async function tryPersist(deps: SubscriberDeps, entry: string): Promise<void> {
   try {
-    deps.persistAllow(entry);
+    await deps.persistAllow(entry);
   } catch (err) {
     const msg = (err as Error)?.message ?? String(err);
     deps.writeNotice(`Failed to persist approval rule: ${msg}. This call was approved one-time.`);

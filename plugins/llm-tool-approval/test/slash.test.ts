@@ -1,5 +1,6 @@
 import { describe, it, expect, mock } from "bun:test";
-import { registerSlashCommands, type SlashRegistryLike, type ApprovalState, type SlashDeps } from "../slash.ts";
+import { registerSlashCommands, type SlashRegistryLike, type SlashDeps } from "../slash.ts";
+import type { ConfigStatus } from "llm-contracts/public";
 
 function makeRegistry() {
   const registered: { manifest: any; handler: any }[] = [];
@@ -15,16 +16,33 @@ function makeRegistry() {
   return { reg, registered };
 }
 
+interface FakeStoreOpts {
+  effective?: { allow: string[]; deny: string[] };
+  status?: Partial<ConfigStatus>;
+}
+
+function makeCfgSvc(opts: FakeStoreOpts = {}): SlashDeps["cfgSvc"] {
+  const effective = opts.effective ?? { allow: [], deny: [] };
+  const baseStatus: ConfigStatus = {
+    plugin: "llm-tool-approval",
+    homePath: "/home/u/.kaizen/harnesses/openai-compatible/config.json",
+    projectPath: "/proj/.kaizen/harnesses/openai-compatible/config.json",
+    homeExists: false,
+    projectExists: false,
+    resolution: { allow: "default", deny: "default" },
+    ...(opts.status ?? {}),
+  };
+  return {
+    get: <T,>(_plugin: string): T => effective as unknown as T,
+    list: () => [baseStatus],
+  };
+}
+
 function makeDeps(over: Partial<SlashDeps> = {}): SlashDeps {
   return {
     state: { paused: false },
     setStatus: () => {},
-    rulesBySource: () => ({
-      defaults: { allow: [], deny: [] },
-      global: { allow: [], deny: [] },
-      project: { allow: [], deny: [] },
-    }),
-    writeTarget: () => "/home/u/.kaizen/plugins/llm-tool-approval/config.json",
+    cfgSvc: makeCfgSvc(),
     ...over,
   };
 }
@@ -80,25 +98,45 @@ describe("registerSlashCommands", () => {
     expect(deps.state.paused).toBe(true);
   });
 
-  it("approval:status prints pause state + per-source counts + merged + target", async () => {
+  it("approval:status prints pause state, effective rules, resolution + write target", async () => {
     const { reg, registered } = makeRegistry();
-    const deps = makeDeps({
-      rulesBySource: () => ({
-        defaults: { allow: ["x"], deny: [] },
-        global:   { allow: ["y"], deny: ["bad"] },
-        project:  { allow: ["x", "z"], deny: [] },
-      }),
-      writeTarget: () => "/proj/.kaizen/plugins/llm-tool-approval/config.json",
+    const cfgSvc = makeCfgSvc({
+      effective: { allow: ["x", "y", "z"], deny: ["bad"] },
+      status: {
+        homeExists: true,
+        projectExists: true,
+        resolution: { allow: "project", deny: "home" },
+        homePath: "/home/u/.kaizen/harnesses/openai-compatible/config.json",
+        projectPath: "/proj/.kaizen/harnesses/openai-compatible/config.json",
+      },
     });
+    const deps = makeDeps({ cfgSvc });
     registerSlashCommands(reg, deps);
     const status = registered.find((r) => r.manifest.name === "approval:status")!.handler;
     const out = (await callHandler(status)).join("\n");
     expect(out).toContain("paused: false");
-    expect(out).toContain("defaults: 1 allow, 0 deny");
-    expect(out).toContain("global: 1 allow, 1 deny");
-    expect(out).toContain("project: 2 allow, 0 deny");
-    expect(out).toContain("/proj/.kaizen/plugins/llm-tool-approval/config.json");
-    expect(out).toMatch(/effective allow.*x.*y.*z/);
-    expect(out).toContain("effective deny");
+    expect(out).toContain("effective allow (3)");
+    expect(out).toContain("x, y, z");
+    expect(out).toContain("effective deny (1)");
+    expect(out).toContain("bad");
+    expect(out).toContain("allow: project");
+    expect(out).toContain("deny: home");
+    expect(out).toContain("/proj/.kaizen/harnesses/openai-compatible/config.json");
+  });
+
+  it("approval:status with no files reports (none) for home/project paths", async () => {
+    const { reg, registered } = makeRegistry();
+    const cfgSvc = makeCfgSvc({
+      effective: { allow: [], deny: [] },
+      status: { homeExists: false, projectExists: false },
+    });
+    const deps = makeDeps({ cfgSvc });
+    registerSlashCommands(reg, deps);
+    const status = registered.find((r) => r.manifest.name === "approval:status")!.handler;
+    const out = (await callHandler(status)).join("\n");
+    expect(out).toContain("home: (none)");
+    expect(out).toContain("project: (none)");
+    expect(out).toContain("effective allow (0): (none)");
+    expect(out).toContain("effective deny (0): (none)");
   });
 });
