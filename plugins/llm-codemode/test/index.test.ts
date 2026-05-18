@@ -1,5 +1,6 @@
 import { test, expect } from "bun:test";
 import plugin from "../index.ts";
+import { DEFAULT_CONFIG } from "../defaults.ts";
 
 function makeFakeCtx() {
   const services = new Map<string, unknown>();
@@ -14,6 +15,15 @@ function makeFakeCtx() {
     invoke: async () => undefined,
   };
   services.set("tools:registry", fakeRegistry);
+  const configRegistrations: Array<{ plugin: string }> = [];
+  const fakeConfigStore = {
+    register: (spec: { plugin: string }) => { configRegistrations.push(spec); },
+    get: <T,>(_plugin: string): T => ({ ...DEFAULT_CONFIG }) as unknown as T,
+    set: async () => {},
+    watch: () => () => {},
+    list: () => [],
+  };
+  services.set("config:store", fakeConfigStore);
   return {
     config: {} as any,
     log: (m: string) => log.push(m),
@@ -58,8 +68,9 @@ test("does NOT provide dispatch:strategy", async () => {
   expect(ctx.consumed.has("dispatch:strategy")).toBe(false);
 });
 
-test("consumes tools:registry only", async () => {
+test("consumes tools:registry and config:store", async () => {
   const ctx = makeFakeCtx();
   await (plugin as any).setup(ctx);
   expect(ctx.consumed.has("tools:registry")).toBe(true);
+  expect(ctx.consumed.has("config:store")).toBe(true);
 });

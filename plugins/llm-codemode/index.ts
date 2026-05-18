@@ -1,7 +1,8 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { ToolSchema } from "llm-contracts/public";
+import type { ConfigStoreService, ToolSchema } from "llm-contracts/public";
 import type { ToolExecutionContext, ToolHandler, ToolsRegistryService } from "llm-tools-registry/public";
-import { loadConfig, realDeps } from "./config.ts";
+import { DEFAULT_CONFIG } from "./defaults.ts";
+import type { CodeModeConfig } from "./public.d.ts";
 import { renderSurface, surfaceHash } from "./assembler.ts";
 import { runInSandbox, type SandboxRunResult } from "./sandbox-host.ts";
 import { formatToolResult } from "./serialize.ts";
@@ -29,13 +30,25 @@ const plugin: KaizenPlugin = {
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
   services: {
-    consumes: ["tools:registry"],
+    consumes: ["tools:registry", "config:store"],
   },
 
   async setup(ctx) {
     ctx.consumeService("tools:registry");
+    ctx.consumeService("config:store");
 
-    const config = await loadConfig(realDeps((m) => ctx.log(m)));
+    const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
+    cfgSvc.register<CodeModeConfig>({
+      plugin: "llm-codemode",
+      defaults: { ...DEFAULT_CONFIG },
+      schema: {
+        timeoutMs: { type: "number", min: 1 },
+        maxStdoutBytes: { type: "number", min: 1 },
+        maxReturnBytes: { type: "number", min: 1 },
+        sandbox: { type: "enum", values: ["bun-worker"] },
+      },
+    });
+    const config = cfgSvc.get<CodeModeConfig>("llm-codemode");
 
     const toolsRegistry = ctx.useService<ToolsRegistryService>("tools:registry");
     if (!toolsRegistry || typeof toolsRegistry.listRegistrations !== "function") {
