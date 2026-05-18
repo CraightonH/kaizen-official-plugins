@@ -1,6 +1,6 @@
 // plugins/llm-tavily-search/tool.ts
 import type { ToolExecutionContext, ToolSchema } from "llm-tools-registry/public";
-import type { TavilyConfig } from "./config.ts";
+import type { TavilyConfig } from "./public.d.ts";
 
 export const schema: ToolSchema = {
   name: "web_search",

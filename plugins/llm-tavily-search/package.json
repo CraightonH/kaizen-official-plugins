@@ -1,6 +1,6 @@
 {
   "name": "llm-tavily-search",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Tavily web search tool (web_search) for the openai-compatible harness. Requires TAVILY_API_KEY.",
   "type": "module",
   "exports": {
@@ -10,6 +10,8 @@
     "kaizen-plugin"
   ],
   "dependencies": {
+    "llm-config": "workspace:*",
+    "llm-contracts": "workspace:*",
     "llm-tools-registry": "workspace:*"
   },
   "devDependencies": {
