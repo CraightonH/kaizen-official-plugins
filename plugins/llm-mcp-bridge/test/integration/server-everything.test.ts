@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { ServerLifecycle } from "../../lifecycle.ts";
 import { createClient } from "../../client.ts";
-import type { ResolvedServerConfig } from "../../config.ts";
+import type { ResolvedServerConfig } from "../../servers.ts";
 
 const RUN = process.env.KAIZEN_INTEGRATION === "1";
 const maybe = RUN ? describe : describe.skip;

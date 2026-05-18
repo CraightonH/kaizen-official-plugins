@@ -1,4 +1,4 @@
-import type { ResolvedServerConfig } from "./config.ts";
+import type { ResolvedServerConfig } from "./servers.ts";
 import type { McpClientLike, CreateClientResult } from "./client.ts";
 import { computeBackoffMs as defaultBackoff, RETRY_BUDGET as DEFAULT_BUDGET } from "./backoff.ts";
 import { toToolRegistration } from "./registration.ts";

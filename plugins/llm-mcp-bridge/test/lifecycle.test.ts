@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { ServerLifecycle } from "../lifecycle.ts";
-import type { ResolvedServerConfig } from "../config.ts";
+import type { ResolvedServerConfig } from "../servers.ts";
 import { makeMockClient, type MockClient } from "./mockServer.ts";
 
 class FakeRegistry {

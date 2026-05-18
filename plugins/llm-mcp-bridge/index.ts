@@ -1,8 +1,8 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { McpBridgeService, ServerInfo } from "llm-contracts/public";
+import type { ConfigStoreService, McpBridgeService, ServerInfo } from "llm-contracts/public";
 import type { ToolsRegistryService } from "llm-tools-registry/public";
 import pkg from "./package.json" with { type: "json" };
-import { loadConfig, realDeps } from "./config.ts";
+import { resolveServers, type ServerConfig } from "./servers.ts";
 import { createClient } from "./client.ts";
 import { makeBridgeService } from "./service.ts";
 import { registerSlashCommands, type SlashRegistryLike } from "./slash.ts";
@@ -21,14 +21,43 @@ const plugin: KaizenPlugin = {
     // optional `useService` in setup; declaring them here guarantees their
     // providers run first. Without these, `ctx.useService(...)` throws
     // "no provider" because kaizen has no edge to schedule us after them.
-    consumes: ["tools:registry", "slash:registry"],
+    consumes: ["tools:registry", "slash:registry", "config:store"],
   },
 
   async setup(ctx) {
     const log = (m: string) => ctx.log(m);
-    const cfgDeps = realDeps(log);
-    const initial = await loadConfig(cfgDeps);
-    for (const w of initial.warnings) log(`llm-mcp-bridge: ${w}`);
+    ctx.consumeService("config:store");
+
+    const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
+    cfgSvc.register<{ servers: Record<string, ServerConfig> }>({
+      plugin: "llm-mcp-bridge",
+      defaults: { servers: {} },
+      schema: {
+        servers: {
+          type: "object",
+          properties: {},
+          additionalProperties: {
+            type: "object",
+            properties: {
+              transport: { type: "enum", values: ["stdio", "sse", "http"] },
+              enabled: { type: "boolean" },
+              timeoutMs: { type: "number", min: 1 },
+              healthCheckMs: { type: "number", min: 1 },
+            },
+            additionalProperties: true,
+          },
+        },
+      },
+    });
+
+    const loadResolved = () => {
+      const cfg = cfgSvc.get<{ servers: Record<string, ServerConfig> }>("llm-mcp-bridge");
+      const res = resolveServers(cfg.servers, process.env);
+      for (const w of res.warnings) log(`llm-mcp-bridge: ${w}`);
+      return res.servers;
+    };
+
+    const initialServers = loadResolved();
 
     const registry = ctx.useService<ToolsRegistryService>("tools:registry");
     if (!registry) {
@@ -51,14 +80,14 @@ const plugin: KaizenPlugin = {
       log,
       emit: (e, p) => { void ctx.emit(e, p); },
       createClient: (cfg) => createClient(cfg, { log, version: VERSION }),
-      initialServers: initial.servers,
+      initialServers,
     });
     ctx.provideService<McpBridgeService>("mcp:bridge", svc);
 
     // Slash commands (soft dependency).
     const slash = ctx.useService<SlashRegistryLike>("slash:registry");
     if (slash) {
-      registerSlashCommands(slash, svc, async () => (await loadConfig(realDeps(log))).servers, log);
+      registerSlashCommands(slash, svc, async () => loadResolved(), log);
     } else {
       log("llm-mcp-bridge: slash:registry not present; /mcp:* commands not registered");
     }
@@ -67,7 +96,7 @@ const plugin: KaizenPlugin = {
     registerToolPeers(
       { register: (s, h) => registry.register(s as any, h as any) },
       svc,
-      async () => (await loadConfig(realDeps(log))).servers,
+      async () => loadResolved(),
     );
 
     // Status-bar integration (best-effort). Hide the item entirely when no

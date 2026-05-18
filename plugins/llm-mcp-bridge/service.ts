@@ -1,4 +1,4 @@
-import type { ResolvedServerConfig } from "./config.ts";
+import type { ResolvedServerConfig } from "./servers.ts";
 import type { McpClientLike, CreateClientResult } from "./client.ts";
 import { ServerLifecycle, type LifecycleDeps, type RegistryLike } from "./lifecycle.ts";
 import { makeReadMcpResourceTool, makeListMcpResourcesTool, type NamedClient } from "./registration.ts";

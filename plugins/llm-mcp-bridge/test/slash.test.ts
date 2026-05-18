@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { registerSlashCommands } from "../slash.ts";
-import type { ResolvedServerConfig } from "../config.ts";
+import type { ResolvedServerConfig } from "../servers.ts";
 
 class FakeSlashRegistry {
   registered: Array<{ manifest: any; handler?: any }> = [];

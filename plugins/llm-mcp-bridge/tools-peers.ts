@@ -1,5 +1,5 @@
 import type { McpBridgeService, ServerInfo } from "llm-contracts/public";
-import type { ResolvedServerConfig } from "./config.ts";
+import type { ResolvedServerConfig } from "./servers.ts";
 import type { ToolSchema } from "llm-contracts/public";
 
 export interface ToolHandlerLike {

@@ -1,6 +1,26 @@
-import { readFile as fsReadFile } from "node:fs/promises";
+// Pure server-config resolution: takes the `servers` map from config:store and
+// applies plugin-specific transforms — `${env:VAR}` interpolation, server-name
+// validation, and transport inference. Returns resolved configs ready for the
+// lifecycle layer.
 
 export type Transport = "stdio" | "sse" | "http";
+
+export interface ServerConfig {
+  transport?: Transport;
+  enabled?: boolean;
+  timeoutMs?: number;
+  healthCheckMs?: number;
+  // stdio
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  cwd?: string;
+  // sse / http
+  url?: string;
+  headers?: Record<string, string>;
+  // additional fields allowed (additionalProperties: true in schema)
+  [k: string]: unknown;
+}
 
 export interface ResolvedServerConfig {
   name: string;
@@ -18,17 +38,9 @@ export interface ResolvedServerConfig {
   headers?: Record<string, string>;
 }
 
-export interface ConfigLoadResult {
+export interface ResolveResult {
   servers: Map<string, ResolvedServerConfig>;
   warnings: string[];
-}
-
-export interface ConfigDeps {
-  home: string;
-  cwd: string;
-  env: Record<string, string | undefined>;
-  readFile: (path: string) => Promise<string>;
-  log: (msg: string) => void;
 }
 
 const NAME_RE = /^[a-z0-9][a-z0-9_-]*$/;
@@ -36,27 +48,6 @@ const ENV_INTERP_RE = /\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}/g;
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
-}
-
-interface FileRead {
-  path: string;
-  json: unknown | null;
-  parseError?: string;
-}
-
-async function tryRead(deps: ConfigDeps, path: string): Promise<FileRead | null> {
-  let raw: string;
-  try {
-    raw = await deps.readFile(path);
-  } catch (err: any) {
-    if (err?.code === "ENOENT") return null;
-    return { path, json: null, parseError: String(err?.message ?? err) };
-  }
-  try {
-    return { path, json: JSON.parse(raw) };
-  } catch (err) {
-    return { path, json: null, parseError: `malformed JSON: ${(err as Error).message}` };
-  }
 }
 
 function interpolateEnv(value: string, env: Record<string, string | undefined>): { ok: true; out: string } | { ok: false; missing: string } {
@@ -146,71 +137,35 @@ function resolveOne(
   return cfg;
 }
 
-export async function loadConfig(deps: ConfigDeps): Promise<ConfigLoadResult> {
-  // Resolution: lowest priority first, highest last.
-  // Order: user (lowest), project, env override (highest).
-  const sources: string[] = [
-    `${deps.home}/.kaizen/mcp/servers.json`,
-    `${deps.cwd}/.kaizen/mcp/servers.json`,
-  ];
-  if (deps.env.KAIZEN_MCP_CONFIG) sources.push(deps.env.KAIZEN_MCP_CONFIG);
-
-  const reads: FileRead[] = [];
-  for (const p of sources) {
-    const r = await tryRead(deps, p);
-    if (r !== null) reads.push(r);
-  }
-
+/**
+ * Resolve a `servers` map (as loaded from config:store) into runtime configs.
+ *
+ * Applies (in order):
+ *   - server-name validation (must match /^[a-z0-9][a-z0-9_-]*$/)
+ *   - deep `${env:VAR}` interpolation across all string fields; one missing var
+ *     skips that one server with a warning
+ *   - transport inference (explicit `transport`, else `command` → stdio, else `url` → http)
+ *   - defaults: enabled=true, timeoutMs=30000, healthCheckMs=60000
+ */
+export function resolveServers(
+  servers: Record<string, unknown> | undefined | null,
+  env: Record<string, string | undefined>,
+): ResolveResult {
   const warnings: string[] = [];
-  const servers = new Map<string, ResolvedServerConfig>();
-
-  if (reads.length === 0) {
-    // No MCP config files is the common default — stay silent.
-    return { servers, warnings };
+  const out = new Map<string, ResolvedServerConfig>();
+  if (!isPlainObject(servers)) return { servers: out, warnings };
+  for (const [name, raw] of Object.entries(servers)) {
+    if (!NAME_RE.test(name)) {
+      warnings.push(`server name "${name}" invalid (must match ${NAME_RE}); skipping`);
+      continue;
+    }
+    if (!isPlainObject(raw)) {
+      warnings.push(`server "${name}": entry must be an object; skipping`);
+      continue;
+    }
+    const resolved = resolveOne(name, raw, env, warnings);
+    if (!resolved) continue;
+    out.set(name, resolved);
   }
-
-  for (const r of reads) {
-    if (r.parseError) {
-      warnings.push(`config "${r.path}" malformed: ${r.parseError}; ignoring this file`);
-      deps.log(`llm-mcp-bridge: ${r.parseError} at ${r.path}`);
-      continue;
-    }
-    if (!isPlainObject(r.json)) {
-      warnings.push(`config "${r.path}" must be a JSON object; ignoring`);
-      continue;
-    }
-    const block = (r.json as Record<string, unknown>).servers;
-    if (!isPlainObject(block)) {
-      warnings.push(`config "${r.path}" missing "servers" object; ignoring`);
-      continue;
-    }
-    for (const [name, raw] of Object.entries(block)) {
-      if (!NAME_RE.test(name)) {
-        warnings.push(`server name "${name}" invalid (must match ${NAME_RE}); skipping`);
-        continue;
-      }
-      if (!isPlainObject(raw)) {
-        warnings.push(`server "${name}": entry must be an object; skipping`);
-        continue;
-      }
-      const resolved = resolveOne(name, raw, deps.env, warnings);
-      if (!resolved) continue;
-      if (servers.has(name)) {
-        warnings.push(`server "${name}": override from ${r.path}`);
-      }
-      servers.set(name, resolved);
-    }
-  }
-
-  return { servers, warnings };
-}
-
-export function realDeps(log: (msg: string) => void): ConfigDeps {
-  return {
-    home: process.env.HOME ?? "/",
-    cwd: process.cwd(),
-    env: process.env as Record<string, string | undefined>,
-    readFile: (p) => fsReadFile(p, "utf8"),
-    log,
-  };
+  return { servers: out, warnings };
 }

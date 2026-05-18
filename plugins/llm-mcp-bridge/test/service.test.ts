@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { makeBridgeService } from "../service.ts";
-import type { ResolvedServerConfig } from "../config.ts";
+import type { ResolvedServerConfig } from "../servers.ts";
 import { makeMockClient } from "./mockServer.ts";
 
 class FakeRegistry {
