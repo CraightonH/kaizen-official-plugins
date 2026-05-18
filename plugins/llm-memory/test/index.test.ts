@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import plugin from "../index.ts";
+import { DEFAULT_CONFIG } from "../defaults.ts";
 
 describe("llm-memory metadata", () => {
   it("name + apiVersion", () => {
@@ -19,7 +20,7 @@ describe("llm-memory metadata", () => {
     // their providers first (otherwise useService throws "no provider").
     // driver:run-conversation lookup is inside a deferred turn:end listener,
     // so it's not needed as a topo hint.
-    expect(plugin.services?.consumes).toEqual(["prompt:registry", "tools:registry"]);
+    expect(plugin.services?.consumes).toEqual(["prompt:registry", "tools:registry", "config:store"]);
   });
 });
 
@@ -43,10 +44,24 @@ function makePromptSystem() {
   };
 }
 
-function makeCtx(promptSystemSvc?: any, env: Record<string, string | undefined> = {}) {
+function makeConfigStore(overrides: Partial<Record<string, unknown>> = {}) {
+  const stored: Record<string, unknown> = { ...overrides };
+  return {
+    register: mock((spec: { plugin: string; defaults: unknown }) => {
+      if (!(spec.plugin in stored)) stored[spec.plugin] = spec.defaults;
+    }),
+    get: mock(<T,>(plugin: string): T => (stored[plugin] ?? { ...DEFAULT_CONFIG }) as unknown as T),
+    set: mock(async () => {}),
+    watch: mock(() => () => {}),
+    list: mock(() => Object.keys(stored).map((plugin) => ({ plugin }))),
+  };
+}
+
+function makeCtx(promptSystemSvc?: any, env: Record<string, string | undefined> = {}, configOverride?: Partial<Record<string, unknown>>) {
   const services: Record<string, unknown> = {};
   const handlers: Record<string, Function[]> = {};
   if (promptSystemSvc) services["prompt:registry"] = promptSystemSvc;
+  services["config:store"] = makeConfigStore(configOverride);
   return {
     log: mock(() => {}),
     defineService: mock(() => {}),

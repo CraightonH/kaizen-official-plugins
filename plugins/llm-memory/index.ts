@@ -1,6 +1,7 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { SystemPromptService, RegisteredSection } from "llm-contracts/public";
-import { loadConfig, realDeps } from "./config.ts";
+import type { ConfigStoreService, SystemPromptService, RegisteredSection } from "llm-contracts/public";
+import { DEFAULT_CONFIG } from "./defaults.ts";
+import type { MemoryConfig } from "./public.d.ts";
 import { resolveDirs, ensureDir, sweepStaleTempFiles } from "./paths.ts";
 import { makeMemoryStore } from "./service.ts";
 import { buildMemoryBlock } from "./injection.ts";
@@ -24,12 +25,25 @@ const plugin: KaizenPlugin = {
     // run yet. Declaring them here forces the right order without making
     // them hard dependencies. `driver:run-conversation` lookup happens
     // inside a `turn:end` listener (deferred), so it's not listed.
-    consumes: ["prompt:registry", "tools:registry"],
+    consumes: ["prompt:registry", "tools:registry", "config:store"],
   },
 
   async setup(ctx) {
     const log = (m: string) => ctx.log(m);
-    const config = await loadConfig(realDeps(log));
+    ctx.consumeService("config:store");
+    const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
+    cfgSvc.register<MemoryConfig>({
+      plugin: "llm-memory",
+      defaults: { ...DEFAULT_CONFIG, extractTriggers: [...DEFAULT_CONFIG.extractTriggers], denyTypes: [...DEFAULT_CONFIG.denyTypes] },
+      schema: {
+        injectionByteCap: { type: "number", min: 0 },
+        autoExtract: { type: "boolean" },
+        extractTriggers: { type: "array", items: { type: "string" } },
+        denyTypes: { type: "array", items: { type: "enum", values: ["user", "feedback", "project", "reference"] } },
+        staleTempMs: { type: "number", min: 0 },
+      },
+    });
+    const config = cfgSvc.get<MemoryConfig>("llm-memory");
     const { globalDir, projectDir } = resolveDirs({
       home: process.env.HOME ?? "/",
       cwd: process.cwd(),

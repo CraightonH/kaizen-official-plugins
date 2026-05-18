@@ -175,8 +175,9 @@
     },
     "plugins/llm-memory": {
       "name": "llm-memory",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "dependencies": {
+        "llm-config": "workspace:*",
         "llm-contracts": "workspace:*",
         "llm-system-prompt": "workspace:*",
         "llm-tools-registry": "workspace:*",

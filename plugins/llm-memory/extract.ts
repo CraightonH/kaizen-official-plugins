@@ -1,4 +1,4 @@
-import type { MemoryConfig } from "./config.ts";
+import type { MemoryConfig } from "./public.d.ts";
 
 export interface RunConversationFn {
   (input: {
