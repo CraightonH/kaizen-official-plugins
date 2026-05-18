@@ -1,6 +1,7 @@
 import { describe, it, expect, mock } from "bun:test";
 import { makeService } from "../service.ts";
-import { DEFAULT_CONFIG, type OpenAILLMConfig } from "../config.ts";
+import { DEFAULT_CONFIG } from "../defaults.ts";
+import type { OpenAILLMConfig } from "../public.d.ts";
 
 function sse(...lines: string[]): ReadableStream<Uint8Array> {
   const body = lines.map(l => `data: ${l}\n\n`).join("") + "data: [DONE]\n\n";

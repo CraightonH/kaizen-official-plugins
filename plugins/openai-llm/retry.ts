@@ -1,4 +1,4 @@
-import type { OpenAILLMConfig } from "./config.ts";
+import type { OpenAILLMConfig } from "./public.d.ts";
 
 export type AttemptOutcome =
   | { kind: "ok" }

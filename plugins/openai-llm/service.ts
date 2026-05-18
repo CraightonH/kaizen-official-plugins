@@ -3,7 +3,7 @@ import { buildHeaders, buildChatBody } from "./http.ts";
 import { readSseFrames } from "./sse.ts";
 import { runStream } from "./stream.ts";
 import { classifyError, computeBackoff, parseRetryAfter, sleep, type AttemptOutcome } from "./retry.ts";
-import type { OpenAILLMConfig } from "./config.ts";
+import type { OpenAILLMConfig } from "./public.d.ts";
 
 export interface ServiceDeps {
   fetch: typeof fetch;

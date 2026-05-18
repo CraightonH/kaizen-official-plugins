@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { buildHeaders, buildChatBody, mapMessages, mapTools } from "../http.ts";
-import { DEFAULT_CONFIG } from "../config.ts";
+import { DEFAULT_CONFIG } from "../defaults.ts";
 import type { LLMRequest } from "llm-contracts/public";
 
 const cfg = { ...DEFAULT_CONFIG, apiKey: "sk-x", extraHeaders: { "OpenAI-Beta": "v1" } };

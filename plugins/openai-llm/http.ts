@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ChatMessage, LLMRequest, ToolSchema } from "llm-contracts/public";
-import type { OpenAILLMConfig } from "./config.ts";
+import type { OpenAILLMConfig } from "./public.d.ts";
 
 function dumpRequest(req: LLMRequest, body: Record<string, unknown>): void {
   if (process.env.KAIZEN_DEBUG_REQUESTS !== "1") return;
