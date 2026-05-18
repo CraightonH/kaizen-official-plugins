@@ -3,6 +3,7 @@ import type { KaizenPlugin } from "kaizen/types";
 import type { ConfigStoreService, SlashRegistryService } from "llm-contracts/public";
 import { homedir } from "node:os";
 import { readFileSync, watch } from "node:fs";
+import { spawn } from "node:child_process";
 import { harnessKey, homeConfigPath, projectConfigPath, type HarnessIdentity } from "./paths.ts";
 import { atomicWriteJson } from "./atomic-write.ts";
 import { createStore, type StoreDeps } from "./store.ts";
@@ -72,6 +73,11 @@ const plugin: KaizenPlugin = {
         harnessKey: key,
         editor: process.env.EDITOR ?? "vi",
         log: ctx.log.bind(ctx),
+        spawnEditor: (editor, path) => new Promise<number>((resolve, reject) => {
+          const child = spawn(editor, [path], { stdio: "inherit" });
+          child.on("exit", (code) => resolve(code ?? 0));
+          child.on("error", reject);
+        }),
       }));
     } catch (err) {
       ctx.log(`llm-config: slash:registry unavailable (${(err as Error).message}); /config commands disabled`);
