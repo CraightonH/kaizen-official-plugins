@@ -12,12 +12,18 @@ This plugin runs arbitrary shell commands with the harness's privileges. The per
 
 ## What it handles
 
-- Loads two config files and merges them (home first, then project; entries are concatenated, not deduped):
-  - **Global:** `~/.kaizen/hooks/hooks.json`
-  - **Project:** `<cwd>/.kaizen/hooks/hooks.json`
+- Reads its `hooks` array from the harness `config:store`. The store resolves
+  defaults → home → project layers and lands the result on a single key:
+  - **Home layer:** `~/.kaizen/harnesses/<harnessKey>/config.json` → `"llm-hooks-shell": { "hooks": [ ... ] }`
+  - **Project layer:** `<cwd>/.kaizen/harnesses/<harnessKey>/config.json` → `"llm-hooks-shell": { "hooks": [ ... ] }`
+  - **Breaking change in 0.1.2:** because arrays are *replaced* (not merged) by the
+    config store's resolution semantics, **a project `hooks` array fully replaces
+    the home `hooks` array**. Prior versions concatenated home + project entries.
+    If you relied on the merge, copy the home entries into the project file (or
+    vice versa).
 - Validates every `event` against the event vocabulary; refuses to start on unknown names.
-- Subscribes to exactly the union of `event` values present in the merged config (no subscriptions when no hooks).
-- For each event delivery, runs the matching hooks sequentially in config-file order (home before project).
+- Subscribes to exactly the union of `event` values present in the resolved config (no subscriptions when no hooks).
+- For each event delivery, runs the matching hooks sequentially in config-array order.
 - Flattens the event payload to `EVENT_<UPPER_SNAKE>` env vars (depth cap 4); always sets `EVENT_NAME` and `EVENT_JSON`.
 - For mutable events with `block_on_nonzero: true`, a non-zero exit (or timeout) cancels the operation:
   - `tool:before-execute` → mutates `payload.args` to the cancellation sentinel and emits a `tool:error` carrying the hook's stderr.
@@ -31,13 +37,18 @@ This plugin runs arbitrary shell commands with the harness's privileges. The per
 
 ## Schema
 
+The plugin's config is stored under the `llm-hooks-shell` key in the harness config file
+(`~/.kaizen/harnesses/<harnessKey>/config.json` or its per-project counterpart):
+
 ```json
 {
-  "hooks": [
-    { "event": "turn:start", "command": "echo $EVENT_TURN_ID >> /tmp/audit.log" },
-    { "event": "tool:before-execute", "command": "./check-tool.sh", "block_on_nonzero": true, "timeout_ms": 5000 },
-    { "event": "turn:end", "command": "osascript -e 'display notification \"done\"'" }
-  ]
+  "llm-hooks-shell": {
+    "hooks": [
+      { "event": "turn:start", "command": "echo $EVENT_TURN_ID >> /tmp/audit.log" },
+      { "event": "tool:before-execute", "command": "./check-tool.sh", "block_on_nonzero": true, "timeout_ms": 5000 },
+      { "event": "turn:end", "command": "osascript -e 'display notification \"done\"'" }
+    ]
+  }
 }
 ```
 
@@ -80,9 +91,11 @@ Nothing. This plugin is a pure event consumer — it registers no services.
 
 **Service** — `events:vocabulary` (required). Used at setup time to validate the `event` field of every config entry. The plugin throws on unknown event names.
 
+**Service** — `config:store` (required). The plugin registers its `{ hooks: HookEntry[] }` schema and reads the resolved value at setup. Project layer fully replaces home layer (see breaking change above).
+
 ### Events subscribed
 
-Dynamic — exactly the union of `event` values across the merged home + project configs. With no config files present, the plugin subscribes to nothing.
+Dynamic — exactly the union of `event` values across the resolved config. With no hooks configured, the plugin subscribes to nothing.
 
 ### Events emitted
 

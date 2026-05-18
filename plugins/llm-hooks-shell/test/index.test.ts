@@ -1,12 +1,13 @@
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "../index.ts";
 import { CANCEL_TOOL, CODEMODE_CANCEL_SENTINEL } from "llm-events";
+import type { ConfigStoreService, ConfigSpec } from "llm-contracts/public";
+import type { HooksConfig } from "../public";
 
 interface Emit { event: string; payload: any }
 
 function makeCtx(opts: {
-  hooks?: any[];                            // entries to "load" from home
-  projectHooks?: any[];                     // entries to "load" from project
+  hooks?: any[];                            // resolved entries returned by config:store
   vocab?: string[];                         // valid event names
   exec?: (bin: string, args: string[], opts: any) => Promise<{ exitCode: number; stdout: string; stderr: string }>;
 }) {
@@ -18,6 +19,26 @@ function makeCtx(opts: {
     "turn:start", "turn:end", "tool:before-execute", "codemode:before-execute",
     "llm:before-call", "llm:done", "tool:result", "conversation:cleared",
   ]);
+
+  let registered: ConfigSpec<HooksConfig> | null = null;
+  const store: ConfigStoreService = {
+    register: (spec) => { registered = spec as ConfigSpec<HooksConfig>; },
+    get: (<T,>(_plugin: string): T => {
+      // If the test supplied hooks, return them. Otherwise fall back to defaults.
+      const hooks = opts.hooks ?? (registered?.defaults as HooksConfig | undefined)?.hooks ?? [];
+      return { hooks } as unknown as T;
+    }) as ConfigStoreService["get"],
+    set: async () => {},
+    watch: () => () => {},
+    list: () => [{
+      plugin: "llm-hooks-shell",
+      homePath: "/home/u/.kaizen/harnesses/openai-compatible/config.json",
+      projectPath: "/proj/.kaizen/harnesses/openai-compatible/config.json",
+      homeExists: false,
+      projectExists: false,
+      resolution: { hooks: "default" },
+    }],
+  };
 
   return {
     subscribed,
@@ -38,20 +59,11 @@ function makeCtx(opts: {
         for (const v of vocab) obj[v.toUpperCase().replace(/[:\-]/g, "_")] = v;
         return Object.freeze(obj);
       }
+      if (name === "config:store") return store;
       return undefined;
     }),
     secrets: { get: mock(async () => undefined), refresh: mock(async () => undefined) },
     exec: { run: opts.exec ?? (async () => ({ exitCode: 0, stdout: "", stderr: "" })) },
-    // Test-only injection facade.
-    _testHookDeps: {
-      home: "/home/u",
-      cwd: "/work/proj",
-      readFile: async (p: string) => {
-        if (p.startsWith("/home/u/") && opts.hooks) return JSON.stringify({ hooks: opts.hooks });
-        if (p.startsWith("/work/proj/") && opts.projectHooks) return JSON.stringify({ hooks: opts.projectHooks });
-        const e: any = new Error("ENOENT"); e.code = "ENOENT"; throw e;
-      },
-    },
   } as any;
 }
 
@@ -63,10 +75,12 @@ describe("llm-hooks-shell setup", () => {
     expect(ctx.logs).toEqual([]);
   });
 
-  it("subscribes to the union of event names from the merged config", async () => {
+  it("subscribes to the union of event names from the resolved config", async () => {
     const ctx = makeCtx({
-      hooks: [{ event: "turn:start", command: "echo a" }],
-      projectHooks: [{ event: "turn:end", command: "echo b" }],
+      hooks: [
+        { event: "turn:start", command: "echo a" },
+        { event: "turn:end", command: "echo b" },
+      ],
     });
     await plugin.setup(ctx);
     expect(ctx.subscribed.sort()).toEqual(["turn:end", "turn:start"]);
@@ -135,16 +149,18 @@ describe("llm-hooks-shell setup", () => {
     expect(payload.request.cancelled).toBe(true);
   });
 
-  it("multiple hooks on same event run in config order (home before project)", async () => {
+  it("multiple hooks on same event run in config order", async () => {
     const calls: string[] = [];
     const ctx = makeCtx({
-      hooks: [{ event: "turn:start", command: "echo home" }],
-      projectHooks: [{ event: "turn:start", command: "echo project" }],
+      hooks: [
+        { event: "turn:start", command: "echo first" },
+        { event: "turn:start", command: "echo second" },
+      ],
       exec: async (_b, args) => { calls.push(args[1]!); return { exitCode: 0, stdout: "", stderr: "" }; },
     });
     await plugin.setup(ctx);
     await ctx.handlers["turn:start"]!({ turnId: "t-1" });
-    expect(calls).toEqual(["echo home", "echo project"]);
+    expect(calls).toEqual(["echo first", "echo second"]);
   });
 
   it("blocking failure on hook #1 short-circuits hook #2", async () => {
@@ -211,5 +227,18 @@ describe("llm-hooks-shell setup", () => {
     expect(captured.EVENT_TURN_ID).toBe("t-7");
     expect(captured.EVENT_TRIGGER).toBe("user");
     expect(captured.EXTRA).toBe("yes");
+  });
+
+  it("registers its config spec on setup", async () => {
+    const ctx = makeCtx({});
+    const store = ctx.useService("config:store");
+    const registerSpy = mock(store.register);
+    (store as any).register = registerSpy;
+    await plugin.setup(ctx);
+    expect(registerSpy).toHaveBeenCalled();
+    const spec = (registerSpy.mock.calls[0] as any[])[0];
+    expect(spec.plugin).toBe("llm-hooks-shell");
+    expect(Array.isArray(spec.defaults.hooks)).toBe(true);
+    expect(spec.defaults.hooks).toEqual([]);
   });
 });

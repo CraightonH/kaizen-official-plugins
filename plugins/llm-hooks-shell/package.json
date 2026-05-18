@@ -1,6 +1,6 @@
 {
   "name": "llm-hooks-shell",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Declarative shell-command hooks bound to harness events. Optional, opt-in.",
   "type": "module",
   "exports": {
@@ -10,6 +10,7 @@
     "kaizen-plugin"
   ],
   "dependencies": {
+    "llm-config": "workspace:*",
     "llm-contracts": "workspace:*",
     "llm-events": "workspace:*"
   },

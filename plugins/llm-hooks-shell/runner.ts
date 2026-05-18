@@ -1,4 +1,4 @@
-import type { HookEntry } from "./config.ts";
+import type { HookEntry } from "./public";
 
 export interface ExecResult {
   exitCode: number;

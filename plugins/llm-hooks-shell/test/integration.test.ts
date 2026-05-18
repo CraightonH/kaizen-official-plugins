@@ -1,10 +1,20 @@
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "../index.ts";
 import { CANCEL_TOOL } from "llm-events";
+import type { ConfigStoreService } from "llm-contracts/public";
 
 function makeBusCtx(opts: { hooks: any[]; exec: (bin: string, args: string[], opts: any) => Promise<{ exitCode: number; stdout: string; stderr: string }> }) {
   const subs: Record<string, ((p: any) => Promise<void> | void)[]> = {};
   const allEmits: { event: string; payload: any }[] = [];
+
+  const store: ConfigStoreService = {
+    register: () => {},
+    get: (<T,>(_plugin: string): T => ({ hooks: opts.hooks } as unknown as T)) as ConfigStoreService["get"],
+    set: async () => {},
+    watch: () => () => {},
+    list: () => [],
+  };
+
   const ctx: any = {
     log: () => {},
     config: {},
@@ -23,17 +33,11 @@ function makeBusCtx(opts: { hooks: any[]; exec: (bin: string, args: string[], op
       if (name === "events:vocabulary") {
         return Object.freeze({ TOOL_BEFORE_EXECUTE: "tool:before-execute", TOOL_ERROR: "tool:error", TOOL_RESULT: "tool:result" });
       }
+      if (name === "config:store") return store;
       return undefined;
     },
     secrets: { get: mock(async () => undefined), refresh: mock(async () => undefined) },
     exec: { run: opts.exec },
-    _testHookDeps: {
-      home: "/home/u",
-      cwd: "/work/proj",
-      readFile: async (p: string) => p.startsWith("/home/u/")
-        ? JSON.stringify({ hooks: opts.hooks })
-        : (() => { const e: any = new Error("ENOENT"); e.code = "ENOENT"; throw e; })(),
-    },
   };
   return { ctx, allEmits };
 }
@@ -70,10 +74,11 @@ describe("llm-hooks-shell integration", () => {
       hooks: [{ event: "turn:start", command: "echo $EVENT_TURN_ID" }],
       exec: async (_b, _a, opts: { env: Record<string, string> }) => { captured = opts.env; return { exitCode: 0, stdout: "t-42\n", stderr: "" }; },
     });
-    // Add turn:start to the vocab so config validation passes.
+    // Re-scope vocab to just turn:start for this test.
+    const origUseService = ctx.useService;
     ctx.useService = (name: string) => {
       if (name === "events:vocabulary") return Object.freeze({ TURN_START: "turn:start" });
-      return undefined;
+      return origUseService(name);
     };
     await plugin.setup(ctx);
     await ctx.emit("turn:start", { turnId: "t-42", trigger: "user" });

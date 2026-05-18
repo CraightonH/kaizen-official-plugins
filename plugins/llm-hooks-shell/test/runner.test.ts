@@ -1,6 +1,6 @@
 import { describe, it, expect, mock } from "bun:test";
 import { runHook, type RunnerDeps } from "../runner.ts";
-import type { HookEntry } from "../config.ts";
+import type { HookEntry } from "../public";
 
 function makeDeps(execImpl: RunnerDeps["exec"]): { deps: RunnerDeps; logs: { level: "info" | "warn"; msg: string }[] } {
   const logs: { level: "info" | "warn"; msg: string }[] = [];

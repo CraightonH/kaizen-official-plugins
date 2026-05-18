@@ -136,8 +136,9 @@
     },
     "plugins/llm-hooks-shell": {
       "name": "llm-hooks-shell",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "dependencies": {
+        "llm-config": "workspace:*",
         "llm-contracts": "workspace:*",
         "llm-events": "workspace:*",
       },

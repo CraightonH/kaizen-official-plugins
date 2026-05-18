@@ -1,8 +1,15 @@
 import type { KaizenPlugin } from "kaizen/types";
 import { CANCEL_TOOL, CODEMODE_CANCEL_SENTINEL } from "llm-events";
-import { loadHookConfigs, MUTABLE_EVENTS, realConfigDeps, type ConfigDeps, type HookEntry } from "./config.ts";
+import type { ConfigStoreService } from "llm-contracts/public";
+import type { HookEntry, HooksConfig } from "./public";
 import { envify } from "./envify.ts";
 import { runHook, type RunnerDeps } from "./runner.ts";
+
+export const MUTABLE_EVENTS: ReadonlySet<string> = new Set([
+  "llm:before-call",
+  "tool:before-execute",
+  "codemode:before-execute",
+]);
 
 const plugin: KaizenPlugin = {
   name: "llm-hooks-shell",
@@ -11,23 +18,56 @@ const plugin: KaizenPlugin = {
     tier: "unscoped",
     exec: { binaries: ["sh"] },
   },
-  services: { consumes: ["events:vocabulary"] },
+  services: { consumes: ["events:vocabulary", "config:store"] },
 
   async setup(ctx) {
     ctx.consumeService("events:vocabulary");
+    ctx.consumeService("config:store");
 
     const vocabObj = ctx.useService<Record<string, string>>("events:vocabulary") ?? {};
     const vocab = new Set(Object.values(vocabObj));
 
-    const configDeps: ConfigDeps = (ctx as any)._testHookDeps ?? realConfigDeps();
-    const { entries, warnings } = await loadHookConfigs(configDeps, vocab);
+    const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
+    cfgSvc.register<HooksConfig>({
+      plugin: "llm-hooks-shell",
+      defaults: { hooks: [] },
+      schema: {
+        hooks: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              event: { type: "string", min: 1 },
+              command: { type: "string", min: 1 },
+              cwd: { type: "string" },
+              block_on_nonzero: { type: "boolean" },
+              timeout_ms: { type: "number", min: 1 },
+            },
+            additionalProperties: true,
+          },
+        },
+      },
+    });
 
-    for (const w of warnings) ctx.log(w);
+    const cfg = cfgSvc.get<HooksConfig>("llm-hooks-shell");
+    const entries: HookEntry[] = Array.isArray(cfg?.hooks) ? cfg.hooks : [];
+
+    // Validate every entry's event against the vocabulary (fail loud).
+    for (const e of entries) {
+      if (!vocab.has(e.event)) {
+        throw new Error(`llm-hooks-shell: unknown event "${e.event}" in entry: ${JSON.stringify(e)}`);
+      }
+    }
+    // Warn on block_on_nonzero for non-mutable events.
+    for (const e of entries) {
+      if (e.block_on_nonzero && !MUTABLE_EVENTS.has(e.event)) {
+        ctx.log(`llm-hooks-shell: block_on_nonzero is ignored on non-mutable event "${e.event}" (entry: ${e.command})`);
+      }
+    }
 
     if (entries.length === 0) {
       // No hooks configured is the default state — stay silent rather than
-      // adding to startup noise. Real warnings (parse errors, etc.) are
-      // already logged via the `warnings` loop above.
+      // adding to startup noise.
       return;
     }
 
