@@ -1,0 +1,19 @@
+{
+  "name": "llm-axioms",
+  "version": "0.1.0",
+  "description": "Session-scoped Aristotelean axiom workspace. Provides axioms:registry.",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./public": "./public.d.ts"
+  },
+  "keywords": ["kaizen-plugin"],
+  "dependencies": {
+    "llm-contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/json-schema": "^7.0.15",
+    "typescript": "^5.4.0"
+  }
+}
