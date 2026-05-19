@@ -60,7 +60,40 @@ export interface AxiomsRegistryService {
 }
 ```
 
-Contract ID `axioms:registry` follows the `<domain>:<role>` convention with no plugin-name prefix. Acid test passes: swap `llm-axioms` for another provider of `axioms:registry` (importing types from `llm-contracts/public` and calling `provideService("axioms:registry", impl)`), and the workspace section, tools, and slash commands all continue working without edits to any consumer.
+Contract ID `axioms:registry` follows the `<domain>:<role>` convention with no plugin-name prefix.
+
+##### Cardinality
+
+**Cardinality-one.** One workspace per harness session is the right model — multiple simultaneous axiom workspaces in a single session would defeat the purpose (the model has no way to address them, and the rendered prompt section would have to interleave or duplicate content). If a future use case wants multiple axiom *scopes* with structural isolation (e.g. one per agent in a multi-agent harness), the right answer is an `axioms:registry-registry` selector contract, not a cardinality-N change to `axioms:registry`. Not in scope for v1.
+
+##### Acid test
+
+Remove `llm-axioms` from the harness manifest. Replace it with a stub plugin whose entire body is:
+
+```typescript
+import type { AxiomsRegistryService } from "llm-contracts/public";
+// minimal in-memory impl that satisfies the contract
+const stub: AxiomsRegistryService = { /* ... */ };
+ctx.provideService<AxiomsRegistryService>("axioms:registry", stub);
+```
+
+The harness boots. The `llm-axioms:methodology` and `llm-axioms:workspace` sections are not registered (the stub doesn't ship them), but every other plugin in the harness continues to function. No other plugin's code changed. This is the contract working as designed: provider swap requires zero consumer edits.
+
+The two sections + tools + slash commands are *part of the `llm-axioms` plugin's value*, not part of the contract. A replacement provider is free to ship its own sections under a different id (or none at all).
+
+##### Contract registration in `llm-contracts`
+
+Per `plugins/llm-contracts/CLAUDE.md`, adding `axioms:registry` to the contracts plugin is a four-step change:
+
+1. Create `plugins/llm-contracts/contracts/axioms-registry.ts` with the `CONTRACT_ID`, `DESCRIPTION`, and interface declarations from the block above.
+2. Re-export `AxiomEntry` and `AxiomsRegistryService` (types) from `plugins/llm-contracts/public.ts`.
+3. In `plugins/llm-contracts/index.ts`, import the new module and add:
+   ```typescript
+   ctx.defineService(axiomsRegistry.CONTRACT_ID, { description: axiomsRegistry.DESCRIPTION });
+   ```
+4. Add a test case in `plugins/llm-contracts/test/index.test.ts` asserting that `defineService` was called with `"axioms:registry"`.
+
+`llm-contracts` ships zero runtime behavior. It must redeploy (and its version bump) before `llm-axioms`. The harness manifest already lists `llm-contracts` first.
 
 ### Module map
 
@@ -90,7 +123,9 @@ plugins/llm-axioms/
 ├── slash.ts          makeSlashHandlers({ store, channel }) → handlers.
 │                     Three slash commands: axioms:list, axioms:show, axioms:clear.
 ├── public.d.ts       Re-exports AxiomEntry, AxiomsRegistryService from
-│                     llm-contracts/public + plugin-internal types if any.
+│                     llm-contracts/public. Plugin-internal types
+│                     (AxiomsConfig shape, AxiomValidationError class) live
+│                     here — see "Non-contract public surface" below.
 ├── package.json
 ├── tsconfig.json
 ├── README.md
@@ -223,28 +258,36 @@ Registered into `slash:registry` using the `domain:command` convention (matches 
 
 #### Declared dependencies
 
-Following `llm-memory`'s precedent (the closest sibling plugin): only `events:vocabulary` is declared in `services.consumes`. Every other dependency is looked up at setup time with `try`/`catch` around `ctx.useService` and the plugin degrades cleanly when absent.
+Per `docs/PLUGIN_ARCHITECTURE.md` and `llm-memory`'s implementation, every service looked up in `setup()` must be declared in `services.consumes` for topo-hint ordering — otherwise `ctx.useService` throws when the provider hasn't run yet, even if it's present in the harness manifest. `events:vocabulary` is the only **hard** dep (also `consumeService` called); the rest are **topo-hint optional** (declared in `services.consumes`, no `consumeService`, conditional registration in `setup()`).
 
 ```jsonc
 // in plugin manifest
 {
   "services": {
     "provides": ["axioms:registry"],
-    "consumes": ["events:vocabulary"]
+    "consumes": [
+      "events:vocabulary",     // hard
+      "config:store",          // topo-hint optional
+      "prompt:registry",       // topo-hint optional
+      "tools:registry",        // topo-hint optional
+      "slash:registry"         // topo-hint optional
+    ]
   }
 }
 ```
 
-| Dependency | Mode | Behavior when absent |
-|---|---|---|
-| `events:vocabulary` | **hard** — declared in `services.consumes`, `consumeService` called, `useService` in setup | Harness refuses to boot the plugin. |
-| `config:store` | **optional** — `useService` in setup wrapped in try/catch | Falls back to `DEFAULT_CONFIG`; logs a notice. |
-| `prompt:registry` | **optional** — same pattern | The two sections are not registered. Service + tools + slash still work. |
-| `tools:registry` | **optional** — same pattern | The three tools are not registered. Service + slash + sections still work. |
-| `slash:registry` | **optional** — same pattern | The three slash commands are not registered. Everything else still works. |
-| `session:active-changed` event | subscription via `ctx.on` | If the event is never emitted (no session manager loaded), the store has no active session and tools return `{ ok: false, error: "no_active_session" }`. |
+| Dependency | Mode | `consumeService` call | Behavior when absent |
+|---|---|---|---|
+| `events:vocabulary` | **hard** | yes | Harness refuses to boot the plugin. |
+| `config:store` | **topo-hint optional** | no | Falls back to `DEFAULT_CONFIG`; logs a notice. |
+| `prompt:registry` | **topo-hint optional** | no | The two sections are not registered. Service + tools + slash still work. |
+| `tools:registry` | **topo-hint optional** | no | The three tools are not registered. Service + slash + sections still work. |
+| `slash:registry` | **topo-hint optional** | no | The three slash commands are not registered. Everything else still works. |
+| `session:active-changed` event | subscription via `ctx.on` | n/a | If the event is never emitted (no session manager loaded), the store has no active session and tools return `{ ok: false, error: "no_active_session" }`. |
 
-If both `prompt:registry` and `tools:registry` are absent, the plugin still boots and serves `axioms:registry` to any direct consumer, but the model has no way to write and no in-prompt visibility — effectively dead. Log a notice in that case but do not throw.
+`session-manager` provides the `session:active-changed` event but not via a service this plugin consumes synchronously — the dependency is event-shaped, so it does not appear in `services.consumes`.
+
+If both `prompt:registry` and `tools:registry` are absent at runtime, the plugin still boots and serves `axioms:registry` to any direct consumer, but the model has no way to write and no in-prompt visibility — effectively dead. Log a notice in that case but do not throw.
 
 ### Configuration (`config:store`)
 
@@ -263,6 +306,20 @@ Config validation: `axiomsDir` must be a non-empty string; numeric caps must be 
 ### Permissions
 
 `tier: unscoped` — reads/writes under `~/.kaizen/plugins/llm-axioms/`. No network, no process spawn.
+
+### Non-contract public surface
+
+Per `docs/PLUGIN_ARCHITECTURE.md` § "Non-Contract Public Surface": a type belongs in `llm-contracts/public` if and only if it appears in a contract method's signature. Implementation-internal types stay in the plugin's own `public.d.ts`.
+
+| Type / value | Lives in | Rationale |
+|---|---|---|
+| `AxiomEntry` | `llm-contracts/public` | Appears in `AxiomsRegistryService.list()`, `.get()`, `.record()`, `.amend()` signatures. Cross-plugin contract surface. |
+| `AxiomsRegistryService` | `llm-contracts/public` | The contract itself. |
+| `AxiomsConfig` | `plugins/llm-axioms/public.d.ts` | Plugin-internal config shape. Only consumed by `config:store.register({ defaults, schema })`; never crosses plugin boundaries as a typed value. |
+| `AxiomValidationError` (if defined) | `plugins/llm-axioms/public.d.ts` | Concrete runtime class thrown by `store.record`/`.amend` on synchronous validation failure. Consumers that `catch` it depend on the implementation, not the contract. Pattern mirrors `BareNamePluginError` in `llm-slash-commands`. |
+| `METHODOLOGY_SECTION` constant text | `plugins/llm-axioms/methodology.ts` (not exported) | Implementation detail of the static section; no other plugin consumes it. |
+
+If a future consumer plugin needs to introspect axioms directly (e.g. a TUI panel that renders the workspace), it imports `AxiomEntry` and `AxiomsRegistryService` from `llm-contracts/public` and calls `ctx.useService<AxiomsRegistryService>("axioms:registry")`. It never imports from `llm-axioms` directly.
 
 ## Behavior contracts and invariants
 
@@ -324,6 +381,21 @@ cp plugins/$PLUGIN/dist/index.js "$INSTALL_DIR/dist/index.js"
 | 7 | `/axioms:clear` included, no per-axiom user mutations | Resetting the frame is distinct from editing a specific axiom and is genuinely useful when the model has reasoned itself into a corner. |
 | 8 | `axioms:registry` contract in `llm-contracts` | Cross-plugin contract per the architecture rules. Passes the swap-the-provider acid test. |
 | 9 | No auto-extraction from user messages | Methodology section teaches the model to derive explicitly; heuristic auto-derivation would write low-quality axioms and waste tokens. |
+
+## Architecture review checklist
+
+Per `docs/PLUGIN_ARCHITECTURE.md` § "Review Checklist":
+
+| Question | Answer |
+|---|---|
+| Is the contract type in `llm-contracts/public`? | Yes. `AxiomEntry` and `AxiomsRegistryService` are added to `plugins/llm-contracts/contracts/axioms-registry.ts` and re-exported from `plugins/llm-contracts/public.ts`. |
+| Is the contract ID in `<domain>:<role>` form with no plugin-name prefix? | Yes. `axioms:registry` — `<domain>` is the concept noun ("axioms"), `<role>` is the contract kind ("registry"). No `llm-axioms:*` form anywhere in the contract. |
+| Can another implementation reasonably slot in without changing consumers? | Yes. The acid test above demonstrates this: a stub provider satisfying the contract makes the harness boot and leaves every consumer untouched. The two prompt sections and three tools are *plugin features*, not contract features — a replacement provider is free to ship its own or none. |
+| Is the dependency hard, topo-hint optional, or deferred optional? Does `services.consumes`, the `consumeService` call, and the `useService` call site agree on the answer? | Yes. `events:vocabulary` is hard (all three call sites agree). `config:store`, `prompt:registry`, `tools:registry`, `slash:registry` are topo-hint optional (declared in `services.consumes`, no `consumeService`, conditional registration in `setup()`). No deferred-optional lookups in this plugin. |
+| Are docs and tests locking the intended ownership boundary? | Yes. `plugins/llm-axioms/CLAUDE.md` will document the module map, invariants, and the boundary that only `store.ts` touches disk. `test/index.test.ts` asserts `provideService("axioms:registry", ...)` is called exactly once. `plugins/llm-contracts/test/index.test.ts` asserts `defineService("axioms:registry", ...)` is called. |
+| Provider swappability — is the consumer surface narrow enough that a different implementation could slot in? | Yes. `AxiomsRegistryService` has six methods, all about the workspace; nothing leaks transport, disk layout, or render concerns. |
+| Cardinality — one provider, or registry-of-providers? | Cardinality-one. One workspace per session is the correct model. See "Cardinality" above. |
+| Are non-contract types correctly placed (impl-internal in plugin, contract surface in `llm-contracts`)? | Yes. See "Non-contract public surface" table above. |
 
 ## Open questions for implementation
 
