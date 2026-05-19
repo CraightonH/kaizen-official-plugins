@@ -6,7 +6,7 @@ import { resolvePath, hasGitRoot, GLOB_CAP } from "../util.ts";
 
 export const schema: ToolSchema = {
   name: "glob",
-  description: "Find files by glob pattern. Returns absolute paths sorted by mtime descending (most recently modified first).",
+  description: "Find files by glob pattern. Returns a newline-separated string of absolute paths sorted by mtime descending (most recently modified first); split on '\\n' to get an array. Capped at 1000 matches with a `... [truncated: N more matches]` trailing line when exceeded.",
   parameters: {
     type: "object",
     properties: {
