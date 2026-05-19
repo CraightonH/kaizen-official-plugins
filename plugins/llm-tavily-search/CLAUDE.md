@@ -5,24 +5,26 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 ## Module map
 
 ```
-index.ts        Plugin lifecycle. Loads config, builds handler with injected fetch,
-                registers web_search via tools:registry. Holds the unregister
-                callback in module scope and calls it from stop(). Only file
-                that touches ctx.
-config.ts       loadConfig() — reads ~/.kaizen/plugins/llm-tavily-search/config.json,
-                falls back to env var (default TAVILY_API_KEY). DI-friendly.
+index.ts        Plugin lifecycle. Registers config:store spec, fetches the
+                merged config, builds handler with injected fetch, registers
+                web_search via tools:registry. Holds the unregister callback
+                in module scope and calls it from stop(). Only file that
+                touches ctx.
+defaults.ts     DEFAULT_CONFIG — baseline TavilyConfig values used as register()
+                defaults and in tests.
 tool.ts         Schema + makeHandler({config, fetch, log}). Pure factory — no I/O,
                 no globals. POSTs to Tavily /search. Wires ctx.signal to AbortController.
                 Imports ToolSchema and ToolExecutionContext from llm-tools-registry/public.
-public.d.ts     Re-exports ToolSchema (from llm-tools-registry/public), declares
-                TOOL_NAMES = ["web_search"]. No plugin-owned types.
-test/           bun:test suites — config.test.ts, tool.test.ts, scaffold.test.ts.
+public.d.ts     TavilyConfig type, plus re-exports ToolSchema from
+                llm-tools-registry/public. Declares TOOL_NAMES = ["web_search"].
+test/           bun:test suites — tool.test.ts, scaffold.test.ts.
 ```
 
 Boundaries:
 - Only `index.ts` imports `kaizen/types` or touches `ctx`.
-- `config.ts` and `tool.ts` are framework-free. `tool.ts` takes `fetch` as a dep so tests stub it.
-- API key plumbing lives entirely in `config.ts`. Don't re-read env in `tool.ts`.
+- `tool.ts` is framework-free and takes `fetch` as a dep so tests stub it.
+- API key plumbing comes from `config:store` (`envVars: { apiKey: "TAVILY_API_KEY" }`).
+  Don't re-read env in `tool.ts`.
 - Shared tool types come from `llm-tools-registry/public`. Don't import
   `llm-events/public` here — this plugin doesn't depend on `llm-events`.
 
@@ -34,6 +36,16 @@ Boundaries:
 - **HTTP errors surface verbatim (truncated to 500 chars).** The body usually contains Tavily's "quota exceeded" / "invalid key" messages — keep them visible.
 - **`include_raw_content` is forced to false.** Raw content can be hundreds of KB per result and blows up context. If a caller needs the full page, they should call `web_fetch` on the URL.
 - **Lifecycle uses `stop()`, not a returned `teardown`.** `KaizenPlugin.setup` is typed `Promise<void>`; the unregister callback lives in module-scope and is invoked from the optional `stop()` hook. `stop()` is idempotent.
+
+## Config location
+
+Reads via `config:store` from the harness-scoped file at
+`~/.kaizen/harnesses/<harnessKey>/config.json` under
+`plugins["llm-tavily-search"]`. For the `official/openai-compatible`
+harness, `<harnessKey>` is `official_openai-compatible`.
+
+Override with `TAVILY_API_KEY` env var (beats file values) or set via
+`/config:set llm-tavily-search apiKey=<key>`.
 
 ## Tavily API quick reference
 
@@ -62,13 +74,4 @@ No real network in tests — `fetch` is always injected. Use `Response` construc
 
 ## Local deploy
 
-The Kaizen runtime prefers bundled `dist/index.js`. After editing:
-
-```bash
-mkdir -p ~/.kaizen/marketplaces/official/plugins/llm-tavily-search@0.1.0/
-cp -R plugins/llm-tavily-search/. ~/.kaizen/marketplaces/official/plugins/llm-tavily-search@0.1.0/
-(cd ~/.kaizen/marketplaces/official/plugins/llm-tavily-search@0.1.0 \
-  && bun build --target=bun --outfile=dist/index.js index.ts)
-```
-
-Then update `~/.kaizen/marketplaces/official/repo/.kaizen/marketplace.json` and the harness manifest if needed (`kaizen marketplace update` will overwrite local edits there).
+See repo CLAUDE.md.

@@ -44,7 +44,7 @@ const plugin: KaizenPlugin = {
     if (!config.apiKey) {
       ctx.log(
         "llm-tavily-search: no API key found; web_search will error on call. " +
-          "Set TAVILY_API_KEY or ~/.kaizen/plugins/llm-tavily-search/config.json",
+          "Set TAVILY_API_KEY or run /config:set llm-tavily-search apiKey=<key>",
       );
     }
 
