@@ -1,3 +1,3 @@
-1. ~~We need a plugin to manage the openai-compatible harness's configs.~~ Done — `llm-config` (`config:store`).
-   Spec: `docs/superpowers/specs/2026-05-18-llm-config-design.md`.
-   Plan: `docs/superpowers/plans/2026-05-18-llm-config.md`.
+1. ~~Build a plugin to record aristotelean first principles reasoning into an axiom registry.~~ Done — `llm-axioms` (`axioms:registry`).
+   Spec: `docs/superpowers/specs/2026-05-19-llm-axioms-design.md`.
+   Plan: `docs/superpowers/plans/2026-05-19-llm-axioms.md`.
