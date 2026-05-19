@@ -104,16 +104,10 @@ const plugin: KaizenPlugin = {
 
     toolsRegistry.register(schema, handler);
 
-    // Register TUI renderer if the service is available (lazy import to avoid
-    // pulling React/Ink in non-TUI environments). Optional dependency: no
-    // hard consume edge — the plugin degrades to no inline renderer.
-    const tuiRenderers = ctx.useService?.("ui:tool-renderer") as
-      | { register: (r: any) => () => void }
-      | undefined;
-    if (tuiRenderers) {
-      const { codemodeRenderer } = await import("./tui-renderer.tsx");
-      tuiRenderers.register(codemodeRenderer);
-    }
+    // The `execute_typescript` TUI renderer lives in `llm-tui/tool-renderers/defaults.tsx`
+    // rather than this plugin. Cross-plugin JSX is broken under kaizen's bundler — each
+    // plugin is bundled hermetically with its own React, so a node built here cannot
+    // render through llm-tui's reconciler ("dispatcher.useContext is null"). See CLAUDE.md.
 
     // Refresh the description on every LLM call. The driver supports request
     // mutation in this hook (see plugins/llm-driver/CLAUDE.md "llm:before-call

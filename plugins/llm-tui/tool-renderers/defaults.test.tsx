@@ -212,6 +212,36 @@ test("bash renderer prefers streamed stdout over parsed output", () => {
   expect(out).not.toContain("FROM-RESULT");
 });
 
+test("execute_typescript renderer shows code, stdout, and result panes", () => {
+  const reg = withDefaults();
+  const { lastFrame } = render(
+    <ToolCallBlock
+      registry={reg}
+      theme={theme as any}
+      entry={entry({
+        name: "execute_typescript",
+        args: { code: "console.log('hi'); 42" },
+        status: "done",
+        stdout: "hi\n",
+        result: "exit: ok\nreturned: 42",
+      })}
+    />
+  );
+  const out = lastFrame() ?? "";
+  expect(out).toContain("exec");
+  expect(out).toContain("console.log");
+  expect(out).toContain("stdout:");
+  expect(out).toContain("hi");
+  expect(out).toContain("result:");
+  expect(out).toContain("42");
+});
+
+test("execute_typescript collapsedSummary reports line count", () => {
+  const reg = withDefaults();
+  expect(reg.service.summarize("execute_typescript", { code: "a\nb\nc" })).toContain("3 lines");
+  expect(reg.service.summarize("execute_typescript", { code: "1+1" })).toContain("1 line");
+});
+
 test("bash renderer renders (no output) when output is empty", () => {
   const reg = withDefaults();
   const result = JSON.stringify({ exit_code: 0, output: "" });

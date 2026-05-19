@@ -160,6 +160,49 @@ export function defaultRenderers(theme: TuiTheme): UiToolRenderer[] {
       },
     },
 
+    // execute_typescript (llm-codemode): show the code that ran, then stdout, then result.
+    // Lives here rather than in llm-codemode because cross-plugin JSX would create a
+    // React node with llm-codemode's bundled React and fail to render through llm-tui's
+    // reconciler ("dispatcher.useContext is null"). See plugins/llm-tui/CLAUDE.md.
+    {
+      toolName: "execute_typescript",
+      collapsedSummary: (args) => {
+        const code = typeof (args as any)?.code === "string" ? (args as any).code : "";
+        const n = code === "" ? 0 : code.split("\n").length;
+        return `exec ${n} line${n === 1 ? "" : "s"}`;
+      },
+      expandedView: (args, result, _status, stdout) => {
+        const code = typeof (args as any)?.code === "string" ? (args as any).code : "";
+        const codeLines = code === "" ? [] : code.split("\n");
+        const stdoutLines = stdout ? stdout.split("\n") : [];
+        const resultLines = result ? result.split("\n") : [];
+        return (
+          <>
+            <Text color={theme.outputColor} dimColor>code:</Text>
+            {codeLines.map((l, i) => (
+              <Text key={`c${i}`} color={theme.outputColor}>{`  ${truncLine(l)}`}</Text>
+            ))}
+            {stdoutLines.length > 0 && (
+              <>
+                <Text color={theme.outputColor} dimColor>stdout:</Text>
+                {stdoutLines.map((l, i) => (
+                  <Text key={`s${i}`} color={theme.outputColor} dimColor>{`  ${truncLine(l)}`}</Text>
+                ))}
+              </>
+            )}
+            {resultLines.length > 0 && (
+              <>
+                <Text color={theme.outputColor} dimColor>result:</Text>
+                {resultLines.map((l, i) => (
+                  <Text key={`r${i}`} color={theme.outputColor}>{`  ${truncLine(l)}`}</Text>
+                ))}
+              </>
+            )}
+          </>
+        );
+      },
+    },
+
     // bash: show stdout preview (or result string if stdout was not streamed).
     {
       toolName: "bash",

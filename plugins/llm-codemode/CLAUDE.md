@@ -11,8 +11,9 @@ This plugin registers exactly one tool, `execute_typescript`, with `tools:regist
 ```
 index.ts            Plugin lifecycle. Loads config, renders the kaizen.tools .d.ts
                     from the live registry, registers `execute_typescript` with the
-                    registry, registers a TUI renderer if `ui:tool-renderer`
-                    is available. The only file that touches `ctx`.
+                    registry. The only file that touches `ctx`. Does NOT register
+                    a TUI renderer — that lives in `llm-tui/tool-renderers/
+                    defaults.tsx` (see "No React/Ink" note below).
 config.ts           loadConfig(deps) → CodeModeConfig. Reads
                     ~/.kaizen/plugins/llm-codemode/config.json (or
                     KAIZEN_LLM_CODEMODE_CONFIG override).
@@ -45,8 +46,6 @@ kaizen-tree.ts      Shared grouping helper. Turns a flat list of
                     sees). Single source of truth — keep host and worker on
                     this helper so they cannot drift.
 rpc-types.ts        Host↔worker message shapes.
-tui-renderer.tsx    `codemodeRenderer: UiToolRenderer`. Exported for the TUI to
-                    register via `ui:tool-renderer`.
 ```
 
 ## Invariants
@@ -56,7 +55,7 @@ tui-renderer.tsx    `codemodeRenderer: UiToolRenderer`. Exported for the TUI to
 - **`tool:progress` emission requires `outerCallId`.** The handler in `index.ts` passes `exec.callId` to `runInSandbox`. Without that, no progress emits.
 - **No system-prompt mutation.** Unlike `llm-codemode-dispatch`, this plugin does not consume `prompt:registry`. The API surface lives in the tool description.
 - **No code-from-prose extraction.** The LLM emits `tool_calls` with `code` as the argument. There is no fence parsing.
-- **Optional TUI integration.** `ui:tool-renderer` is looked up via `ctx.useService` only — never declared in `services.consumes` and never hard-consumed via `ctx.consumeService`. The plugin must run unchanged without `llm-tui` (no inline renderer, everything else identical).
+- **No TUI integration code in this plugin.** The `execute_typescript` renderer for the TUI now lives in `llm-tui/tool-renderers/defaults.tsx`. This plugin does not consume `ui:tool-renderer`, does not import `react` or `ink`, and runs identically whether or not `llm-tui` is in the harness.
 
 ## Local deploy
 
@@ -73,3 +72,5 @@ rsync -a --exclude='node_modules' --exclude='dist' plugins/$PLUGIN/ "$INSTALL_DI
 ```
 
 `sandbox-entry.ts` is loaded by URL at runtime — it must remain present alongside the bundle. Do not bundle it into `dist/index.js`.
+
+**No React/Ink in this plugin.** The TUI rendering of `execute_typescript` lives in `llm-tui/tool-renderers/defaults.tsx` (alongside the renderers for `edit`/`write`/`bash`). It must stay there: `kaizen marketplace update` bundles every plugin hermetically with its own React, so a renderer registered from this plugin would create JSX with a different React instance than the one `llm-tui`'s Ink reconciler uses, blowing up with `dispatcher.useContext is null`.

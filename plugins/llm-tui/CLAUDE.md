@@ -126,3 +126,5 @@ cp -R plugins/llm-tui/. ~/.kaizen/marketplaces/official/plugins/llm-tui@0.2.0/
 ```
 
 Note: entry is `index.tsx` (not `.ts`) — the bundler must run on the TSX file. If the harness manifest needs to pick up new exports or the version bumps, sync the local marketplace repo (`~/.kaizen/marketplaces/official/repo/`) — `kaizen marketplace update` will overwrite local edits there.
+
+**External plugins must not register `ui:tool-renderer`s that return JSX.** Kaizen bundles each plugin hermetically with its own React, so a JSX node built in another plugin's bundle uses a different React instance than the one this plugin's Ink reconciler runs. The result is `dispatcher.useContext is null` at render time. Renderers for cross-plugin tools should live here in `tool-renderers/defaults.tsx` (the `execute_typescript` renderer for `llm-codemode` is an example). If a future external plugin needs custom rendering, change the `ui:tool-renderer` contract to return a framework-neutral structured view instead of `ReactNode`.
