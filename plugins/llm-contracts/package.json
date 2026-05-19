@@ -1,6 +1,6 @@
 {
   "name": "llm-contracts",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Service contract definitions for the openai-compatible harness. Pure types + defineService; no runtime behavior.",
   "type": "module",
   "exports": {
