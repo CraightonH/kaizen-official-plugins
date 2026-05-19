@@ -173,21 +173,29 @@ export function defaultRenderers(theme: TuiTheme): UiToolRenderer[] {
       },
       expandedView: (args, result, _status, stdout) => {
         const code = typeof (args as any)?.code === "string" ? (args as any).code : "";
-        const codeLines = code === "" ? [] : code.split("\n");
-        const stdoutLines = stdout ? stdout.split("\n") : [];
-        const resultLines = result ? result.split("\n") : [];
+        const codePrev = code ? previewLines(code, PREVIEW_LINES) : { lines: [], hidden: 0 };
+        const stdoutPrev = stdout ? previewLines(stdout, PREVIEW_LINES) : { lines: [], hidden: 0 };
+        // `result` is formatToolResult output: `exit: ok\nreturned: …\nstdout:\n<text>`
+        // (or the error form). The stdout block is already shown above — slice it off
+        // so we don't render the same bytes twice.
+        let resultHead = "";
+        if (result) {
+          const idx = result.indexOf("\nstdout:");
+          resultHead = idx >= 0 ? result.slice(0, idx) : result;
+        }
+        const resultLines = resultHead ? resultHead.split("\n") : [];
         return (
           <>
-            <Text color={theme.outputColor} dimColor>code:</Text>
-            {codeLines.map((l, i) => (
-              <Text key={`c${i}`} color={theme.outputColor}>{`  ${truncLine(l)}`}</Text>
-            ))}
-            {stdoutLines.length > 0 && (
+            {codePrev.lines.length > 0 && (
+              <>
+                <Text color={theme.outputColor} dimColor>code:</Text>
+                {renderLines(codePrev.lines.map((l) => `  ${l}`), theme, codePrev.hidden)}
+              </>
+            )}
+            {stdoutPrev.lines.length > 0 && (
               <>
                 <Text color={theme.outputColor} dimColor>stdout:</Text>
-                {stdoutLines.map((l, i) => (
-                  <Text key={`s${i}`} color={theme.outputColor} dimColor>{`  ${truncLine(l)}`}</Text>
-                ))}
+                {renderLines(stdoutPrev.lines.map((l) => `  ${l}`), theme, stdoutPrev.hidden)}
               </>
             )}
             {resultLines.length > 0 && (
