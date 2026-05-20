@@ -22,7 +22,11 @@ const plugin = {
   permissions: { tier: "unscoped" },
   services: {
     provides: [],
-    consumes: ["tools:registry"],
+    // Dependency classification (see docs/PLUGIN_ARCHITECTURE.md):
+    //   prompt:registry — hard: section registration is the entire point of the plugin
+    //   slash:registry / tools:registry — topo-hint optional: best-effort registration,
+    //     listed here so kaizen schedules the providers before this plugin's setup.
+    consumes: ["prompt:registry", "slash:registry", "tools:registry"],
   },
 
   async setup(ctx) {
@@ -33,6 +37,8 @@ const plugin = {
     const handle = captureEnvironment({ cwd, env });
     await handle.refresh();
 
+    // Hard dependency — kaizen must refuse to boot this plugin if absent.
+    ctx.consumeService("prompt:registry");
     const prompt = ctx.useService<SystemPromptService>("prompt:registry");
     const sectionHandle = prompt.register(handle.section);
     teardown.push(() => sectionHandle.unregister());

@@ -44,6 +44,7 @@ function makeFakeCtx(opts: { slash?: boolean; tools?: boolean; cwd?: string; env
   const slashRegs: SlashReg[] = [];
   const toolRegs: ToolReg[] = [];
   const logs: string[] = [];
+  const consumed: string[] = [];
 
   const promptRegistry = {
     register(section: { id: string; priority: number; title?: string; render(): Promise<string> | string }) {
@@ -83,7 +84,7 @@ function makeFakeCtx(opts: { slash?: boolean; tools?: boolean; cwd?: string; env
     env: opts.env ?? {},
     log: (m: string) => { logs.push(m); },
     provideService: () => {},
-    consumeService: () => {},
+    consumeService: (n: string) => { consumed.push(n); },
     useService: (n: string) => {
       if (n === "prompt:registry") return promptRegistry;
       if (n === "slash:registry") {
@@ -100,7 +101,7 @@ function makeFakeCtx(opts: { slash?: boolean; tools?: boolean; cwd?: string; env
     on: () => {},
   };
 
-  return { ctx: ctx as never, sections, slashRegs, toolRegs, logs };
+  return { ctx: ctx as never, sections, slashRegs, toolRegs, logs, consumed };
 }
 
 describe("llm-environment plugin", () => {
@@ -112,6 +113,17 @@ describe("llm-environment plugin", () => {
     expect(f.sections[0]!.priority).toBe(30);
     expect(f.sections[0]!.title).toBe("Environment");
     await plugin.stop!();
+  });
+
+  it("declares prompt:registry as a hard dependency via consumeService", async () => {
+    const f = makeFakeCtx();
+    await plugin.setup!(f.ctx);
+    expect(f.consumed).toContain("prompt:registry");
+    await plugin.stop!();
+  });
+
+  it("declares all three services in plugin.services.consumes for topo ordering", () => {
+    expect(plugin.services?.consumes).toEqual(["prompt:registry", "slash:registry", "tools:registry"]);
   });
 
   it("registers /env:refresh when slash:registry is present", async () => {

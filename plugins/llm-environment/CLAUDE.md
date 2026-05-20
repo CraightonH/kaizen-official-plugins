@@ -24,6 +24,21 @@ Boundaries:
 - `environment.ts` is the only stateful module. slash.ts and tool.ts are pure.
 - Tests for each module live alongside in `test/` and run independently (`bun test`).
 
+## Service dependencies
+
+Classification per `docs/PLUGIN_ARCHITECTURE.md`. All three services are
+declared in `services.consumes` so kaizen orders their providers before this
+plugin's setup, but they are NOT all hard:
+
+| Service | Category | Why |
+|---|---|---|
+| `prompt:registry` | **Hard** | Section registration is the entire point of the plugin. If absent, the harness must refuse to boot us. `setup()` calls `ctx.consumeService("prompt:registry")` then `ctx.useService` directly. |
+| `slash:registry` | **Topo-hint optional** | `/env:refresh` is convenient but not load-bearing. `safeUseService` swallows the `useService` throw when the provider is missing from the manifest. |
+| `tools:registry` | **Topo-hint optional** | `environment_refresh` is convenient but not load-bearing. Same `safeUseService` pattern. |
+
+Do not promote `slash:registry` or `tools:registry` to hard. The LLM still
+benefits from the static prompt section even without a refresh affordance.
+
 ## Invariants
 
 - **Snapshot is static between refresh calls.** `render()` is a synchronous
