@@ -37,22 +37,9 @@ kaizen --harness ./harnesses/openai-compatible.json
 kaizen --harness ./harnesses/claude-wrapper.json
 ```
 
-## Local plugin deploy
-
-The kaizen runtime prefers the bundled `dist/index.js` over source. After editing a plugin, copy source + rebuild bundle into the install dir, e.g. for `llm-tui@0.2.0`:
-
-```sh
-cd plugins/llm-tui
-bun build --target=bun --outfile=dist/index.js index.tsx
-INSTALL_DIR=~/.kaizen/marketplaces/official/plugins/llm-tui@0.2.0
-rsync -a --exclude=node_modules --exclude=dist ./ "$INSTALL_DIR/"
-cp dist/index.js "$INSTALL_DIR/dist/index.js"
-```
-
-Entry file may be `index.tsx` or `index.ts` — match the plugin. Bundling on the source file is required; copying source alone is not enough.
-
 ## Working in this repo
 
+- Always reference and incorporate principles from docs/PLUGIN_ARCHITECTURE.md when considering inter-plugin communication or building a new plugin. 
 - Plugins are independent: tests, types, and bundles are per-plugin.
 - Contracts (types crossing plugin boundaries) live in `plugins/llm-contracts/public.ts`. Implementation plugins import from `llm-contracts/public`, never from each other.
 - `kaizen plugin validate plugins/<name>` is the contract for a publishable plugin; run it after manifest, permissions, or `public.d.ts` changes.
