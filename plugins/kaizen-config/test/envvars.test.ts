@@ -1,4 +1,4 @@
-// plugins/llm-config/test/envvars.test.ts
+// plugins/kaizen-config/test/envvars.test.ts
 import { describe, it, expect } from "bun:test";
 import { applyEnvOverrides } from "../envvars.ts";
 import type { ConfigSchema } from "../schema.ts";

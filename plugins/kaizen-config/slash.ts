@@ -1,4 +1,4 @@
-// plugins/llm-config/slash.ts
+// plugins/kaizen-config/slash.ts
 import type { ConfigStoreService, SlashCommandManifest, SlashCommandHandler } from "llm-contracts/public";
 
 export interface SlashRegistryLike {

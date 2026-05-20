@@ -1,4 +1,4 @@
-// plugins/llm-config/store.ts
+// plugins/kaizen-config/store.ts
 import type {
   ConfigSpec,
   ConfigScope,
@@ -56,7 +56,7 @@ export function createStore(deps: StoreDeps): ConfigStoreService {
   return {
     register<T>(spec: ConfigSpec<T>): void {
       if (entries.has(spec.plugin)) {
-        throw new Error(`llm-config: plugin '${spec.plugin}' already registered`);
+        throw new Error(`kaizen-config: plugin '${spec.plugin}' already registered`);
       }
       const { value, resolution } = resolve(
         spec.plugin,
@@ -74,12 +74,12 @@ export function createStore(deps: StoreDeps): ConfigStoreService {
     },
     get<T>(plugin: string): T {
       const e = entries.get(plugin);
-      if (!e) throw new Error(`llm-config: plugin '${plugin}' is not registered`);
+      if (!e) throw new Error(`kaizen-config: plugin '${plugin}' is not registered`);
       return e.cachedValue as T;
     },
     async set<T>(plugin: string, partial: Partial<T>, scope: ConfigScope = "home"): Promise<void> {
       const e = entries.get(plugin);
-      if (!e) throw new Error(`llm-config: plugin '${plugin}' is not registered`);
+      if (!e) throw new Error(`kaizen-config: plugin '${plugin}' is not registered`);
       const path = scope === "home" ? deps.homePath : deps.projectPath;
       const current = scope === "home" ? home.file : project.file;
       const next = mergePluginSection(current, plugin, partial as Record<string, unknown>);
@@ -89,7 +89,7 @@ export function createStore(deps: StoreDeps): ConfigStoreService {
       const { ok, errors } = resolve(plugin, e.spec, probeHome, probeProject, deps);
       if (!ok) {
         throw new Error(
-          `llm-config: validation failed for '${plugin}': ${errors!.map((er) => `${er.path}: ${er.message}`).join("; ")}`,
+          `kaizen-config: validation failed for '${plugin}': ${errors!.map((er) => `${er.path}: ${er.message}`).join("; ")}`,
         );
       }
       deps.writeFile(path, next);
@@ -103,7 +103,7 @@ export function createStore(deps: StoreDeps): ConfigStoreService {
     },
     watch<T>(plugin: string, cb: (v: T) => void): () => void {
       const e = entries.get(plugin);
-      if (!e) throw new Error(`llm-config: plugin '${plugin}' is not registered`);
+      if (!e) throw new Error(`kaizen-config: plugin '${plugin}' is not registered`);
       e.watchers.add(cb as (v: unknown) => void);
       return () => { e.watchers.delete(cb as (v: unknown) => void); };
     },
@@ -129,7 +129,7 @@ function safeRead(deps: StoreDeps, path: string): LayerState {
     return { file, exists: true };
   } catch (err: any) {
     if (err?.code !== "ENOENT") {
-      deps.log(`llm-config: failed to read ${path}: ${err.message}`);
+      deps.log(`kaizen-config: failed to read ${path}: ${err.message}`);
     }
     return { file: { plugins: {} }, exists: false };
   }
@@ -164,7 +164,7 @@ function resolve(
     const r = validate(withEnv, spec.schema as ConfigSchema<unknown>);
     if (!r.ok) {
       deps.log(
-        `llm-config: validation failed for '${plugin}': ${r.errors.map((e) => `${e.path}: ${e.message}`).join("; ")} — using defaults`,
+        `kaizen-config: validation failed for '${plugin}': ${r.errors.map((e) => `${e.path}: ${e.message}`).join("; ")} — using defaults`,
       );
       return {
         ok: false,

@@ -11,7 +11,7 @@
     "kaizen-plugin"
   ],
   "dependencies": {
-    "llm-config": "workspace:*",
+    "kaizen-config": "workspace:*",
     "llm-contracts": "workspace:*",
     "llm-events": "workspace:*",
     "llm-tools-registry": "workspace:*",

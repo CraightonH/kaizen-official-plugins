@@ -1,5 +1,5 @@
 {
-  "name": "llm-config",
+  "name": "kaizen-config",
   "version": "0.1.0",
   "description": "Harness-scoped plugin configuration store. Provides config:store.",
   "type": "module",

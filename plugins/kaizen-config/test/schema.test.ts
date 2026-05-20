@@ -1,4 +1,4 @@
-// plugins/llm-config/test/schema.test.ts
+// plugins/kaizen-config/test/schema.test.ts
 import { describe, it, expect } from "bun:test";
 import { validate, type ConfigSchema, type FieldSchema } from "../schema.ts";
 

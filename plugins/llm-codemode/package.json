@@ -11,7 +11,7 @@
   ],
   "dependencies": {
     "json-schema-to-typescript": "^15.0.3",
-    "llm-config": "workspace:*",
+    "kaizen-config": "workspace:*",
     "llm-contracts": "workspace:*",
     "llm-tools-registry": "workspace:*"
   },

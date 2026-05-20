@@ -1,4 +1,4 @@
-// plugins/llm-config/test/slash.test.ts
+// plugins/kaizen-config/test/slash.test.ts
 import { describe, it, expect } from "bun:test";
 import { registerSlashCommands, type SlashRegistryLike, type SlashDeps } from "../slash.ts";
 import type { ConfigStoreService } from "llm-contracts/public";

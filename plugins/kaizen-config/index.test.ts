@@ -21,9 +21,9 @@ function makeCtx() {
   } as any;
 }
 
-describe("llm-config", () => {
+describe("kaizen-config", () => {
   it("metadata", () => {
-    expect(plugin.name).toBe("llm-config");
+    expect(plugin.name).toBe("kaizen-config");
     expect(plugin.apiVersion).toBe("3.0.0");
   });
 
@@ -52,8 +52,8 @@ describe("llm-config", () => {
       join(import.meta.dir, "..", "..", ".kaizen", "marketplace.json"),
       "utf8",
     ));
-    expect(harness.plugins).toContain(`official/llm-config@${pkg.version}`);
-    const entry = marketplace.entries.find((e: any) => e.kind === "plugin" && e.name === "llm-config");
+    expect(harness.plugins).toContain(`official/kaizen-config@${pkg.version}`);
+    const entry = marketplace.entries.find((e: any) => e.kind === "plugin" && e.name === "kaizen-config");
     expect(entry?.versions?.some((v: any) => v.version === pkg.version)).toBe(true);
   });
 

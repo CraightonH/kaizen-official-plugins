@@ -1,4 +1,4 @@
-// plugins/llm-config/index.ts
+// plugins/kaizen-config/index.ts
 import type { KaizenPlugin } from "kaizen/types";
 import type { ConfigStoreService, SlashRegistryService } from "llm-contracts/public";
 import { homedir } from "node:os";
@@ -12,7 +12,7 @@ import { registerSlashCommands } from "./slash.ts";
 const teardowns: Array<() => void> = [];
 
 const plugin: KaizenPlugin = {
-  name: "llm-config",
+  name: "kaizen-config",
   apiVersion: "3.0.0",
   permissions: {
     tier: "scoped",
@@ -80,7 +80,7 @@ const plugin: KaizenPlugin = {
         }),
       }));
     } catch (err) {
-      ctx.log(`llm-config: slash:registry unavailable (${(err as Error).message}); /config commands disabled`);
+      ctx.log(`kaizen-config: slash:registry unavailable (${(err as Error).message}); /config commands disabled`);
     }
   },
 

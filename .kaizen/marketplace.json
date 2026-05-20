@@ -34,11 +34,11 @@
     },
     {
       "kind": "plugin",
-      "name": "llm-config",
+      "name": "kaizen-config",
       "description": "Harness-scoped plugin configuration store. Provides config:store.",
       "categories": ["foundation", "config"],
       "versions": [
-        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-config" } }
+        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/kaizen-config" } }
       ]
     },
     {

@@ -1,4 +1,4 @@
-// plugins/llm-config/schema.ts
+// plugins/kaizen-config/schema.ts
 import type { ConfigSchema, FieldSchema } from "llm-contracts/public";
 
 export type { ConfigSchema, FieldSchema };

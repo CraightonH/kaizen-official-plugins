@@ -1,4 +1,4 @@
-// plugins/llm-config/envvars.ts
+// plugins/kaizen-config/envvars.ts
 import type { ConfigSchema, FieldSchema } from "./schema.ts";
 
 export type ResolutionSource = "default" | "home" | "project" | "env";

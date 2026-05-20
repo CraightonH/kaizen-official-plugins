@@ -6,7 +6,7 @@ import { atomicWriteJson, mergePluginSection } from "../atomic-write.ts";
 
 const dirs: string[] = [];
 function makeTmp(): string {
-  const d = mkdtempSync(join(tmpdir(), "llm-config-test-"));
+  const d = mkdtempSync(join(tmpdir(), "kaizen-config-test-"));
   dirs.push(d);
   return d;
 }
