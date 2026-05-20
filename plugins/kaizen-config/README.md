@@ -1,6 +1,6 @@
 # kaizen-config
 
-Harness-scoped plugin configuration store for the openai-compatible harness. Provides the `config:store` service that lets peer plugins register typed configuration fields and persist them per-harness, with home and project layers merged on read and env-var overrides winning over both.
+Harness-scoped plugin configuration store for the local harness. Provides the `config:store` service that lets peer plugins register typed configuration fields and persist them per-harness, with home and project layers merged on read and env-var overrides winning over both.
 
 ## Service
 

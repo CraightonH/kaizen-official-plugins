@@ -1,7 +1,7 @@
 {
   "name": "llm-agents",
   "version": "0.2.2",
-  "description": "Subagent dispatch + file-loader registry for the openai-compatible harness",
+  "description": "Subagent dispatch + file-loader registry for the local harness",
   "type": "module",
   "exports": {
     ".": "./index.ts",

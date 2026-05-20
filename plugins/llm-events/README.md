@@ -1,6 +1,6 @@
 # llm-events
 
-Tier 0 foundation plugin for the openai-compatible Kaizen harness.
+Tier 0 foundation plugin for the local Kaizen harness.
 
 ## What it provides
 

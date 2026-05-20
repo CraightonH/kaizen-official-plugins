@@ -3,7 +3,7 @@ import { harnessKey } from "../harness-key";
 
 describe("harnessKey", () => {
   test("ref with version strips trailing version", () => {
-    expect(harnessKey({ ref: "official/openai-compatible@0.1.0" })).toBe("official_openai-compatible");
+    expect(harnessKey({ ref: "official/local@0.1.0" })).toBe("official_local");
   });
 
   test("scoped npm-style refs only strip the trailing version segment", () => {
@@ -11,8 +11,8 @@ describe("harnessKey", () => {
   });
 
   test("local json paths get local_ prefix", () => {
-    expect(harnessKey({ jsonPath: "/repo/harnesses/openai-compatible.json" })).toBe("local_openai-compatible");
-    expect(harnessKey({ jsonPath: "/repo/harnesses/openai-compatible/kaizen.json" })).toBe("local_openai-compatible");
+    expect(harnessKey({ jsonPath: "/repo/harnesses/local.json" })).toBe("local_local");
+    expect(harnessKey({ jsonPath: "/repo/harnesses/local/kaizen.json" })).toBe("local_local");
   });
 
   test("missing identity falls back to default", () => {

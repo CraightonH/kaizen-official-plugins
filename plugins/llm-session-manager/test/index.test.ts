@@ -21,7 +21,7 @@ function makeCtx() {
   };
   services.set("config:store", cfgStore);
   return {
-    harness: { ref: "official/openai-compatible@0.1.0" },
+    harness: { ref: "official/local@0.1.0" },
     log: () => {},
     defineService: () => {},
     provideService: (name: string, impl: any) => services.set(name, impl),

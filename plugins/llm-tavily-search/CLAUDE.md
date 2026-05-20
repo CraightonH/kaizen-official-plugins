@@ -41,8 +41,8 @@ Boundaries:
 
 Reads via `config:store` from the harness-scoped file at
 `~/.kaizen/harnesses/<harnessKey>/config.json` under
-`plugins["llm-tavily-search"]`. For the `official/openai-compatible`
-harness, `<harnessKey>` is `official_openai-compatible`.
+`plugins["llm-tavily-search"]`. For the `official/local`
+harness, `<harnessKey>` is `official_local`.
 
 Override with `TAVILY_API_KEY` env var (beats file values) or set via
 `/config:set llm-tavily-search apiKey=<key>`.

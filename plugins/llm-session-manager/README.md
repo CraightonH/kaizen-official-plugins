@@ -1,6 +1,6 @@
 # llm-session-manager
 
-Persistent conversation sessions for the openai-compatible harness.
+Persistent conversation sessions for the local harness.
 
 The plugin provides `sessions:store`, a service that creates, loads, lists, deletes, and drives persistent sessions. Each session owns a canonical `ChatMessage[]` snapshot and an append-only `events.jsonl` trace under:
 

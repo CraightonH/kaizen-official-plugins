@@ -69,6 +69,6 @@ cp -R plugins/llm-native-dispatch/. ~/.kaizen/marketplaces/official/plugins/llm-
   && bun build --target=bun --outfile=dist/index.js index.ts)
 ```
 
-Substitute `<version>` with the version pinned by your local harness manifest (see `harnesses/openai-compatible.json`).
+Substitute `<version>` with the version pinned by your local harness manifest (see `harnesses/local.json`).
 
 If you also need the harness manifest to pick up changes, sync the local marketplace repo (`~/.kaizen/marketplaces/official/repo/`) — it tracks upstream `main` and `kaizen marketplace update` will overwrite local edits.

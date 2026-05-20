@@ -1,6 +1,6 @@
 # openai-llm
 
-OpenAI-compatible LLM provider for the openai-compatible Kaizen harness.
+OpenAI-compatible LLM provider for the local Kaizen harness.
 
 This plugin implements the `llm:complete` service against OpenAI-style
 `/chat/completions` streaming endpoints. It is a provider implementation, not

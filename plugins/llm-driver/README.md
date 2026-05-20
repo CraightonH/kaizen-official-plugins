@@ -1,6 +1,6 @@
 # llm-driver
 
-Coordination plugin for the openai-compatible harness. Owns the assistant turn loop, active session selection, cancellation, and the canonical conversation/turn/LLM lifecycle events. Persistent message storage lives in `llm-session-manager`.
+Coordination plugin for the local harness. Owns the assistant turn loop, active session selection, cancellation, and the canonical conversation/turn/LLM lifecycle events. Persistent message storage lives in `llm-session-manager`.
 
 ## What it does
 

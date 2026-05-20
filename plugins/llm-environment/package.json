@@ -1,7 +1,7 @@
 {
   "name": "llm-environment",
   "version": "0.1.0",
-  "description": "Surfaces working directory, host platform, and git context in the system prompt for the openai-compatible harness.",
+  "description": "Surfaces working directory, host platform, and git context in the system prompt for the local harness.",
   "type": "module",
   "exports": {
     ".": "./index.ts",

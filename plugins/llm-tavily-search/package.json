@@ -1,7 +1,7 @@
 {
   "name": "llm-tavily-search",
   "version": "0.1.1",
-  "description": "Tavily web search tool (web_search) for the openai-compatible harness. Requires TAVILY_API_KEY.",
+  "description": "Tavily web search tool (web_search) for the local harness. Requires TAVILY_API_KEY.",
   "type": "module",
   "exports": {
     ".": "./index.ts"

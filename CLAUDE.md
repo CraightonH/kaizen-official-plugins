@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Always read `docs/PLUGIN_ARCHITECTURE.md` before touching any service, contract, or `services.consumes` declaration.** It is the authoritative reference for:
 
 - Service ownership (`defineService` / `provideService` / `consumeService`)
-- The "contracts plugin" pattern (`llm-contracts` is the sole site of `defineService` for cross-plugin contracts in the openai-compatible harness)
+- The "contracts plugin" pattern (`llm-contracts` is the sole site of `defineService` for cross-plugin contracts in the local harness)
 - Contract ID naming (`<domain>:<role>`, never plugin-name prefixes)
 - Required vs topo-hint-optional vs deferred-optional dependencies
 - Provider swappability and the cardinality-one rule
@@ -33,7 +33,7 @@ kaizen plugin validate plugins/<name>                # plugin manifest + structu
 Run a harness from the local checkout (no marketplace install needed):
 
 ```sh
-kaizen --harness ./harnesses/openai-compatible.json
+kaizen --harness ./harnesses/local.json
 kaizen --harness ./harnesses/claude-wrapper.json
 ```
 

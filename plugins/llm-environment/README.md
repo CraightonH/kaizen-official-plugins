@@ -1,7 +1,7 @@
 # llm-environment
 
 Adds an `Environment` section to the assembled system prompt for the
-openai-compatible harness. Lets the LLM see the current working directory,
+local harness. Lets the LLM see the current working directory,
 host platform, and git branch.
 
 ## Rendered output

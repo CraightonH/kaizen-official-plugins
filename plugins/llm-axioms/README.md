@@ -1,6 +1,6 @@
 # llm-axioms
 
-Session-scoped Aristotelean axiom workspace for the openai-compatible harness. Records first-principles axioms (statement + premises + reasoning + scope) derived during a session, persists them under `~/.kaizen/plugins/llm-axioms/sessions/<session-id>.json`, and injects them into every LLM turn alongside a static methodology section that teaches the model when to derive.
+Session-scoped Aristotelean axiom workspace for the local harness. Records first-principles axioms (statement + premises + reasoning + scope) derived during a session, persists them under `~/.kaizen/plugins/llm-axioms/sessions/<session-id>.json`, and injects them into every LLM turn alongside a static methodology section that teaches the model when to derive.
 
 Axioms are **distinct from memories**: session-bound (not user/project), structured (with explicit premises and scope), ephemeral relative to broader durable context. If a derived axiom proves durable across problems, the user lifts it into `llm-memory` by hand.
 

@@ -1,7 +1,7 @@
 {
   "name": "llm-status-items",
   "version": "0.1.1",
-  "description": "Status-bar items (model, tokens, turn-state, optional cost) for the openai-compatible harness.",
+  "description": "Status-bar items (model, tokens, turn-state, optional cost) for the local harness.",
   "type": "module",
   "exports": {
     ".": "./index.ts"

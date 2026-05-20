@@ -72,4 +72,4 @@ rsync -a --exclude='node_modules' --exclude='dist' plugins/$PLUGIN/ "$INSTALL_DI
 
 `llm-contracts` must be redeployed before any plugin that calls `provideService`
 for a contract defined here — it must boot first. It is listed as the first
-plugin in `harnesses/openai-compatible.json`.
+plugin in `harnesses/local.json`.

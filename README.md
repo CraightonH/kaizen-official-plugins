@@ -14,7 +14,7 @@ This registers the marketplace under the id `official`, which is the prefix used
 
 ### Foundation
 
-- **llm-events** — event vocabulary, shared LLM primitives, and the neutral `llm:complete` service definition for openai-compatible harnesses.
+- **llm-events** — event vocabulary, shared LLM primitives, and the neutral `llm:complete` service definition for local harnesses.
 - **openai-llm** — OpenAI-compatible LLM provider. Implements `llm:complete`. Configure at `~/.kaizen/plugins/openai-llm/config.json`; see the plugin's README for the schema.
 
 ### Tools
@@ -27,7 +27,7 @@ This registers the marketplace under the id `official`, which is the prefix used
 
 ### Conversation
 
-- **llm-driver** — turn loop and conversation state for openai-compatible harnesses. Provides `driver:run-conversation`.
+- **llm-driver** — turn loop and conversation state for local harnesses. Provides `driver:run-conversation`.
 - **llm-skills** — skills registry and file-loader for `~/.kaizen/skills/` and `<project>/.kaizen/skills/`. Injects skills into the system prompt.
 - **llm-memory** — file-backed persistent memory. Provides `memory:store`, `memory_recall`/`memory_save` tools, and `llm:before-call` injection.
 - **llm-agents** — subagent dispatch and file-loader for `~/.kaizen/agents/`. Provides `dispatch_agent` tool.
@@ -35,7 +35,7 @@ This registers the marketplace under the id `official`, which is the prefix used
 
 ### UI
 
-- **llm-tui** — generic LLM-chat TUI: input box, output pane, status bar, completion popup, theme system. Backs the `openai-compatible` harness.
+- **llm-tui** — generic LLM-chat TUI: input box, output pane, status bar, completion popup, theme system. Backs the `local` harness.
 
 ### Optional
 
@@ -52,12 +52,12 @@ This registers the marketplace under the id `official`, which is the prefix used
 ## Harnesses
 
 - **claude-wrapper** — Claude Code wrapper UI over `claude -p`. Requires the `claude` binary on `$PATH` and an authenticated Claude Code login (Pro/Max/Team/Enterprise OAuth, or API key).
-- **openai-compatible** — chat with any OpenAI-compatible LLM endpoint (LM Studio, Ollama, vLLM, llama.cpp, hosted providers). No `claude` binary required. Configuration lives in `~/.kaizen/plugins/openai-llm/config.json`.
+- **local** — chat with any OpenAI-compatible LLM endpoint (LM Studio, Ollama, vLLM, llama.cpp, hosted providers). No `claude` binary required. Configuration lives in `~/.kaizen/plugins/openai-llm/config.json`.
 
 ### Choosing a harness
 
 - Use **claude-wrapper** if you have a Claude Code login and want the existing Claude UX over `claude -p`.
-- Use **openai-compatible** for everything else: local LLMs (LM Studio, Ollama, vLLM) and any third-party OpenAI-compatible endpoint.
+- Use **local** for everything else: local LLMs (LM Studio, Ollama, vLLM) and any third-party OpenAI-compatible endpoint.
 
 ## Usage
 
@@ -71,16 +71,16 @@ Or run from a local checkout:
 kaizen --harness ./harnesses/claude-wrapper.json
 ```
 
-For the OpenAI-compatible harness:
+For the local harness:
 
 ```sh
-kaizen --harness official/openai-compatible@0.1.0
+kaizen --harness official/local@0.1.0
 ```
 
 Or run from a local checkout:
 
 ```sh
-kaizen --harness ./harnesses/openai-compatible.json
+kaizen --harness ./harnesses/local.json
 ```
 
 ## Layout
@@ -111,7 +111,7 @@ kaizen --harness ./harnesses/openai-compatible.json
 │   └── claude-driver/
 └── harnesses/
     ├── claude-wrapper.json
-    └── openai-compatible.json
+    └── local.json
 ```
 
 ## Development

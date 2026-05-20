@@ -1,6 +1,6 @@
 # llm-tool-approval
 
-Per-tool-call approval gate for the openai-compatible harness. Subscribes to `tool:before-execute` and prompts the user with four options: Approve Once, Approve Always, Approve Domain Always, Deny. Persists allow/deny rules to project or global config, with a shipped baseline of safe defaults.
+Per-tool-call approval gate for the local harness. Subscribes to `tool:before-execute` and prompts the user with four options: Approve Once, Approve Always, Approve Domain Always, Deny. Persists allow/deny rules to project or global config, with a shipped baseline of safe defaults.
 
 ## Config
 

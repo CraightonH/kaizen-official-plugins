@@ -26,7 +26,7 @@ contract is owned in the wrong place.
 
 ## The Contracts Plugin Pattern
 
-The openai-compatible harness uses a dedicated `llm-contracts` plugin:
+The local harness uses a dedicated `llm-contracts` plugin:
 
 - It is the **sole** site of `defineService` for every cross-plugin contract
   in the harness.

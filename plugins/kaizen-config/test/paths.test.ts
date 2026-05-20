@@ -3,10 +3,10 @@ import { harnessKey, homeConfigPath, projectConfigPath, type HarnessIdentity } f
 
 describe("harnessKey", () => {
   it("uses ref when present, stripping version", () => {
-    expect(harnessKey({ ref: "official/openai-compatible@0.1.0" })).toBe("official_openai-compatible");
+    expect(harnessKey({ ref: "official/local@0.1.0" })).toBe("official_local");
   });
   it("derives from jsonPath basename when ref missing", () => {
-    expect(harnessKey({ jsonPath: "/abs/harnesses/openai-compatible.json" })).toBe("local_openai-compatible");
+    expect(harnessKey({ jsonPath: "/abs/harnesses/local.json" })).toBe("local_local");
   });
   it("derives from parent dir when jsonPath is kaizen.json", () => {
     expect(harnessKey({ jsonPath: "/abs/my-harness/kaizen.json" })).toBe("local_my-harness");
@@ -24,8 +24,8 @@ describe("harnessKey", () => {
 
 describe("path resolution", () => {
   it("homeConfigPath joins home + harnesses + key + config.json", () => {
-    expect(homeConfigPath("/u/me", "official_openai-compatible"))
-      .toBe("/u/me/.kaizen/harnesses/official_openai-compatible/config.json");
+    expect(homeConfigPath("/u/me", "official_local"))
+      .toBe("/u/me/.kaizen/harnesses/official_local/config.json");
   });
   it("projectConfigPath joins cwd + .kaizen + harnesses + key + config.json", () => {
     expect(projectConfigPath("/proj", "default"))

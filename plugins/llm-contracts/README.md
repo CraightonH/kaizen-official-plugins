@@ -1,6 +1,6 @@
 # llm-contracts
 
-The contract foundation for the openai-compatible Kaizen harness. This plugin
+The contract foundation for the local Kaizen harness. This plugin
 defines every cross-plugin service contract and exports their TypeScript types.
 It has zero runtime behavior — no `provideService` calls, no event
 subscriptions, no UI mutation.
@@ -138,7 +138,7 @@ Minimal check per contract:
 1. Create a throwaway stub plugin at `plugins/_acidtest/<contract-slug>/index.ts`
    that imports the contract type from `llm-contracts/public` and calls
    `ctx.provideService("<contract-id>", <minimal-stub>)`.
-2. In `harnesses/openai-compatible.json`, temporarily replace the implementation
+2. In `harnesses/local.json`, temporarily replace the implementation
    plugin entry with `official/_acidtest-<slug>@0.1.0`.
 3. Boot the harness. No other plugin should error during setup (the feature will
    not work; that is expected).

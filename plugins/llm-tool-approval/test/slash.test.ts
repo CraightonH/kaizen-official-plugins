@@ -25,8 +25,8 @@ function makeCfgSvc(opts: FakeStoreOpts = {}): SlashDeps["cfgSvc"] {
   const effective = opts.effective ?? { allow: [], deny: [] };
   const baseStatus: ConfigStatus = {
     plugin: "llm-tool-approval",
-    homePath: "/home/u/.kaizen/harnesses/openai-compatible/config.json",
-    projectPath: "/proj/.kaizen/harnesses/openai-compatible/config.json",
+    homePath: "/home/u/.kaizen/harnesses/local/config.json",
+    projectPath: "/proj/.kaizen/harnesses/local/config.json",
     homeExists: false,
     projectExists: false,
     resolution: { allow: "default", deny: "default" },
@@ -106,8 +106,8 @@ describe("registerSlashCommands", () => {
         homeExists: true,
         projectExists: true,
         resolution: { allow: "project", deny: "home" },
-        homePath: "/home/u/.kaizen/harnesses/openai-compatible/config.json",
-        projectPath: "/proj/.kaizen/harnesses/openai-compatible/config.json",
+        homePath: "/home/u/.kaizen/harnesses/local/config.json",
+        projectPath: "/proj/.kaizen/harnesses/local/config.json",
       },
     });
     const deps = makeDeps({ cfgSvc });
@@ -121,7 +121,7 @@ describe("registerSlashCommands", () => {
     expect(out).toContain("bad");
     expect(out).toContain("allow: project");
     expect(out).toContain("deny: home");
-    expect(out).toContain("/proj/.kaizen/harnesses/openai-compatible/config.json");
+    expect(out).toContain("/proj/.kaizen/harnesses/local/config.json");
   });
 
   it("approval:status with no files reports (none) for home/project paths", async () => {

@@ -44,7 +44,7 @@
     {
       "kind": "plugin",
       "name": "llm-contracts",
-      "description": "Service contract definitions for the openai-compatible harness. Pure types + defineService; no runtime behavior.",
+      "description": "Service contract definitions for the local harness. Pure types + defineService; no runtime behavior.",
       "categories": ["foundation", "contracts"],
       "versions": [
         { "version": "0.3.0", "source": { "type": "file", "path": "plugins/llm-contracts" } },
@@ -69,7 +69,7 @@
     {
       "kind": "plugin",
       "name": "llm-session-manager",
-      "description": "Persistent session store and per-session execution trace for openai-compatible harnesses.",
+      "description": "Persistent session store and per-session execution trace for local harnesses.",
       "categories": ["sessions", "persistence", "llm"],
       "versions": [
         { "version": "0.1.2", "source": { "type": "file", "path": "plugins/llm-session-manager" } },
@@ -123,7 +123,7 @@
     {
       "kind": "plugin",
       "name": "llm-tools-registry",
-      "description": "Central tool registry and single tool-execution chokepoint for the openai-compatible harness.",
+      "description": "Central tool registry and single tool-execution chokepoint for the local harness.",
       "categories": ["tools", "registry"],
       "versions": [
         { "version": "0.3.0", "source": { "type": "file", "path": "plugins/llm-tools-registry" } },
@@ -134,14 +134,14 @@
     {
       "kind": "plugin",
       "name": "llm-local-tools",
-      "description": "Built-in local-development toolset (read/write/create/edit/glob/grep/bash/web_fetch) for the openai-compatible harness. NOT sandboxed.",
+      "description": "Built-in local-development toolset (read/write/create/edit/glob/grep/bash/web_fetch) for the local harness. NOT sandboxed.",
       "categories": ["tools", "local"],
       "versions": [{ "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-local-tools" } }]
     },
     {
       "kind": "plugin",
       "name": "llm-tavily-search",
-      "description": "Tavily web search tool (web_search) for the openai-compatible harness. Requires TAVILY_API_KEY.",
+      "description": "Tavily web search tool (web_search) for the local harness. Requires TAVILY_API_KEY.",
       "categories": ["tools", "web", "search"],
       "versions": [
         { "version": "0.1.1", "source": { "type": "file", "path": "plugins/llm-tavily-search" } },
@@ -228,7 +228,7 @@
     {
       "kind": "plugin",
       "name": "llm-slash-commands",
-      "description": "Slash command registry, dispatcher, and file loader for the openai-compatible harness.",
+      "description": "Slash command registry, dispatcher, and file loader for the local harness.",
       "categories": ["slash", "commands"],
       "versions": [
         { "version": "0.2.1", "source": { "type": "file", "path": "plugins/llm-slash-commands" } },
@@ -260,7 +260,7 @@
     {
       "kind": "plugin",
       "name": "llm-status-items",
-      "description": "Optional status-bar items (model, tokens, turn-state, optional cost) for the openai-compatible harness.",
+      "description": "Optional status-bar items (model, tokens, turn-state, optional cost) for the local harness.",
       "categories": ["status", "llm"],
       "versions": [
         { "version": "0.1.1", "source": { "type": "file", "path": "plugins/llm-status-items" } },
@@ -286,10 +286,10 @@
     },
     {
       "kind": "harness",
-      "name": "openai-compatible",
-      "description": "OpenAI-compatible LLM harness: chat against any OpenAI-compatible endpoint (LM Studio, Ollama, vLLM, etc.).",
-      "categories": ["harness", "llm", "openai"],
-      "versions": [{ "version": "0.1.0", "path": "harnesses/openai-compatible.json" }]
+      "name": "local",
+      "description": "Local LLM harness: in-process chat loop against any OpenAI-compatible endpoint (LM Studio, Ollama, vLLM, etc.).",
+      "categories": ["harness", "llm", "local"],
+      "versions": [{ "version": "0.1.0", "path": "harnesses/local.json" }]
     }
   ]
 }

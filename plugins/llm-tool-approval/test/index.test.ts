@@ -22,8 +22,8 @@ function makeFakeCtx(opts: { hasPrompt?: boolean; hasRenderer?: boolean; hasChan
       watch: () => () => {},
       list: () => [{
         plugin: "llm-tool-approval",
-        homePath: "/home/u/.kaizen/harnesses/openai-compatible/config.json",
-        projectPath: "/proj/.kaizen/harnesses/openai-compatible/config.json",
+        homePath: "/home/u/.kaizen/harnesses/local/config.json",
+        projectPath: "/proj/.kaizen/harnesses/local/config.json",
         homeExists: false,
         projectExists: false,
         resolution: { allow: "default", deny: "default" },

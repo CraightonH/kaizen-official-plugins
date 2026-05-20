@@ -1,6 +1,6 @@
 # llm-memory
 
-File-backed persistent memory for the openai-compatible harness. Reads and writes Claude-Code-compatible markdown memories under `<project>/.kaizen/memory/` and `~/.kaizen/memory/`, contributes a `prompt:registry` section that injects the merged `MEMORY.md` blocks plus an entry catalog on every LLM request, and exposes a service plus two tools for reading and writing memory.
+File-backed persistent memory for the local harness. Reads and writes Claude-Code-compatible markdown memories under `<project>/.kaizen/memory/` and `~/.kaizen/memory/`, contributes a `prompt:registry` section that injects the merged `MEMORY.md` blocks plus an entry catalog on every LLM request, and exposes a service plus two tools for reading and writing memory.
 
 ## What it does
 

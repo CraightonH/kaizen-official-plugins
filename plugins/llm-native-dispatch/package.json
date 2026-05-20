@@ -1,7 +1,7 @@
 {
   "name": "llm-native-dispatch",
   "version": "0.3.1",
-  "description": "Native OpenAI tool-calling dispatch strategy for the openai-compatible harness.",
+  "description": "Native OpenAI tool-calling dispatch strategy for the local harness.",
   "type": "module",
   "exports": {
     ".": "./index.ts"

@@ -1,7 +1,7 @@
 {
   "name": "llm-driver",
   "version": "0.2.1",
-  "description": "Coordination plugin for the openai-compatible harness: turn loop, conversation state, lifecycle events.",
+  "description": "Coordination plugin for the local harness: turn loop, conversation state, lifecycle events.",
   "type": "module",
   "exports": {
     ".": "./index.ts",

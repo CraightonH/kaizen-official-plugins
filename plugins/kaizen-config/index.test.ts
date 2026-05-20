@@ -42,10 +42,10 @@ describe("kaizen-config", () => {
     expect(Array.isArray(fs?.write)).toBe(true);
   });
 
-  it("package version matches openai-compatible harness and marketplace pins", () => {
+  it("package version matches local harness and marketplace pins", () => {
     const pkg = JSON.parse(readFileSync(join(import.meta.dir, "package.json"), "utf8"));
     const harness = JSON.parse(readFileSync(
-      join(import.meta.dir, "..", "..", "harnesses", "openai-compatible.json"),
+      join(import.meta.dir, "..", "..", "harnesses", "local.json"),
       "utf8",
     ));
     const marketplace = JSON.parse(readFileSync(

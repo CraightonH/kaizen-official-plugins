@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import type { SystemPromptSection } from "./public";
 
 export const FALLBACK_PREFIX =
-  "You are a helpful assistant running locally via the kaizen openai-compatible harness.";
+  "You are a helpful assistant running locally via the kaizen local harness.";
 
 const FALLBACK_TEMPLATE = (date: string): string =>
   `${FALLBACK_PREFIX} Today is ${date}. The user prefers concise answers and direct action; avoid unnecessary preamble. When tools are available, prefer calling them over guessing. When skills are listed below, load them on demand rather than guessing their contents.`;

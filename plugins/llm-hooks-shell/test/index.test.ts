@@ -32,8 +32,8 @@ function makeCtx(opts: {
     watch: () => () => {},
     list: () => [{
       plugin: "llm-hooks-shell",
-      homePath: "/home/u/.kaizen/harnesses/openai-compatible/config.json",
-      projectPath: "/proj/.kaizen/harnesses/openai-compatible/config.json",
+      homePath: "/home/u/.kaizen/harnesses/local/config.json",
+      projectPath: "/proj/.kaizen/harnesses/local/config.json",
       homeExists: false,
       projectExists: false,
       resolution: { hooks: "default" },
