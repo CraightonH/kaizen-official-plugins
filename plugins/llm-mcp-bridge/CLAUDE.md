@@ -13,7 +13,7 @@ servers.ts        resolveServers(servers, env) → { servers, warnings }. Pure l
                   plugin-specific transforms: `${env:VAR}` interpolation, server-name
                   validation, transport inference, defaults. Owns `ServerConfig` and
                   `ResolvedServerConfig` types. The home/project file paths and JSON
-                  loading live in `llm-config`, not here.
+                  loading live in `kaizen-config`, not here.
 client.ts         createClient(cfg, deps) → { client, pid }. Wraps the official
                   @modelcontextprotocol/sdk Client + transport (stdio/sse/http) into the
                   internal `McpClientLike` surface. Stderr from stdio is piped to log

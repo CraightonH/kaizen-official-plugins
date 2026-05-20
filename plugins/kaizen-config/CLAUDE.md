@@ -1,7 +1,7 @@
 # Working in `kaizen-config`
 
 Notes for agents editing this plugin. See the design spec at
-`docs/superpowers/specs/2026-05-18-llm-config-design.md`.
+`docs/superpowers/archive/specs/2026-05-18-llm-config-design.md`.
 
 ## Invariants
 
