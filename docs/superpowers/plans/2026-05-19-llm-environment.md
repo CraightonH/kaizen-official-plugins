@@ -121,95 +121,103 @@ git commit -m "feat(llm-environment): scaffold plugin manifest and public types"
 
 ---
 
-### Task 2: Build test fixtures for git detection
+### Task 2: Build fixtures helper (programmatic, not static)
 
 **Files:**
-- Create: `plugins/llm-environment/test/fixtures/git-branch/.git/HEAD`
-- Create: `plugins/llm-environment/test/fixtures/git-branch/.git/refs/heads/main`
-- Create: `plugins/llm-environment/test/fixtures/git-detached/.git/HEAD`
-- Create: `plugins/llm-environment/test/fixtures/git-worktree/.git` (file)
-- Create: `plugins/llm-environment/test/fixtures/git-worktree/.realgit/HEAD`
-- Create: `plugins/llm-environment/test/fixtures/git-worktree/.realgit/refs/heads/feature`
-- Create: `plugins/llm-environment/test/fixtures/git-malformed/.git/HEAD`
-- Create: `plugins/llm-environment/test/fixtures/non-git/.gitkeep`
+- Create: `plugins/llm-environment/test/fixtures.ts`
 
-These are hand-rolled — no `git init` required.
+**Why programmatic:** git refuses to track any path containing `.git/` (security invariant in `update-index`). Static fixtures committed under `test/fixtures/git-branch/.git/HEAD` are silently dropped on commit. Build the same tree in a tmpdir at test time instead.
 
-- [ ] **Step 1: Make directories**
+- [ ] **Step 1: Write `plugins/llm-environment/test/fixtures.ts`**
+
+```typescript
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+export interface FixtureSet {
+  gitBranch: string;
+  gitDetached: string;
+  gitWorktree: string;
+  gitMalformed: string;
+  nonGit: string;
+}
+
+/**
+ * Build the git-detection fixture tree under `root`. Returns the absolute
+ * paths of each fixture's working-directory root (the dir that callers will
+ * pass as `cwd` to captureEnvironment).
+ *
+ * These cannot be checked in as static files because git refuses to track
+ * any path under a `.git/` directory. They are built per-test instead.
+ */
+export function buildFixtures(root: string): FixtureSet {
+  const gitBranch = join(root, "git-branch");
+  const gitDetached = join(root, "git-detached");
+  const gitWorktree = join(root, "git-worktree");
+  const gitMalformed = join(root, "git-malformed");
+  const nonGit = join(root, "non-git");
+
+  mkdirSync(join(gitBranch, ".git", "refs", "heads"), { recursive: true });
+  writeFileSync(join(gitBranch, ".git", "HEAD"), "ref: refs/heads/main\n");
+  writeFileSync(join(gitBranch, ".git", "refs", "heads", "main"), "");
+
+  mkdirSync(join(gitDetached, ".git"), { recursive: true });
+  writeFileSync(
+    join(gitDetached, ".git", "HEAD"),
+    "1234567890abcdef1234567890abcdef12345678\n",
+  );
+
+  mkdirSync(join(gitWorktree, ".realgit", "refs", "heads"), { recursive: true });
+  writeFileSync(join(gitWorktree, ".git"), "gitdir: .realgit\n");
+  writeFileSync(join(gitWorktree, ".realgit", "HEAD"), "ref: refs/heads/feature\n");
+  writeFileSync(join(gitWorktree, ".realgit", "refs", "heads", "feature"), "");
+
+  mkdirSync(join(gitMalformed, ".git"), { recursive: true });
+  writeFileSync(join(gitMalformed, ".git", "HEAD"), " \n");
+
+  mkdirSync(nonGit, { recursive: true });
+
+  return { gitBranch, gitDetached, gitWorktree, gitMalformed, nonGit };
+}
+```
+
+- [ ] **Step 2: Smoke-test the helper**
 
 ```bash
 cd plugins/llm-environment
-mkdir -p test/fixtures/git-branch/.git/refs/heads
-mkdir -p test/fixtures/git-detached/.git
-mkdir -p test/fixtures/git-worktree/.realgit/refs/heads
-mkdir -p test/fixtures/git-malformed/.git
-mkdir -p test/fixtures/non-git
+cat > /tmp/verify-fixtures.ts <<'EOF'
+import { mkdtempSync, readFileSync, statSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { buildFixtures } from "./test/fixtures.ts";
+const root = mkdtempSync(join(tmpdir(), "llm-env-fixtures-"));
+try {
+  const f = buildFixtures(root);
+  console.log("branch HEAD:", JSON.stringify(readFileSync(join(f.gitBranch, ".git/HEAD"), "utf8")));
+  console.log("detached HEAD:", JSON.stringify(readFileSync(join(f.gitDetached, ".git/HEAD"), "utf8")));
+  console.log("worktree .git is file:", statSync(join(f.gitWorktree, ".git")).isFile());
+  console.log("worktree .realgit HEAD:", JSON.stringify(readFileSync(join(f.gitWorktree, ".realgit/HEAD"), "utf8")));
+  console.log("malformed bytes:", Array.from(readFileSync(join(f.gitMalformed, ".git/HEAD"))));
+  console.log("non-git exists:", statSync(f.nonGit).isDirectory());
+} finally { rmSync(root, { recursive: true, force: true }); }
+EOF
+bun /tmp/verify-fixtures.ts
+rm /tmp/verify-fixtures.ts
 ```
 
-- [ ] **Step 2: Write `git-branch/.git/HEAD`**
+Expected output (each on its own line):
+- `branch HEAD: "ref: refs/heads/main\n"`
+- `detached HEAD: "1234567890abcdef1234567890abcdef12345678\n"`
+- `worktree .git is file: true`
+- `worktree .realgit HEAD: "ref: refs/heads/feature\n"`
+- `malformed bytes: [ 32, 10 ]`
+- `non-git exists: true`
 
-Path: `plugins/llm-environment/test/fixtures/git-branch/.git/HEAD`
-Content (exact, single line + trailing newline):
-
-```
-ref: refs/heads/main
-```
-
-- [ ] **Step 3: Write `git-branch/.git/refs/heads/main`** (empty file — only existence matters)
+- [ ] **Step 3: Commit**
 
 ```bash
-touch plugins/llm-environment/test/fixtures/git-branch/.git/refs/heads/main
-```
-
-- [ ] **Step 4: Write `git-detached/.git/HEAD`** (a hex SHA, no `ref:` prefix)
-
-Path: `plugins/llm-environment/test/fixtures/git-detached/.git/HEAD`
-Content:
-
-```
-1234567890abcdef1234567890abcdef12345678
-```
-
-- [ ] **Step 5: Write `git-worktree/.git` as a file**
-
-Path: `plugins/llm-environment/test/fixtures/git-worktree/.git`
-Content (note: this is a regular file, not a directory):
-
-```
-gitdir: .realgit
-```
-
-- [ ] **Step 6: Write the worktree's real gitdir HEAD**
-
-Path: `plugins/llm-environment/test/fixtures/git-worktree/.realgit/HEAD`
-Content:
-
-```
-ref: refs/heads/feature
-```
-
-Then create `test/fixtures/git-worktree/.realgit/refs/heads/feature` as an empty file.
-
-- [ ] **Step 7: Write malformed HEAD (just whitespace)**
-
-Path: `plugins/llm-environment/test/fixtures/git-malformed/.git/HEAD`
-Content (literal — a single space and newline):
-
-```
- 
-```
-
-- [ ] **Step 8: Create non-git placeholder**
-
-```bash
-touch plugins/llm-environment/test/fixtures/non-git/.gitkeep
-```
-
-- [ ] **Step 9: Commit**
-
-```bash
-git add plugins/llm-environment/test/fixtures
-git commit -m "test(llm-environment): add git-detection fixtures"
+git add plugins/llm-environment/test/fixtures.ts
+git commit -m "test(llm-environment): programmatic git-detection fixtures helper"
 ```
 
 ---
@@ -226,16 +234,28 @@ Path: `plugins/llm-environment/test/environment.test.ts`
 Content:
 
 ```typescript
-import { describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { writeFileSync } from "node:fs";
 import { captureEnvironment } from "../environment.ts";
+import { buildFixtures, type FixtureSet } from "./fixtures.ts";
 
-const FIXTURES = join(import.meta.dir, "fixtures");
+let root: string;
+let f: FixtureSet;
+
+beforeAll(() => {
+  root = mkdtempSync(join(tmpdir(), "llm-env-test-"));
+  f = buildFixtures(root);
+});
+
+afterAll(() => {
+  rmSync(root, { recursive: true, force: true });
+});
 
 describe("captureEnvironment", () => {
   it("registers section with id, priority 30, and title", async () => {
-    const handle = captureEnvironment({ cwd: join(FIXTURES, "non-git") });
+    const handle = captureEnvironment({ cwd: f.nonGit });
     await handle.refresh();
     expect(handle.section.id).toBe("llm-environment:env");
     expect(handle.section.priority).toBe(30);
@@ -243,24 +263,22 @@ describe("captureEnvironment", () => {
   });
 
   it("renders cwd and platform; omits git line when not a repo", async () => {
-    const cwd = join(FIXTURES, "non-git");
-    const handle = captureEnvironment({ cwd });
+    const handle = captureEnvironment({ cwd: f.nonGit });
     await handle.refresh();
     const body = await handle.section.render();
-    expect(body).toContain(`- Working directory: ${cwd}`);
+    expect(body).toContain(`- Working directory: ${f.nonGit}`);
     expect(body).toContain(`- Platform: ${process.platform}`);
     expect(body).not.toContain("Git repo:");
   });
 
   it("renders branch when HEAD points to a ref", async () => {
-    const handle = captureEnvironment({ cwd: join(FIXTURES, "git-branch") });
+    const handle = captureEnvironment({ cwd: f.gitBranch });
     await handle.refresh();
-    const body = await handle.section.render();
-    expect(body).toContain("- Git repo: main");
+    expect(await handle.section.render()).toContain("- Git repo: main");
   });
 
   it("renders 'yes' when HEAD is detached", async () => {
-    const handle = captureEnvironment({ cwd: join(FIXTURES, "git-detached") });
+    const handle = captureEnvironment({ cwd: f.gitDetached });
     await handle.refresh();
     const body = await handle.section.render();
     expect(body).toContain("- Git repo: yes");
@@ -268,52 +286,43 @@ describe("captureEnvironment", () => {
   });
 
   it("follows .git-as-file worktree pointer", async () => {
-    const handle = captureEnvironment({ cwd: join(FIXTURES, "git-worktree") });
+    const handle = captureEnvironment({ cwd: f.gitWorktree });
     await handle.refresh();
-    const body = await handle.section.render();
-    expect(body).toContain("- Git repo: feature");
+    expect(await handle.section.render()).toContain("- Git repo: feature");
   });
 
   it("treats malformed .git/HEAD as non-repo without throwing", async () => {
-    const handle = captureEnvironment({ cwd: join(FIXTURES, "git-malformed") });
+    const handle = captureEnvironment({ cwd: f.gitMalformed });
     await handle.refresh();
-    const body = await handle.section.render();
-    expect(body).not.toContain("Git repo:");
+    expect(await handle.section.render()).not.toContain("Git repo:");
   });
 
   it("walks up to find .git in an ancestor directory", async () => {
-    // git-branch/.git exists; running from a deeper path should still resolve.
-    const handle = captureEnvironment({ cwd: join(FIXTURES, "git-branch", "subdir-that-does-not-exist", "..") });
+    // gitBranch contains .git; descend one level and confirm walk-up resolves.
+    const handle = captureEnvironment({ cwd: join(f.gitBranch, "nonexistent-subdir", "..") });
     await handle.refresh();
-    const body = await handle.section.render();
-    expect(body).toContain("- Git repo: main");
+    expect(await handle.section.render()).toContain("- Git repo: main");
   });
 
   it("returns empty string when KAIZEN_ENVIRONMENT_DISABLE=1", async () => {
     const handle = captureEnvironment({
-      cwd: join(FIXTURES, "git-branch"),
+      cwd: f.gitBranch,
       env: { KAIZEN_ENVIRONMENT_DISABLE: "1" },
     });
     await handle.refresh();
-    const body = await handle.section.render();
-    expect(body).toBe("");
+    expect(await handle.section.render()).toBe("");
   });
 
   it("refresh() picks up a branch change", async () => {
-    // Write a HEAD file, capture, then rewrite and re-capture.
-    const cwd = join(FIXTURES, "git-branch");
-    const headPath = join(cwd, ".git", "HEAD");
+    const headPath = join(f.gitBranch, ".git", "HEAD");
     writeFileSync(headPath, "ref: refs/heads/main\n");
-    const handle = captureEnvironment({ cwd });
+    const handle = captureEnvironment({ cwd: f.gitBranch });
     await handle.refresh();
     expect(await handle.section.render()).toContain("- Git repo: main");
 
     writeFileSync(headPath, "ref: refs/heads/feature-x\n");
     await handle.refresh();
     expect(await handle.section.render()).toContain("- Git repo: feature-x");
-
-    // Restore so the fixture remains canonical.
-    writeFileSync(headPath, "ref: refs/heads/main\n");
   });
 });
 ```
@@ -675,11 +684,24 @@ Path: `plugins/llm-environment/test/index.test.ts`
 Content:
 
 ```typescript
-import { describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import plugin from "../index.ts";
+import { buildFixtures, type FixtureSet } from "./fixtures.ts";
 
-const FIXTURES = join(import.meta.dir, "fixtures");
+let fixtureRoot: string;
+let fixtures: FixtureSet;
+
+beforeAll(() => {
+  fixtureRoot = mkdtempSync(join(tmpdir(), "llm-env-index-"));
+  fixtures = buildFixtures(fixtureRoot);
+});
+
+afterAll(() => {
+  rmSync(fixtureRoot, { recursive: true, force: true });
+});
 
 interface SectionReg {
   id: string;
@@ -743,7 +765,7 @@ function makeFakeCtx(opts: { slash?: boolean; tools?: boolean; cwd?: string; env
   };
 
   const ctx = {
-    cwd: opts.cwd ?? join(FIXTURES, "non-git"),
+    cwd: opts.cwd ?? fixtures.nonGit,
     env: opts.env ?? {},
     log: (m: string) => { logs.push(m); },
     provideService: () => {},
