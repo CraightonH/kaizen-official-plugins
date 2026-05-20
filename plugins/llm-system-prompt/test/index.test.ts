@@ -9,14 +9,19 @@ import type {
   RegisteredSection,
 } from "../public";
 
-function makeFakeCtx(opts: { slash?: boolean } = {}) {
+function makeFakeCtx(opts: { slash?: boolean; tools?: boolean } = {}) {
   const services: Record<string, unknown> = {};
   const provided: Record<string, unknown> = {};
   const consumed: string[] = [];
   const events: string[] = [];
   const emitted: Array<{ name: string; payload: unknown }> = [];
   const slashRegistrations: Array<{ name: string; description: string }> = [];
+  const toolRegistrations: Array<{
+    schema: { name: string; tags?: string[] };
+    source: { kind: string };
+  }> = [];
   const slash = opts.slash ?? true;
+  const tools = opts.tools ?? true;
   const vocab = {
     PROMPT_REBUILT: "prompt:rebuilt",
     PROMPT_RELOAD: "prompt:reload",
@@ -31,6 +36,25 @@ function makeFakeCtx(opts: { slash?: boolean } = {}) {
     list: () => [],
   };
 
+  const unregisterCalls: number[] = [];
+
+  const toolsRegistry = {
+    register(_schema: unknown, _handler: unknown): () => void {
+      return () => { unregisterCalls.push(1); };
+    },
+    registerWith(reg: {
+      schema: { name: string; tags?: string[] };
+      handler: unknown;
+      source: { kind: string };
+    }): () => void {
+      toolRegistrations.push({ schema: reg.schema, source: reg.source });
+      return () => { unregisterCalls.push(1); };
+    },
+    list: () => [],
+    listRegistrations: () => toolRegistrations,
+    invoke: async () => {},
+  };
+
   return {
     cwd: tmpdir(),
     env: {} as Record<string, string | undefined>,
@@ -41,13 +65,22 @@ function makeFakeCtx(opts: { slash?: boolean } = {}) {
     useService: (n: string) => {
       if (n === "events:vocabulary") return vocab;
       if (n === "slash:registry" && slash) return slashRegistry;
+      if (n === "tools:registry" && tools) return toolsRegistry;
       throw new Error(`missing service ${n}`);
     },
     defineEvent: (n: string) => { events.push(n); },
     emit: async (n: string, p: unknown) => { emitted.push({ name: n, payload: p }); },
     on: (_n: string, _h: unknown) => {},
     config: {},
-    services, provided, consumed, events, emitted, slashRegistrations, slashRegistry,
+    services,
+    provided,
+    consumed,
+    events,
+    emitted,
+    slashRegistrations,
+    slashRegistry,
+    toolRegistrations,
+    unregisterCalls,
   };
 }
 
@@ -64,6 +97,7 @@ describe("llm-system-prompt plugin manifest", () => {
 
   it("requires the llm-events vocabulary and leaves slash commands optional", () => {
     expect(plugin.services?.consumes).toContain("events:vocabulary");
+    expect(plugin.services?.consumes).toContain("tools:registry");
     expect(plugin.services?.consumes ?? []).not.toContain("slash:registry");
   });
 });
@@ -133,5 +167,41 @@ describe("index.ts — plugin lifecycle", () => {
     const out = await svc.assemble();
     expect(out).toContain("GLOBAL-MARKER");
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("registers prompt_show, prompt_reload, prompt_disable, prompt_enable on tools:registry", async () => {
+    const ctx = makeFakeCtx();
+    await plugin.setup!(ctx as any);
+    const names = ctx.toolRegistrations.map((r) => r.schema.name).sort();
+    expect(names).toEqual(["prompt_disable", "prompt_enable", "prompt_reload", "prompt_show"]);
+    for (const reg of ctx.toolRegistrations) {
+      expect(reg.source.kind).toBe("prompt");
+    }
+  });
+
+  it("does not register tools when tools:registry is absent", async () => {
+    const ctx = makeFakeCtx({ tools: false });
+    await plugin.setup!(ctx as any);
+    expect(ctx.toolRegistrations).toEqual([]);
+    expect("prompt:registry" in ctx.provided).toBe(true);
+    expect(ctx.slashRegistrations.length).toBe(4);
+  });
+
+  it("stop() unregisters all tools and the identity section", async () => {
+    const ctx = makeFakeCtx();
+    await plugin.setup!(ctx as any);
+    expect(ctx.unregisterCalls.length).toBe(0);
+
+    // Verify tools were registered before stop
+    expect(ctx.toolRegistrations.length).toBe(4);
+
+    if (plugin.stop) {
+      await plugin.stop(ctx as any);
+    }
+
+    // 4 tool unregisters ran (identity handle unregister is a real
+    // registry handle, not the fake — it modifies internal state, not
+    // unregisterCalls).
+    expect(ctx.unregisterCalls.length).toBe(4);
   });
 });

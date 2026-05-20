@@ -1,3 +1,4 @@
+import { makePromptToolHandlers } from "./tool.ts";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { KaizenPlugin, PluginContext } from "kaizen/types";
@@ -6,6 +7,7 @@ import { resolveIdentity } from "./identity.ts";
 import { makePromptSlashHandlers } from "./slash.ts";
 import type { SystemPromptService } from "llm-contracts/public";
 import type { SlashRegistryService } from "llm-contracts/public";
+import type { ToolsRegistryService } from "llm-contracts/public";
 
 interface PromptEventVocabulary {
   PROMPT_REBUILT: string;
@@ -46,13 +48,17 @@ function safeUseService<T>(ctx: PluginContext, name: string): T | undefined {
   }
 }
 
+// Module-scope cleanup handles. setup() populates these; stop() drains them.
+let identityHandle: ReturnType<NonNullable<SystemPromptService["register"]>> | undefined;
+let toolUnregisters: Array<() => void> = [];
+
 const plugin: KaizenPlugin = {
   name: "llm-system-prompt",
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
   services: {
     provides: ["prompt:registry"],
-    consumes: ["events:vocabulary"],
+    consumes: ["events:vocabulary", "tools:registry"],
   },
 
   async setup(ctx) {
@@ -76,17 +82,19 @@ const plugin: KaizenPlugin = {
       env: runtime.env ?? process.env,
     });
     await identity.reload();
-    const identityHandle = registry.register(identity.section);
+    identityHandle = registry.register(identity.section);
+
+    const reloadIdentity = async () => {
+      await identity.reload();
+      identityHandle!.bumpGeneration();
+      await ctx.emit(vocab.PROMPT_RELOAD, {});
+    };
 
     const slashRegistry = safeUseService<SlashRegistryService>(ctx, "slash:registry");
     if (slashRegistry) {
       const handlers = makePromptSlashHandlers({
         registry,
-        reloadIdentity: async () => {
-          await identity.reload();
-          identityHandle.bumpGeneration();
-          await ctx.emit(vocab.PROMPT_RELOAD, {});
-        },
+        reloadIdentity,
       });
       slashRegistry.register(
         { name: "prompt:show", description: "Show the current assembled system prompt.", usage: "[--stats]", source: "plugin" },
@@ -105,6 +113,32 @@ const plugin: KaizenPlugin = {
         handlers.enable,
       );
     }
+
+    // Register prompt_* tools into tools:registry if available.
+    const toolsRegistry = safeUseService<ToolsRegistryService>(ctx, "tools:registry");
+    if (toolsRegistry) {
+      const tools = makePromptToolHandlers({ registry, reloadIdentity });
+      for (const entry of [tools.show, tools.reload, tools.disable, tools.enable]) {
+        toolUnregisters.push(
+          toolsRegistry.registerWith({
+            schema: entry.schema,
+            handler: entry.handler,
+            source: { kind: "prompt" },
+          }),
+        );
+      }
+    } else {
+      ctx.log?.("[llm-system-prompt] tools:registry not available; prompt_* tools not registered");
+    }
+  },
+
+  async stop() {
+    for (const u of toolUnregisters) {
+      try { u(); } catch { /* idempotent */ }
+    }
+    toolUnregisters = [];
+    try { identityHandle?.unregister(); } catch { /* idempotent */ }
+    identityHandle = undefined;
   },
 };
 
