@@ -32,39 +32,39 @@ describe("captureEnvironment", () => {
     const body = await handle.section.render();
     expect(body).toContain(`- Working directory: ${f.nonGit}`);
     expect(body).toContain(`- Platform: ${process.platform}`);
-    expect(body).not.toContain("Git repo:");
+    expect(body).not.toContain("Git branch:");
   });
 
   it("renders branch when HEAD points to a ref", async () => {
     const handle = captureEnvironment({ cwd: f.gitBranch });
     await handle.refresh();
-    expect(await handle.section.render()).toContain("- Git repo: main");
+    expect(await handle.section.render()).toContain("- Git branch: main");
   });
 
-  it("renders 'yes' when HEAD is detached", async () => {
+  it("renders '(detached HEAD)' when HEAD is detached", async () => {
     const handle = captureEnvironment({ cwd: f.gitDetached });
     await handle.refresh();
     const body = await handle.section.render();
-    expect(body).toContain("- Git repo: yes");
-    expect(body).not.toContain("- Git repo: main");
+    expect(body).toContain("- Git branch: (detached HEAD)");
+    expect(body).not.toContain("- Git branch: main");
   });
 
   it("follows .git-as-file worktree pointer", async () => {
     const handle = captureEnvironment({ cwd: f.gitWorktree });
     await handle.refresh();
-    expect(await handle.section.render()).toContain("- Git repo: feature");
+    expect(await handle.section.render()).toContain("- Git branch: feature");
   });
 
   it("treats malformed .git/HEAD as non-repo without throwing", async () => {
     const handle = captureEnvironment({ cwd: f.gitMalformed });
     await handle.refresh();
-    expect(await handle.section.render()).not.toContain("Git repo:");
+    expect(await handle.section.render()).not.toContain("Git branch:");
   });
 
   it("walks up to find .git in an ancestor directory", async () => {
     const handle = captureEnvironment({ cwd: join(f.gitBranch, "nonexistent-subdir", "..") });
     await handle.refresh();
-    expect(await handle.section.render()).toContain("- Git repo: main");
+    expect(await handle.section.render()).toContain("- Git branch: main");
   });
 
   it("returns empty string when KAIZEN_ENVIRONMENT_DISABLE=1", async () => {
@@ -81,10 +81,10 @@ describe("captureEnvironment", () => {
     writeFileSync(headPath, "ref: refs/heads/main\n");
     const handle = captureEnvironment({ cwd: f.gitBranch });
     await handle.refresh();
-    expect(await handle.section.render()).toContain("- Git repo: main");
+    expect(await handle.section.render()).toContain("- Git branch: main");
 
     writeFileSync(headPath, "ref: refs/heads/feature-x\n");
     await handle.refresh();
-    expect(await handle.section.render()).toContain("- Git repo: feature-x");
+    expect(await handle.section.render()).toContain("- Git branch: feature-x");
   });
 });

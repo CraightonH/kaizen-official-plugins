@@ -32,12 +32,12 @@ Boundaries:
   surfaced as `git.isRepo = false`.
 - **Empty render → section dropped.** `KAIZEN_ENVIRONMENT_DISABLE=1` returns
   `""`; the prompt registry drops empty sections.
-- **No "Git repo: no" line.** When `isRepo === false`, the line is omitted
-  entirely.
-- **Detached HEAD renders `Git repo: yes`.** `git.branch` is `undefined`; the
-  render falls back to `yes`.
+- **Non-repo → no git line.** When `isRepo === false`, the `Git branch:` line
+  is omitted entirely. Never emit "Git branch: no" or similar.
+- **Detached HEAD renders `Git branch: (detached HEAD)`.** `git.branch` is
+  `undefined`; the render falls back to the literal `(detached HEAD)`.
 - **Malformed HEAD → non-repo.** Whitespace-only or unparseable HEAD content
-  is treated as `isRepo: false` (no `Git repo:` line).
+  is treated as `isRepo: false` (no `Git branch:` line).
 - **No shell-out.** Git detection is filesystem-only — walk up for `.git`,
   read `HEAD`, follow `.git`-as-file worktree pointers once.
 - **Teardown is idempotent.** `stop()` drains every handle; second call is a

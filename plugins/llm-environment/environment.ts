@@ -89,7 +89,7 @@ export function captureEnvironment(opts: CaptureOptions): EnvironmentHandle {
       `- Platform: ${snapshot.platform}`,
     ];
     if (snapshot.git.isRepo) {
-      lines.push(`- Git repo: ${snapshot.git.branch ?? "yes"}`);
+      lines.push(`- Git branch: ${snapshot.git.branch ?? "(detached HEAD)"}`);
     }
     return lines.join("\n");
   }

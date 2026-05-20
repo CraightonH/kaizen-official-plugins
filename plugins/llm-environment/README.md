@@ -11,11 +11,11 @@ host platform, and git branch.
 
 - Working directory: /Users/you/projects/app
 - Platform: darwin (Darwin 25.4.0)
-- Git repo: main
+- Git branch: main
 ```
 
-In a non-git directory, the `Git repo:` line is omitted. In a detached-HEAD
-state, the line reads `Git repo: yes`.
+In a non-git directory, the `Git branch:` line is omitted. In a detached-HEAD
+state, the line reads `Git branch: (detached HEAD)`.
 
 ## Slash command
 
