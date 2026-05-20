@@ -87,14 +87,77 @@ const plugin: KaizenPlugin = {
       };
     };
 
+    // Sub-agent dispatch tracking: when llm-agents emits
+    // `agent:dispatch:start`, we map the child session id to the parent's
+    // dispatch_agent tool callId. Streamed events (llm:reasoning, llm:token,
+    // llm:tool-call) carrying that sessionId are routed under the parent's
+    // tool-call entry rather than the parent's thinking box / spinner.
+    const childSessionToCallId = new Map<string, string>();
+    // Per-child token buffer: split on newlines, push completed lines to the
+    // parent tool-call's agentActivity. The trailing partial line is held
+    // until a newline arrives or the dispatch ends.
+    const childTokenBuffer = new Map<string, string>();
+    const flushChildTokens = (sessionId: string, callId: string, final: boolean) => {
+      const buf = childTokenBuffer.get(sessionId) ?? "";
+      if (!buf) return;
+      const parts = buf.split("\n");
+      const tail = final ? "" : parts.pop()!;
+      for (const line of parts) {
+        const trimmed = line.trim();
+        if (trimmed) store.appendAgentActivity(callId, trimmed);
+      }
+      if (final || tail === "") childTokenBuffer.delete(sessionId);
+      else childTokenBuffer.set(sessionId, tail);
+    };
+
+    ctx.on("agent:dispatch:start", async (payload: any) => {
+      if (!payload || typeof payload.callId !== "string" || typeof payload.sessionId !== "string") return;
+      childSessionToCallId.set(payload.sessionId, payload.callId);
+    });
+    ctx.on("agent:dispatch:end", async (payload: any) => {
+      if (!payload || typeof payload.sessionId !== "string") return;
+      const callId = childSessionToCallId.get(payload.sessionId);
+      if (callId) flushChildTokens(payload.sessionId, callId, true);
+      childSessionToCallId.delete(payload.sessionId);
+    });
+
     // Reasoning events → live thinking buffer; finalize when the LLM call ends.
+    // Child-session reasoning is suppressed here (the sub-agent has its own
+    // dispatch_agent tool-call block; we do not bleed its thoughts into the
+    // parent's thinking box).
     ctx.on("llm:reasoning", async (payload: any) => {
+      const sessionId = typeof payload?.sessionId === "string" ? payload.sessionId : "";
+      if (sessionId && childSessionToCallId.has(sessionId)) return;
       const delta = typeof payload?.delta === "string" ? payload.delta : "";
       if (delta) store.appendReasoning(delta);
     });
-    // Streamed completion tokens → bump the spinner counter live.
-    ctx.on("llm:token", async () => {
+    // Streamed completion tokens → bump the spinner counter live. For child
+    // sessions, accumulate tokens and push completed lines as agent activity
+    // under the parent's dispatch_agent entry.
+    ctx.on("llm:token", async (payload: any) => {
+      const sessionId = typeof payload?.sessionId === "string" ? payload.sessionId : "";
+      const callId = sessionId ? childSessionToCallId.get(sessionId) : undefined;
+      if (callId) {
+        const delta = typeof payload?.delta === "string" ? payload.delta : "";
+        if (delta) {
+          childTokenBuffer.set(sessionId, (childTokenBuffer.get(sessionId) ?? "") + delta);
+          flushChildTokens(sessionId, callId, false);
+        }
+        return;
+      }
       store.incrementBusyTokens(1);
+    });
+    // Sub-agent tool calls (announced via llm:tool-call before the tool runs)
+    // surface as a single-line entry under the parent's dispatch_agent block.
+    ctx.on("llm:tool-call", async (payload: any) => {
+      const sessionId = typeof payload?.sessionId === "string" ? payload.sessionId : "";
+      const callId = sessionId ? childSessionToCallId.get(sessionId) : undefined;
+      if (!callId) return;
+      const tc = payload?.toolCall as { name?: unknown; arguments?: unknown } | undefined;
+      const name = typeof tc?.name === "string" ? tc.name : "(tool)";
+      // Flush any partial assistant line first so ordering reads naturally.
+      flushChildTokens(sessionId, callId, true);
+      store.appendAgentActivity(callId, `▸ ${name}()`);
     });
     ctx.on("llm:done", async (payload: any) => {
       // Move accumulated reasoning into the transcript as a Thoughts block,

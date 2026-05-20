@@ -327,6 +327,41 @@ describe("TuiStore", () => {
       expect(e.errorMessage).toBe("unknown tool");
     });
 
+    it("appendAgentActivity pushes onto the rolling buffer for a live tool call", () => {
+      const store = new TuiStore();
+      store.appendLiveToolCall("c1", "dispatch_agent", { agent_name: "a" });
+      store.appendAgentActivity("c1", "first line");
+      store.appendAgentActivity("c1", "second line");
+      const e = store.snapshot().liveToolCalls.get("c1")!;
+      expect(e.agentActivity).toEqual(["first line", "second line"]);
+    });
+
+    it("appendAgentActivity caps the buffer at AGENT_ACTIVITY_CAP, dropping oldest entries", async () => {
+      const { AGENT_ACTIVITY_CAP } = await import("./store.ts");
+      const store = new TuiStore();
+      store.appendLiveToolCall("c1", "dispatch_agent", {});
+      for (let i = 0; i < AGENT_ACTIVITY_CAP + 3; i++) store.appendAgentActivity("c1", `line ${i}`);
+      const e = store.snapshot().liveToolCalls.get("c1")!;
+      expect(e.agentActivity).toHaveLength(AGENT_ACTIVITY_CAP);
+      expect(e.agentActivity![0]).toBe(`line 3`);
+      expect(e.agentActivity![AGENT_ACTIVITY_CAP - 1]).toBe(`line ${AGENT_ACTIVITY_CAP + 2}`);
+    });
+
+    it("appendAgentActivity is a no-op for unknown callId", () => {
+      const store = new TuiStore();
+      expect(() => store.appendAgentActivity("missing", "line")).not.toThrow();
+      expect(store.snapshot().liveToolCalls.size).toBe(0);
+    });
+
+    it("finalizeLiveToolCall preserves agentActivity on the transcript entry", () => {
+      const store = new TuiStore();
+      store.appendLiveToolCall("c1", "dispatch_agent", {});
+      store.appendAgentActivity("c1", "did something");
+      store.finalizeLiveToolCall("c1", "done");
+      const e = store.snapshot().transcript[0] as ToolCallEntry;
+      expect(e.agentActivity).toEqual(["did something"]);
+    });
+
     it("clearLiveToolCalls drops in-flight entries (used on turn:end rollback)", () => {
       const store = new TuiStore();
       store.appendLiveToolCall("c1", "read_file", {});

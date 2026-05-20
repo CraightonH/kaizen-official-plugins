@@ -133,6 +133,13 @@ export function makeDispatchTool(deps: DispatchDeps): { schema: ToolSchema; hand
     const emit = deps.emit;
     try {
       await emit?.("status:item-update", { key: "agents.active", value: name });
+      // Pair the parent tool call with the child session so consumers (e.g. the
+      // TUI) can route child-turn events under this dispatch_agent entry.
+      await emit?.("agent:dispatch:start", {
+        callId: ctx.callId,
+        sessionId: session.id,
+        agentName: name,
+      });
       let output: RunConversationOutput;
       try {
         output = await deps.driver.runConversation(input);
@@ -145,6 +152,10 @@ export function makeDispatchTool(deps: DispatchDeps): { schema: ToolSchema; hand
       }
       return String(output.finalMessage.content ?? "");
     } finally {
+      await emit?.("agent:dispatch:end", {
+        callId: ctx.callId,
+        sessionId: session.id,
+      });
       await emit?.("status:item-clear", { key: "agents.active" });
     }
   };

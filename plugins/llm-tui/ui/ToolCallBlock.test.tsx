@@ -238,3 +238,43 @@ test("error trail still renders even when an expandedView is present", () => {
   );
   expect(lastFrame() ?? "").toContain("boom");
 });
+
+test("renders agentActivity lines under the header while running", () => {
+  const reg = makeToolRendererRegistry();
+  const { lastFrame } = render(
+    <ToolCallBlock
+      entry={entry({
+        name: "dispatch_agent",
+        status: "running",
+        agentActivity: ["Looking at file...", "▸ read_file()", "Making edit"],
+      })}
+      registry={reg}
+      theme={theme as any}
+    />
+  );
+  const out = lastFrame() ?? "";
+  expect(out).toContain("dispatch_agent");
+  expect(out).toContain("Looking at file...");
+  expect(out).toContain("▸ read_file()");
+  expect(out).toContain("Making edit");
+});
+
+test("agentActivity suppresses the success trail (avoid double-display)", () => {
+  const reg = makeToolRendererRegistry();
+  const { lastFrame } = render(
+    <ToolCallBlock
+      entry={entry({
+        name: "dispatch_agent",
+        status: "done",
+        result: "AGENT-RESULT",
+        agentActivity: ["did the thing"],
+      })}
+      registry={reg}
+      theme={theme as any}
+    />
+  );
+  const out = lastFrame() ?? "";
+  expect(out).toContain("did the thing");
+  expect(out).not.toContain("AGENT-RESULT");
+});
+

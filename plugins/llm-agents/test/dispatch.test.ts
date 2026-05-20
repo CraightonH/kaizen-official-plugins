@@ -162,6 +162,45 @@ describe("dispatch_agent", () => {
     await expect(tool.handler({ agent_name: "a" } as any, makeCtx("tp"))).rejects.toThrow();
   });
 
+  it("emits agent:dispatch:start before runConversation and agent:dispatch:end after", async () => {
+    const reg = makeRegistryHandle(makeRegistry([m("a")]));
+    const tracker = makeTurnTracker();
+    tracker.onTurnStart({ turnId: "tp", trigger: "user" });
+    const order: string[] = [];
+    const driver = {
+      runConversation: async () => {
+        order.push("runConversation");
+        return { finalMessage: { role: "assistant" as const, content: "ok" }, usage: { promptTokens: 0, completionTokens: 0 } };
+      },
+    };
+    const emitted: { event: string; payload: any }[] = [];
+    const emit = async (event: string, payload: unknown) => {
+      emitted.push({ event, payload });
+      if (event === "agent:dispatch:start") order.push("start");
+      if (event === "agent:dispatch:end") order.push("end");
+    };
+    const tool = makeDispatchTool({ registry: reg, tracker, driver, sessions: makeSessions(), maxDepth: 3, hasSkills: () => false, emit });
+    const ctx = { ...makeCtx("tp"), callId: "call-XYZ" };
+    await tool.handler({ agent_name: "a", prompt: "p", session_id: "thread" }, ctx as any);
+    const start = emitted.find((e) => e.event === "agent:dispatch:start");
+    const end = emitted.find((e) => e.event === "agent:dispatch:end");
+    expect(start?.payload).toMatchObject({ callId: "call-XYZ", sessionId: "parent-session/thread", agentName: "a" });
+    expect(end?.payload).toMatchObject({ callId: "call-XYZ", sessionId: "parent-session/thread" });
+    expect(order).toEqual(["start", "runConversation", "end"]);
+  });
+
+  it("emits agent:dispatch:end even when runConversation throws", async () => {
+    const reg = makeRegistryHandle(makeRegistry([m("a")]));
+    const tracker = makeTurnTracker();
+    tracker.onTurnStart({ turnId: "tp", trigger: "user" });
+    const driver = { runConversation: async () => { throw new Error("boom"); } };
+    const emitted: { event: string; payload: any }[] = [];
+    const emit = async (event: string, payload: unknown) => { emitted.push({ event, payload }); };
+    const tool = makeDispatchTool({ registry: reg, tracker, driver, sessions: makeSessions(), maxDepth: 3, hasSkills: () => false, emit });
+    await expect(tool.handler({ agent_name: "a", prompt: "p" }, makeCtx("tp"))).rejects.toThrow(/Agent 'a' failed/);
+    expect(emitted.find((e) => e.event === "agent:dispatch:end")).toBeDefined();
+  });
+
   it("emits status:item-update before runConversation and status:item-clear after", async () => {
     const reg = makeRegistryHandle(makeRegistry([m("a")]));
     const tracker = makeTurnTracker();

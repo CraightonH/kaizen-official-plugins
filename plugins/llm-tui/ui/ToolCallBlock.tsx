@@ -35,10 +35,13 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ entry, registry, t
       ? renderer.expandedView(entry.args, entry.result, entry.status, entry.stdout)
       : null;
 
-  // Suppress the success trail when an expansion is present — the ⎿ block
-  // already shows the same content, more legibly. Errors keep the trail
-  // (errorMessage) since the expansion is usually null for error cases.
-  const resultPreview = entry.status === "done" && !expanded
+  const activity = entry.agentActivity ?? [];
+  const hasActivity = activity.length > 0;
+
+  // Suppress the success trail when an expansion or agent activity is present
+  // — the ⎿ block already shows the same content, more legibly. Errors keep
+  // the trail (errorMessage) since the expansion is usually null for error cases.
+  const resultPreview = entry.status === "done" && !expanded && !hasActivity
     ? (entry.stdout && entry.stdout.length > 0 ? defaultResultPreview(entry.stdout) : defaultResultPreview(entry.result))
     : "";
   const trail =
@@ -56,15 +59,27 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ entry, registry, t
     </Text>
   );
 
-  if (!expanded) return header;
+  if (!expanded && !hasActivity) return header;
 
   return (
     <Box flexDirection="column">
       {header}
-      <Box flexDirection="row">
-        <Text color={theme.outputColor} dimColor>{"  ⎿  "}</Text>
-        <Box flexDirection="column">{expanded}</Box>
-      </Box>
+      {hasActivity && (
+        <Box flexDirection="row">
+          <Text color={theme.outputColor} dimColor>{"  ⎿  "}</Text>
+          <Box flexDirection="column">
+            {activity.map((line, i) => (
+              <Text key={i} color={theme.outputColor} dimColor>{line}</Text>
+            ))}
+          </Box>
+        </Box>
+      )}
+      {expanded && (
+        <Box flexDirection="row">
+          <Text color={theme.outputColor} dimColor>{"  ⎿  "}</Text>
+          <Box flexDirection="column">{expanded}</Box>
+        </Box>
+      )}
     </Box>
   );
 };

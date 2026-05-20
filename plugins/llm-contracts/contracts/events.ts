@@ -44,6 +44,8 @@ export interface Vocab {
   readonly TOOLS_REGISTERED: "tools:registered";
   readonly TOOLS_UNREGISTERED: "tools:unregistered";
   readonly MCP_REGISTRATION_CONFLICT: "mcp:registration-conflict";
+  readonly AGENT_DISPATCH_START: "agent:dispatch:start";
+  readonly AGENT_DISPATCH_END: "agent:dispatch:end";
 }
 export type EventName = Vocab[keyof Vocab];
 

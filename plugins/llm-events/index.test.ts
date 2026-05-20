@@ -113,6 +113,8 @@ describe("llm-events", () => {
       "tools:registered",
       "tools:unregistered",
       "mcp:registration-conflict",
+      "agent:dispatch:start",
+      "agent:dispatch:end",
     ]);
     const actual = new Set(Object.values(VOCAB));
     for (const name of expected) expect(actual.has(name)).toBe(true);

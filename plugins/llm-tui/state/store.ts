@@ -46,7 +46,16 @@ export interface ToolCallEntry {
   stdout: string;
   result?: string;
   errorMessage?: string;
+  /**
+   * Rolling buffer of recent activity lines from a sub-agent dispatch. Only
+   * populated for `dispatch_agent` calls — the TUI subscribes to events scoped
+   * to the child session and pushes formatted lines here. Capped at
+   * AGENT_ACTIVITY_CAP entries; older lines are discarded.
+   */
+  agentActivity?: string[];
 }
+
+export const AGENT_ACTIVITY_CAP = 5;
 
 export type TranscriptLine = PlainTranscriptLine | ToolCallEntry;
 export interface BusyState {
@@ -212,6 +221,22 @@ export class TuiStore {
 
   hasLiveToolCall(callId: string): boolean {
     return this._liveToolCalls.has(callId);
+  }
+
+  /**
+   * Push a sub-agent activity line onto the rolling buffer for a live
+   * dispatch_agent call. Caps to AGENT_ACTIVITY_CAP; oldest entries drop.
+   * No-op if the callId is not currently a live tool call.
+   */
+  appendAgentActivity(callId: string, line: string): void {
+    const cur = this._liveToolCalls.get(callId);
+    if (!cur) return;
+    const next: ToolCallEntry = {
+      ...cur,
+      agentActivity: [...(cur.agentActivity ?? []), line].slice(-AGENT_ACTIVITY_CAP),
+    };
+    this._liveToolCalls = new Map(this._liveToolCalls).set(callId, next);
+    this._emit();
   }
 
   appendToolCallToTranscript(
