@@ -6,10 +6,12 @@ import { registerBuiltins } from "./builtins.ts";
 import { loadFileCommands, type DriverLike } from "./file-loader.ts";
 import { makeOnInputSubmit } from "./dispatcher.ts";
 import { buildCompletionSource } from "./completion.ts";
+import { buildArgCompletionSource } from "./arg-completion.ts";
 import type { UiCompletionService } from "llm-contracts/public";
 
 // Module-scope handles so stop() can clean up idempotently on reload.
 let completionOff: (() => void) | undefined;
+let argCompletionOff: (() => void) | undefined;
 
 const plugin: KaizenPlugin = {
   name: "llm-slash-commands",
@@ -79,14 +81,19 @@ const plugin: KaizenPlugin = {
     on("harness:start", async () => {
       try {
         const completion = ctx.useService<UiCompletionService>("ui:completion-source");
-        if (completion) completionOff = completion.register(buildCompletionSource(registry));
+        if (completion) {
+          completionOff = completion.register(buildCompletionSource(registry));
+          argCompletionOff = completion.register(buildArgCompletionSource(registry));
+        }
       } catch { /* ui:completion-source absent — skip */ }
     });
   },
 
   async stop() {
     try { completionOff?.(); } catch { /* idempotent */ }
+    try { argCompletionOff?.(); } catch { /* idempotent */ }
     completionOff = undefined;
+    argCompletionOff = undefined;
   },
 };
 

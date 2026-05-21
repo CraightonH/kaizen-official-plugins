@@ -128,10 +128,28 @@ describe("llm-slash-commands integration", () => {
     await plugin.setup(ctx);
     await ctx.emit("harness:start", {});
 
-    expect(tuiSources.length).toBe(1);
-    expect(tuiSources[0]!.trigger).toBe("/");
-    const items = await tuiSources[0]!.list("he");
+    expect(tuiSources.length).toBe(2);
+    const commandSource = tuiSources.find((s: any) => s.trigger === "/");
+    expect(commandSource).toBeDefined();
+    const items = await commandSource!.list("he");
     expect(items.find((i: any) => i.label === "/help")).toBeDefined();
+
+    process.env.HOME = origHome;
+    process.chdir(origCwd);
+  });
+
+  it("registers an arg-completion source on harness:start", async () => {
+    const origHome = process.env.HOME, origCwd = process.cwd();
+    process.env.HOME = join(FIX, "user-home");
+    process.chdir(join(FIX, "project-home"));
+
+    const registered: any[] = [];
+    const tui = { register: (s: any) => { registered.push(s); return () => {}; } };
+    const { ctx } = makeCtx({ tuiCompletion: tui });
+    await plugin.setup(ctx);
+    await ctx.emit("harness:start", {});
+
+    expect(registered.map((s: any) => s.id)).toContain("llm-slash-commands:args");
 
     process.env.HOME = origHome;
     process.chdir(origCwd);
