@@ -4,14 +4,17 @@ export type { CompletionItem, CompletionSource, UiCompletionService } from "llm-
 export interface CompletionRegistry {
   service: UiCompletionService;
   query(trigger: string, q: string): Promise<CompletionItem[]>;
+  queryBySource(sourceId: string, q: string, ctx?: { line: string; cursor: number }): Promise<CompletionItem[]>;
 }
 
 export interface RegistryOptions { debounceMs?: number; }
 
 interface Pending {
-  trigger: string;
+  trigger: string; // sentinel "__by-id" for queryBySource
   q: string;
   resolve: (items: CompletionItem[]) => void;
+  sourceId?: string;
+  qctx?: { line: string; cursor: number };
 }
 
 export function makeCompletionRegistry(opts: RegistryOptions = {}): CompletionRegistry {
@@ -72,5 +75,38 @@ export function makeCompletionRegistry(opts: RegistryOptions = {}): CompletionRe
     });
   }
 
-  return { service, query };
+  function fireById(): void {
+    const job = pending;
+    pending = null;
+    timer = null;
+    if (!job || !job.sourceId) return;
+    const myToken = ++token;
+    const src = sources.get(job.sourceId);
+    if (!src) { job.resolve([]); return; }
+    Promise.resolve()
+      .then(() => src.list(job.q, job.qctx))
+      .catch(() => [] as CompletionItem[])
+      .then((items) => {
+        if (myToken !== token) { job.resolve([]); return; }
+        const arr = Array.isArray(items) ? items : [];
+        arr.sort((a, b) => {
+          const wa = a.sortWeight ?? 0; const wb = b.sortWeight ?? 0;
+          if (wb !== wa) return wb - wa;
+          return a.label.localeCompare(b.label);
+        });
+        job.resolve(arr);
+      });
+  }
+
+  async function queryBySource(sourceId: string, q: string, qctx?: { line: string; cursor: number }): Promise<CompletionItem[]> {
+    if (pending) pending.resolve([]);
+    if (timer) { clearTimeout(timer); timer = null; }
+    return new Promise<CompletionItem[]>((resolve) => {
+      pending = { trigger: "__by-id", q, resolve, sourceId, qctx };
+      if (debounceMs <= 0) fireById();
+      else timer = setTimeout(fireById, debounceMs);
+    });
+  }
+
+  return { service, query, queryBySource };
 }

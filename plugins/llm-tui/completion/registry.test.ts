@@ -118,4 +118,18 @@ describe("CompletionRegistry", () => {
     r.service.register({ id: "a", trigger: "/", list: () => [] });
     expect(await r.query("/", "x")).toEqual([]);
   });
+
+  it("queryBySource returns only the named source's items", async () => {
+    const r = makeCompletionRegistry({ debounceMs: 0 });
+    r.service.register({ id: "a", trigger: "/", list: () => [{ label: "A", insertText: "A" }] });
+    r.service.register({ id: "b", match: () => null, list: (q) => [{ label: `B:${q}`, insertText: `B:${q}` }] });
+    const items = await r.queryBySource("b", "hi");
+    expect(items.map(i => i.label)).toEqual(["B:hi"]);
+  });
+
+  it("queryBySource resolves [] when source id is unknown", async () => {
+    const r = makeCompletionRegistry({ debounceMs: 0 });
+    const items = await r.queryBySource("missing", "q");
+    expect(items).toEqual([]);
+  });
 });

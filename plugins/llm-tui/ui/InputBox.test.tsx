@@ -545,6 +545,53 @@ describe("InputBox", () => {
     });
   });
 
+  it("opens popup from a match-based source", async () => {
+    const ctx = setup();
+    const src: import("llm-contracts/public").CompletionSource = {
+      id: "args",
+      match: (line: string, _cursor: number) => {
+        if (line === "/foo bar") return { triggerPos: 5, query: "bar" };
+        return null;
+      },
+      list: (q: string) => [{ label: `key:${q}`, insertText: `key:${q}` }],
+    };
+    ctx.sources.set(src.id, src);
+    ctx.reg.service.register(src);
+    const { stdin } = render(
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+    );
+    await tick();
+    stdin.write("/foo bar");
+    await tick(80);
+    const popup = ctx.store.snapshot().popup;
+    expect(popup?.sourceId).toBe("args");
+    expect(popup?.anchor).toBe(5);
+    expect(popup?.query).toBe("bar");
+    expect(popup?.items.map(i => i.label)).toEqual(["key:bar"]);
+  });
+
+  it("closes match-based popup when match returns null", async () => {
+    const ctx = setup();
+    const src: import("llm-contracts/public").CompletionSource = {
+      id: "args2",
+      match: (line: string, _c: number) => line.startsWith("/foo ") ? { triggerPos: 5, query: line.slice(5) } : null,
+      list: (q: string) => [{ label: q || "(empty)", insertText: q }],
+    };
+    ctx.sources.set(src.id, src);
+    ctx.reg.service.register(src);
+    const { stdin } = render(
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+    );
+    await tick();
+    stdin.write("/foo ");
+    await tick(80);
+    expect(ctx.store.snapshot().popup?.sourceId).toBe("args2");
+    // Backspace 5 times to remove "/foo " — match returns null after that.
+    for (let i = 0; i < 5; i++) stdin.write("\x7f"); // DEL (backspace)
+    await tick(80);
+    expect(ctx.store.snapshot().popup).toBeNull();
+  });
+
   it("Up arrow recalls history when popup is closed", async () => {
     const ctx = setup();
     ctx.store.submit("first");

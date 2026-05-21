@@ -155,11 +155,49 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, sources, th
     });
   }, [registry, store]);
 
-  // When popup query changes, refresh items.
+  // When popup query changes, refresh items (char-triggered popups only).
   useEffect(() => {
     if (!popup) return;
+    if (popup.trigger === undefined) return; // match-based: handled by queryBySource effect
     refreshPopupItems(popup.trigger, popup.query);
   }, [popup?.trigger, popup?.query, refreshPopupItems]);
+
+  // Match-based activation: re-evaluate match predicates on every value/cursor change.
+  // Char-triggered popups are owned by the keypress loop; leave them alone.
+  useEffect(() => {
+    const cur = store.snapshot().popup;
+    if (cur && cur.trigger !== undefined) return; // char-triggered: owned elsewhere
+
+    for (const src of sources.values()) {
+      if (!src.match) continue;
+      const hit = src.match(value, cursor);
+      if (hit) {
+        if (cur && cur.sourceId === src.id) {
+          if (cur.anchor !== hit.triggerPos || cur.query !== hit.query) {
+            store.openPopup({ sourceId: src.id, query: hit.query, anchor: hit.triggerPos });
+          }
+        } else {
+          store.openPopup({ sourceId: src.id, query: hit.query, anchor: hit.triggerPos });
+        }
+        return;
+      }
+    }
+    // No match-based source matches; close any open match-based popup.
+    if (cur && cur.trigger === undefined) store.closePopup();
+  }, [value, cursor, sources, store]);
+
+  // Fetch items for match-based popups via queryBySource (char-triggered popups
+  // use the existing refreshPopupItems path).
+  useEffect(() => {
+    if (!popup || popup.trigger !== undefined) return;
+    const my = ++queryToken.current;
+    void registry.queryBySource(popup.sourceId, popup.query, { line: value, cursor }).then((items) => {
+      if (my !== queryToken.current) return;
+      const cur = store.snapshot().popup;
+      if (!cur || cur.sourceId !== popup.sourceId) return;
+      store.setPopupItems(items);
+    });
+  }, [popup?.sourceId, popup?.query, popup?.trigger, value, cursor, registry, store]);
 
   const setBuffer = useCallback((newValue: string, newCursor: number) => {
     store.setInput(newValue, newCursor);
