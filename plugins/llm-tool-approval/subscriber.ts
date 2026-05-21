@@ -4,7 +4,7 @@ import type {
   UiPromptOptionsRequest,
   UiPromptService,
 } from "llm-contracts/public";
-import { deriveDomain, matchesAny } from "./matcher.ts";
+import { deriveDomain, matchesAnyRule } from "./matcher.ts";
 
 export interface RuleSet {
   allow: string[];
@@ -33,13 +33,13 @@ export function makeSubscriber(deps: SubscriberDeps): Subscriber {
 
     const { allow, deny } = deps.rules();
 
-    if (matchesAny(payload.name, deny)) {
+    if (matchesAnyRule(payload.name, payload.args, deny)) {
       payload.args = CANCEL_TOOL;
       payload.cancelReason = DENY_BY_RULE_REASON;
       deps.writeNotice(`✗ approval gate: ${payload.name} denied by rule`);
       return;
     }
-    if (matchesAny(payload.name, allow)) {
+    if (matchesAnyRule(payload.name, payload.args, allow)) {
       return;
     }
 
