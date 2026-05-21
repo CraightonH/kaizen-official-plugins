@@ -262,6 +262,7 @@
       "description": "Per-tool-call approval gate. Prompts the user (Approve Once / Always / Domain Always / Deny) before any tool call runs; persists rules to project or global config.",
       "categories": ["security", "llm", "tools"],
       "versions": [
+        { "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-tool-approval" } },
         { "version": "0.1.1", "source": { "type": "file", "path": "plugins/llm-tool-approval" } },
         { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-tool-approval" } }
       ]
