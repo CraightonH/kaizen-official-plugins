@@ -1,0 +1,9 @@
+{
+  "plugins": {
+    "llm-tool-approval": {
+      "allow": [
+        "bash"
+      ]
+    }
+  }
+}
