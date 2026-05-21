@@ -27,6 +27,7 @@ export interface SecretsRegistryService {
   /** No-op if already absent. */
   delete(ref: SecretRef): Promise<void>;
   schemes(): string[];
+  readOnlySchemes(): string[];
   has(scheme: string): boolean;
 }
 

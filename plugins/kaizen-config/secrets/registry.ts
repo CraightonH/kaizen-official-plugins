@@ -41,6 +41,13 @@ export function createRegistry(): SecretsRegistryService {
     schemes() {
       return [...resolvers.keys()];
     },
+    readOnlySchemes() {
+      const out: string[] = [];
+      for (const [scheme, r] of resolvers) {
+        if (r.readOnly) out.push(scheme);
+      }
+      return out;
+    },
     has(scheme) {
       return resolvers.has(scheme);
     },

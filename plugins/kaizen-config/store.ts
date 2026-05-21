@@ -5,8 +5,10 @@ import type {
   ConfigStoreService,
   ConfigStatus,
   SecretsRegistryService,
+  FieldSchema,
 } from "llm-contracts/public";
 import { isSecretRef } from "llm-contracts/public";
+import { selectBackend } from "./secrets/select-backend.ts";
 import { validate, type ConfigSchema } from "./schema.ts";
 import { applyEnvOverrides, type ResolutionSource } from "./envvars.ts";
 import { mergePluginSection, type HarnessConfigFile } from "./atomic-write.ts";
@@ -114,8 +116,36 @@ export function createStore(deps: StoreDeps): ConfigStoreService {
       if (!e) throw new Error(`kaizen-config: plugin '${plugin}' is not registered`);
       const path = scope === "home" ? deps.homePath : deps.projectPath;
       const current = scope === "home" ? home.file : project.file;
-      const next = mergePluginSection(current, plugin, partial as Record<string, unknown>);
-      // Pre-validate the resulting merged value
+
+      const schema = e.spec.schema as Record<string, FieldSchema | undefined> | undefined;
+      const toFile: Record<string, unknown> = {};
+      const secretWrites: Array<{ key: string; value: string }> = [];
+      for (const [k, v] of Object.entries(partial as Record<string, unknown>)) {
+        const fs = schema?.[k];
+        const isSecretField = fs && fs.type === "string" && fs.secret === true;
+        if (!isSecretField) { toFile[k] = v; continue; }
+        if (typeof v !== "string") {
+          if (isSecretRef(v)) { toFile[k] = v; continue; }
+          throw new Error(`kaizen-config: secret field '${plugin}.${k}' must be set with a string value`);
+        }
+        secretWrites.push({ key: k, value: v });
+      }
+
+      if (secretWrites.length > 0) {
+        if (!deps.registry) throw new Error("kaizen-config: no secrets registry available; cannot set secret fields");
+        const kaizenSelf = entries.get("kaizen-config");
+        const configured = (kaizenSelf?.cachedValue as { defaultSecretBackend?: string } | undefined)?.defaultSecretBackend;
+        const available = deps.registry.schemes();
+        const readOnly = deps.registry.readOnlySchemes();
+        const pick = selectBackend({ configured, available, readOnly });
+        if (!pick.ok) throw new Error(`kaizen-config: ${pick.error}`);
+        for (const { key, value } of secretWrites) {
+          const ref = await deps.registry.store(pick.scheme, `${plugin}/${key}`, value);
+          toFile[key] = ref;
+        }
+      }
+
+      const next = mergePluginSection(current, plugin, toFile);
       const probeHome = scope === "home" ? next : home.file;
       const probeProject = scope === "project" ? next : project.file;
       const { ok, errors } = resolve(plugin, e.spec, probeHome, probeProject, deps);
@@ -127,11 +157,12 @@ export function createStore(deps: StoreDeps): ConfigStoreService {
       deps.writeFile(path, next);
       if (scope === "home") home = { file: next, exists: true };
       else project = { file: next, exists: true };
-      // Recompute and notify
       const r = resolve(plugin, e.spec, home.file, project.file, deps);
       e.cachedValue = r.value;
       e.cachedResolution = r.resolution;
-      for (const cb of e.watchers) cb(r.value);
+      const cv = e.cachedValue as Record<string, unknown>;
+      for (const { key, value } of secretWrites) cv[key] = value;
+      for (const cb of e.watchers) cb(e.cachedValue);
     },
     watch<T>(plugin: string, cb: (v: T) => void): () => void {
       const e = entries.get(plugin);

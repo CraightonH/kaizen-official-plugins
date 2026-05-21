@@ -232,6 +232,94 @@ describe("store — secret refs on load", () => {
   });
 });
 
+describe("store — set() secret-aware routing", () => {
+  it("writes a $ref (not plaintext) when the field is marked secret", async () => {
+    const { deps, fs } = makeDeps();
+    const registry = createRegistry();
+    const backendData = new Map<string, string>();
+    registry.register({
+      scheme: "fake",
+      async get(k) { const v = backendData.get(k); if (v === undefined) throw new Error("nope"); return v; },
+      async set(k, v) { backendData.set(k, v); },
+      async delete(k) { backendData.delete(k); },
+    });
+    const store = createStore({ ...deps, registry });
+    store.register({
+      plugin: "x",
+      defaults: { apiKey: "" },
+      schema: { apiKey: { type: "string", secret: true } },
+    });
+    await store.set("x", { apiKey: "tvly-abc" } as any, "home");
+    const onDisk = JSON.parse(fs.files.get(deps.homePath)!);
+    expect(onDisk.plugins.x.apiKey).toEqual({ $ref: "fake:x/apiKey" });
+    expect(backendData.get("x/apiKey")).toBe("tvly-abc");
+    expect(store.get<{ apiKey: string }>("x").apiKey).toBe("tvly-abc");
+  });
+
+  it("rejects with helpful error when no writable backend is registered", async () => {
+    const { deps } = makeDeps();
+    const registry = createRegistry();
+    const store = createStore({ ...deps, registry });
+    store.register({
+      plugin: "x",
+      defaults: { apiKey: "" },
+      schema: { apiKey: { type: "string", secret: true } },
+    });
+    await expect(store.set("x", { apiKey: "tvly-abc" } as any)).rejects.toThrow(/no writable secrets backend registered/);
+  });
+
+  it("rejects when multiple writable backends and no defaultSecretBackend", async () => {
+    const { deps } = makeDeps();
+    const registry = createRegistry();
+    registry.register({ scheme: "a", async get() { return ""; }, async set() {}, async delete() {} });
+    registry.register({ scheme: "b", async get() { return ""; }, async set() {}, async delete() {} });
+    const store = createStore({ ...deps, registry });
+    store.register({
+      plugin: "x",
+      defaults: { apiKey: "" },
+      schema: { apiKey: { type: "string", secret: true } },
+    });
+    await expect(store.set("x", { apiKey: "tvly-abc" } as any)).rejects.toThrow(/multiple writable backends/);
+  });
+
+  it("uses kaizen-config.defaultSecretBackend when set", async () => {
+    const { deps } = makeDeps();
+    const registry = createRegistry();
+    const aData = new Map<string, string>(); const bData = new Map<string, string>();
+    registry.register({ scheme: "a", async get(k){return aData.get(k)!;}, async set(k,v){aData.set(k,v);}, async delete(k){aData.delete(k);} });
+    registry.register({ scheme: "b", async get(k){return bData.get(k)!;}, async set(k,v){bData.set(k,v);}, async delete(k){bData.delete(k);} });
+    const store = createStore({ ...deps, registry });
+    store.register({
+      plugin: "kaizen-config",
+      defaults: { defaultSecretBackend: undefined as string | undefined },
+      schema: { defaultSecretBackend: { type: "string" } },
+    });
+    await store.set("kaizen-config", { defaultSecretBackend: "b" } as any);
+    store.register({
+      plugin: "x",
+      defaults: { apiKey: "" },
+      schema: { apiKey: { type: "string", secret: true } },
+    });
+    await store.set("x", { apiKey: "tvly-abc" } as any);
+    expect(bData.get("x/apiKey")).toBe("tvly-abc");
+    expect(aData.has("x/apiKey")).toBe(false);
+  });
+
+  it("writes plaintext for non-secret fields (unchanged behavior)", async () => {
+    const { deps, fs } = makeDeps();
+    const registry = createRegistry();
+    const store = createStore({ ...deps, registry });
+    store.register({
+      plugin: "x",
+      defaults: { model: "" },
+      schema: { model: { type: "string" } },
+    });
+    await store.set("x", { model: "gpt-4" } as any);
+    const onDisk = JSON.parse(fs.files.get(deps.homePath)!);
+    expect(onDisk.plugins.x.model).toBe("gpt-4");
+  });
+});
+
 describe("store — ready() with backend", () => {
   it("ready() resolves $refs against the registered backend", async () => {
     const { deps, fs } = makeDeps();
