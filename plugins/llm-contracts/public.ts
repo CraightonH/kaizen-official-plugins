@@ -23,6 +23,8 @@ export type {
   SlashCommandManifest,
   SlashRegistryEntry,
   RegistryEntry,
+  ArgSlot,
+  SlashCommandFlag,
 } from "./contracts/slash-registry";
 export type { SkillsRegistryService, SkillManifest, SkillRescanResult } from "./contracts/skills-registry";
 export type { MemoryStoreService, MemoryEntry, MemoryType, MemoryScope } from "./contracts/memory-store";

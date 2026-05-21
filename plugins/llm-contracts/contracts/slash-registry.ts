@@ -1,3 +1,17 @@
+import type { CompletionItem } from "./ui-completion";
+
+export interface ArgSlot {
+  name: string;
+  description?: string;
+  complete?: (prev: string[], query: string) =>
+    Promise<CompletionItem[]> | CompletionItem[];
+}
+
+export interface SlashCommandFlag {
+  name: string;            // e.g. "--project"
+  description?: string;
+}
+
 export interface SlashPrintOptions {
   /**
    * When true, the print body is forwarded through the
@@ -24,6 +38,8 @@ export interface SlashCommandManifest {
   usage?: string;
   source: "builtin" | "plugin" | "file";
   filePath?: string;
+  arguments?: ArgSlot[];
+  flags?: SlashCommandFlag[];
 }
 
 export interface SlashRegistryEntry {
