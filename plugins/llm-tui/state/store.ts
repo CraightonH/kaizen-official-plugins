@@ -118,6 +118,12 @@ export interface TuiSnapshot {
   viewMode: ViewMode;
   historyView: HistoryViewState;
   prompt: PromptSlice;
+  /**
+   * Monotonic counter bumped whenever the InputBox-visible completion sources
+   * Map changes. Consumers re-derive trigger lookups when this changes; the
+   * sources Map itself is mutated in place and won't trip referential checks.
+   */
+  sourcesVersion: number;
 }
 
 export class TuiStore {
@@ -132,6 +138,7 @@ export class TuiStore {
   private _viewMode: ViewMode = "chat";
   private _historyView: HistoryViewState = { focusIdx: -1, expanded: new Set() };
   private _prompt: PromptSlice = null;
+  private _sourcesVersion = 0;
   private _seq = 0;
 
   // Bracketed-paste registry: pasted content is stored here keyed by id; the
@@ -467,6 +474,16 @@ export class TuiStore {
     this._emit();
   }
 
+  /**
+   * Bump the sources-version counter so subscribers re-derive any cached
+   * views over the completion-sources Map (which is mutated in place by the
+   * TUI's wrapped register()).
+   */
+  bumpSourcesVersion(): void {
+    this._sourcesVersion++;
+    this._emit();
+  }
+
   awaitInput(): Promise<string> {
     if (this._queue.length > 0) {
       const next = this._queue.shift()!;
@@ -603,6 +620,7 @@ export class TuiStore {
       viewMode: this._viewMode,
       historyView: this._historyView,
       prompt: this._prompt,
+      sourcesVersion: this._sourcesVersion,
     };
   }
 

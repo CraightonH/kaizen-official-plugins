@@ -137,7 +137,7 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, sources, th
       if (s.trigger) m.set(s.trigger, s);
     }
     return m;
-  }, [sources]);
+  }, [sources, snap.sourcesVersion]);
 
   const popup = snap.popup;
   const value = snap.input.value;
@@ -184,7 +184,7 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, sources, th
     }
     // No match-based source matches; close any open match-based popup.
     if (cur && cur.trigger === undefined) store.closePopup();
-  }, [value, cursor, sources, store]);
+  }, [value, cursor, sources, store, snap.sourcesVersion]);
 
   // Fetch items for match-based popups via queryBySource (char-triggered popups
   // use the existing refreshPopupItems path).

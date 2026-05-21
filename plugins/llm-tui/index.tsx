@@ -57,14 +57,18 @@ const plugin: KaizenPlugin = {
     for (const r of defaultRenderers(theme)) toolRenderers.service.register(r);
 
     // Track registered sources by id. The InputBox derives both char-trigger
-    // activation and match-based activation (Task 7) from this map.
+    // activation and match-based activation from this map. The Map is mutated
+    // in place — propagation to React goes through store.bumpSourcesVersion()
+    // which is read by InputBox via the existing snapshot subscription.
     const sources = new Map<string, CompletionSource>();
     const origRegister = registry.service.register;
     registry.service.register = (source) => {
       sources.set(source.id, source);
+      store.bumpSourcesVersion();
       const off = origRegister(source);
       return () => {
         if (sources.get(source.id) === source) sources.delete(source.id);
+        store.bumpSourcesVersion();
         off();
       };
     };

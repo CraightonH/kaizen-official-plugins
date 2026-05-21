@@ -13,6 +13,21 @@ function setup() {
   const store = new TuiStore();
   const reg = makeCompletionRegistry({ debounceMs: 0 });
   const sources = new Map<string, CompletionSource>();
+  // Mirror the production wrapper from llm-tui/index.tsx so register()
+  // updates the sources map AND bumps the snapshot version. Without this,
+  // tests can drift from production behavior — see the post-mount registration
+  // regression test below.
+  const origRegister = reg.service.register;
+  reg.service.register = (source) => {
+    sources.set(source.id, source);
+    store.bumpSourcesVersion();
+    const off = origRegister(source);
+    return () => {
+      if (sources.get(source.id) === source) sources.delete(source.id);
+      store.bumpSourcesVersion();
+      off();
+    };
+  };
   const onSubmit = (text: string) => store.submit(text);
   return { store, reg, sources, onSubmit };
 }
@@ -568,6 +583,28 @@ describe("InputBox", () => {
     expect(popup?.anchor).toBe(5);
     expect(popup?.query).toBe("bar");
     expect(popup?.items.map(i => i.label)).toEqual(["key:bar"]);
+  });
+
+  it("picks up sources registered after mount (regression: char trigger)", async () => {
+    // In production, llm-slash-commands registers its sources on harness:start
+    // which fires AFTER the TUI mounts. The InputBox must observe those
+    // registrations and treat their trigger chars as live.
+    const ctx = setup();
+    const { stdin } = render(
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+    );
+    await tick();
+    // Register the "/" source AFTER mount.
+    ctx.reg.service.register({
+      id: "post-mount",
+      trigger: "/",
+      list: () => [{ label: "/help", insertText: "/help " }],
+    });
+    await tick();
+    stdin.write("/");
+    await tick(60);
+    expect(ctx.store.snapshot().popup?.trigger).toBe("/");
+    expect(ctx.store.snapshot().popup?.items.map(i => i.label)).toEqual(["/help"]);
   });
 
   it("keeps match-based popup open while typing additional characters", async () => {
