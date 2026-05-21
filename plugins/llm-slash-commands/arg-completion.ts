@@ -1,4 +1,5 @@
 import { parse } from "./parser.ts";
+import type { SlashRegistryService, CompletionItem, CompletionSource } from "llm-contracts/public";
 
 export interface ArgSlotInfo {
   name: string;
@@ -57,4 +58,59 @@ export function computeArgSlot(line: string, cursor: number): ArgSlotInfo | null
   const flagMode = activeToken?.isFlag === true || (!activeToken && positionalBefore.length >= 2);
 
   return { name: parsed.name, slotIndex, prevArgs: positionalBefore, query, anchor, flagMode };
+}
+
+export function buildArgCompletionSource(registry: SlashRegistryService): CompletionSource {
+  return {
+    id: "llm-slash-commands:args",
+    match(line, cursor) {
+      const slot = computeArgSlot(line, cursor);
+      if (!slot) return null;
+      const entry = registry.get(slot.name);
+      if (!entry) return null;
+      const args = entry.manifest.arguments ?? [];
+      const flags = entry.manifest.flags ?? [];
+
+      // Positional slot in range and the active position isn't a flag token.
+      if (slot.slotIndex < args.length && !slot.flagMode) {
+        if (!args[slot.slotIndex]!.complete) return null;
+        return { triggerPos: slot.anchor, query: slot.query };
+      }
+      // Flag slot: positional slots filled (or flag token under cursor) AND flags remain.
+      if (slot.slotIndex >= args.length || slot.flagMode) {
+        const flagsLeft = flags.filter((f) => !line.includes(` ${f.name}`));
+        if (flagsLeft.length === 0) return null;
+        return { triggerPos: slot.anchor, query: slot.query };
+      }
+      return null;
+    },
+    async list(_query, ctx) {
+      if (!ctx) return [];
+      const slot = computeArgSlot(ctx.line, ctx.cursor);
+      if (!slot) return [];
+      const entry = registry.get(slot.name);
+      if (!entry) return [];
+      const args = entry.manifest.arguments ?? [];
+      const flags = entry.manifest.flags ?? [];
+
+      if (slot.slotIndex < args.length && !slot.flagMode) {
+        const fn = args[slot.slotIndex]!.complete;
+        if (!fn) return [];
+        return await fn(slot.prevArgs, slot.query);
+      }
+
+      // Flag slot: return one item per declared flag not yet present in the line.
+      const present = new Set<string>();
+      for (const tok of ctx.line.split(/\s+/)) {
+        if (tok.startsWith("--")) present.add(tok);
+      }
+      return flags
+        .filter((f) => !present.has(f.name))
+        .map<CompletionItem>((f) => ({
+          label: f.name,
+          insertText: f.name,
+          detail: f.description,
+        }));
+    },
+  };
 }
