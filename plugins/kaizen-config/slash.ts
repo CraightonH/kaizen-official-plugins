@@ -1,6 +1,7 @@
 // plugins/kaizen-config/slash.ts
 import type { ConfigStoreService, SecretsRegistryService, SlashCommandManifest, SlashCommandHandler, ConfigSchema, FieldSchema } from "llm-contracts/public";
 import { redactSnapshot, redactValue } from "./secrets/redact.ts";
+import { pluginCompletions, keyEqualsValueCompletions, keyOnlyCompletions } from "./slash-completions.ts";
 
 export interface SlashRegistryLike {
   register(manifest: SlashCommandManifest, handler: SlashCommandHandler): () => void;
@@ -63,6 +64,11 @@ export function registerSlashCommands(reg: SlashRegistryLike, deps: SlashDeps): 
       name: "config:get",
       description: "Print the merged config for a plugin. Usage: /config:get <plugin> [key.path] [--reveal]",
       source: "plugin",
+      arguments: [
+        { name: "plugin", complete: () => pluginCompletions(deps.store) },
+        { name: "key", complete: (prev) => keyOnlyCompletions(deps.store, prev) },
+      ],
+      flags: [{ name: "--reveal", description: "Reveal secret values" }],
     },
     async (ctx) => {
       const tokens = ctx.args.trim().split(/\s+/).filter(Boolean);
@@ -92,6 +98,11 @@ export function registerSlashCommands(reg: SlashRegistryLike, deps: SlashDeps): 
       name: "config:set",
       description: "Set a config value. Usage: /config:set <plugin> <key>=<value> [--project]",
       source: "plugin",
+      arguments: [
+        { name: "plugin", complete: () => pluginCompletions(deps.store) },
+        { name: "key=value", complete: (prev) => keyEqualsValueCompletions(deps.store, prev) },
+      ],
+      flags: [{ name: "--project", description: "Write to project scope" }],
     },
     async (ctx) => {
       const tokens = ctx.args.trim().split(/\s+/);
@@ -121,6 +132,11 @@ export function registerSlashCommands(reg: SlashRegistryLike, deps: SlashDeps): 
       name: "config:unset",
       description: "Remove a config key. Usage: /config:unset <plugin> <key> [--project]",
       source: "plugin",
+      arguments: [
+        { name: "plugin", complete: () => pluginCompletions(deps.store) },
+        { name: "key", complete: (prev) => keyOnlyCompletions(deps.store, prev) },
+      ],
+      flags: [{ name: "--project", description: "Write to project scope" }],
     },
     async (ctx) => {
       const tokens = ctx.args.trim().split(/\s+/).filter(Boolean);
