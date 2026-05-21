@@ -509,9 +509,11 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, sources, th
         // Regular char (or trigger at non-word-start/inside-quote): update buffer.
         curVal = next;
         curPos = newCursor;
-        // If popup is open, update query or close if cursor passed trigger.
+        // If a char-triggered popup is open, update query or close if cursor
+        // passed trigger. Match-based popups (cur.trigger === undefined) are
+        // driven by the value/cursor effect; do not touch them here.
         const cur = store.snapshot().popup;
-        if (cur) {
+        if (cur && cur.trigger !== undefined) {
           const tp = cur.anchor;
           if (curPos <= tp || curVal[tp] !== cur.trigger) {
             store.setInput(curVal, curPos);

@@ -570,6 +570,34 @@ describe("InputBox", () => {
     expect(popup?.items.map(i => i.label)).toEqual(["key:bar"]);
   });
 
+  it("keeps match-based popup open while typing additional characters", async () => {
+    const ctx = setup();
+    const src: import("llm-contracts/public").CompletionSource = {
+      id: "args-keep",
+      match: (line: string, _c: number) =>
+        line.startsWith("/cmd ") ? { triggerPos: 5, query: line.slice(5) } : null,
+      list: (q: string) => [{ label: `it:${q}`, insertText: `it:${q}` }],
+    };
+    ctx.sources.set(src.id, src);
+    ctx.reg.service.register(src);
+    const { stdin } = render(
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+    );
+    await tick();
+    stdin.write("/cmd ");
+    await tick(80);
+    expect(ctx.store.snapshot().popup?.sourceId).toBe("args-keep");
+    // Type into the open match-based popup — popup must remain open and query must update.
+    stdin.write("a");
+    await tick(80);
+    expect(ctx.store.snapshot().popup?.sourceId).toBe("args-keep");
+    expect(ctx.store.snapshot().popup?.query).toBe("a");
+    stdin.write("b");
+    await tick(80);
+    expect(ctx.store.snapshot().popup?.sourceId).toBe("args-keep");
+    expect(ctx.store.snapshot().popup?.query).toBe("ab");
+  });
+
   it("closes match-based popup when match returns null", async () => {
     const ctx = setup();
     const src: import("llm-contracts/public").CompletionSource = {
