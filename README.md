@@ -14,6 +14,9 @@ This registers the marketplace under the id `official`, which is the prefix used
 
 ### Foundation
 
+- **llm-contracts** — service contract definitions for the local harness. Pure types + `defineService`; no runtime behavior.
+- **kaizen-config** — harness-scoped plugin configuration store. Provides `config:store` and `secrets:registry`.
+- **kaizen-secrets-keychain** — macOS Keychain backend for `secrets:registry`.
 - **llm-events** — event vocabulary, shared LLM primitives, and the neutral `llm:complete` service definition for local harnesses.
 - **openai-llm** — OpenAI-compatible LLM provider. Implements `llm:complete`. Configure at `~/.kaizen/plugins/openai-llm/config.json`; see the plugin's README for the schema.
 
@@ -90,6 +93,9 @@ kaizen --harness ./harnesses/local.json
 ├── .kaizen/
 │   └── marketplace.json      # catalog: plugin + harness entries
 ├── plugins/
+│   ├── llm-contracts/        # service contract definitions
+│   ├── kaizen-config/        # config:store + secrets:registry
+│   ├── kaizen-secrets-keychain/ # macOS Keychain secrets backend
 │   ├── llm-events/           # event vocab + shared types (Spec 0)
 │   ├── openai-llm/           # LLM provider (llm:complete)
 │   ├── llm-tools-registry/   # tool registry (tools:registry)
