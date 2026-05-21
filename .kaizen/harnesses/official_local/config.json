@@ -2,7 +2,7 @@
   "plugins": {
     "llm-tool-approval": {
       "allow": [
-        "bash"
+        "bash(ls *)"
       ]
     }
   }
