@@ -1,0 +1,17 @@
+{
+  "name": "kaizen-secrets-keychain",
+  "version": "0.1.0",
+  "description": "macOS Keychain backend for kaizen-config secrets:registry. Registers the 'keychain' resolver scheme.",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "keywords": ["kaizen-plugin"],
+  "dependencies": {
+    "llm-contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.4.0"
+  }
+}
