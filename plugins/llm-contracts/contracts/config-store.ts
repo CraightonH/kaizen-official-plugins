@@ -45,6 +45,7 @@ export interface ConfigStoreService {
   set<T>(plugin: string, value: Partial<T>, scope?: ConfigScope): Promise<void>;
   watch<T>(plugin: string, cb: (next: T) => void): () => void;
   list(): ConfigStatus[];
+  ready(): Promise<void>;
 }
 
 export const CONTRACT_ID = "config:store" as const;

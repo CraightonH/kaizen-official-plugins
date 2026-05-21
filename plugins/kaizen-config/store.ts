@@ -4,6 +4,7 @@ import type {
   ConfigScope,
   ConfigStoreService,
   ConfigStatus,
+  SecretsRegistryService,
 } from "llm-contracts/public";
 import { isSecretRef } from "llm-contracts/public";
 import { validate, type ConfigSchema } from "./schema.ts";
@@ -18,6 +19,7 @@ export interface StoreDeps {
   watchFile: (path: string, cb: () => void) => () => void;
   env: Record<string, string | undefined>;
   log: (msg: string) => void;
+  registry?: SecretsRegistryService;
 }
 
 interface Entry {
@@ -37,7 +39,10 @@ export function createStore(deps: StoreDeps): ConfigStoreService {
   let home = safeRead(deps, deps.homePath);
   let project = safeRead(deps, deps.projectPath);
 
+  let readyPromise: Promise<void> | null = null;
+
   const recomputeAll = () => {
+    readyPromise = null;
     home = safeRead(deps, deps.homePath);
     project = safeRead(deps, deps.projectPath);
     for (const [name, entry] of entries) {
@@ -46,6 +51,32 @@ export function createStore(deps: StoreDeps): ConfigStoreService {
       entry.cachedValue = value;
       entry.cachedResolution = resolution;
       for (const cb of entry.watchers) cb(value);
+    }
+  };
+
+  const resolveRefsForEntry = async (entry: Entry): Promise<void> => {
+    const registry = deps.registry;
+    if (!registry) return;
+    const current = entry.cachedValue as Record<string, unknown>;
+    if (!current || typeof current !== "object") return;
+    for (const [k, v] of Object.entries(current)) {
+      if (!isSecretRef(v)) continue;
+      const colon = v.$ref.indexOf(":");
+      const scheme = colon > 0 ? v.$ref.slice(0, colon) : "";
+      if (!registry.has(scheme)) continue;
+      try {
+        const plaintext = await registry.resolve(v);
+        (current as Record<string, unknown>)[k] = plaintext;
+      } catch (err) {
+        deps.log(`kaizen-config: failed to resolve ${v.$ref} for '${entry.spec.plugin}': ${(err as Error).message}`);
+      }
+    }
+    for (const cb of entry.watchers) cb(entry.cachedValue);
+  };
+
+  const resolveAll = async (): Promise<void> => {
+    for (const entry of entries.values()) {
+      await resolveRefsForEntry(entry);
     }
   };
 
@@ -117,6 +148,10 @@ export function createStore(deps: StoreDeps): ConfigStoreService {
         projectExists: project.exists,
         resolution: e.cachedResolution,
       }));
+    },
+    ready(): Promise<void> {
+      if (!readyPromise) readyPromise = resolveAll();
+      return readyPromise;
     },
   };
 }

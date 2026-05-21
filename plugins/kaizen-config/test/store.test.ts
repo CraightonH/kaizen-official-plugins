@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { createStore, type StoreDeps } from "../store.ts";
+import { createRegistry } from "../secrets/registry.ts";
 
 interface Fs {
   files: Map<string, string>;
@@ -228,5 +229,68 @@ describe("store — secret refs on load", () => {
     });
     const status = store.list().find((s) => s.plugin === "x")!;
     expect(status.resolution.apiKey).toBe("secret:keychain");
+  });
+});
+
+describe("store — ready() with backend", () => {
+  it("ready() resolves $refs against the registered backend", async () => {
+    const { deps, fs } = makeDeps();
+    fs.files.set(deps.homePath, JSON.stringify({
+      plugins: { x: { apiKey: { $ref: "fake:x/apiKey" } } },
+    }));
+    const registry = createRegistry();
+    registry.register({
+      scheme: "fake",
+      async get(k) { return k === "x/apiKey" ? "resolved-value" : (() => { throw new Error("nope"); })(); },
+      async set() {},
+      async delete() {},
+    });
+    const store = createStore({ ...deps, registry });
+    store.register({
+      plugin: "x",
+      defaults: { apiKey: "" },
+      schema: { apiKey: { type: "string", secret: true } },
+    });
+    expect(store.get<{ apiKey: unknown }>("x").apiKey).toEqual({ $ref: "fake:x/apiKey" });
+    await store.ready();
+    expect(store.get<{ apiKey: string }>("x").apiKey).toBe("resolved-value");
+  });
+
+  it("ready() leaves SecretRef in place when scheme is not registered", async () => {
+    const { deps, fs } = makeDeps();
+    fs.files.set(deps.homePath, JSON.stringify({
+      plugins: { x: { apiKey: { $ref: "missing:k" } } },
+    }));
+    const registry = createRegistry();
+    const store = createStore({ ...deps, registry });
+    store.register({
+      plugin: "x",
+      defaults: { apiKey: "" },
+      schema: { apiKey: { type: "string", secret: true } },
+    });
+    await store.ready();
+    expect(store.get<{ apiKey: unknown }>("x").apiKey).toEqual({ $ref: "missing:k" });
+  });
+
+  it("ready() tolerates backend get() failures (keeps SecretRef, does not throw)", async () => {
+    const { deps, fs } = makeDeps();
+    fs.files.set(deps.homePath, JSON.stringify({
+      plugins: { x: { apiKey: { $ref: "fake:x/apiKey" } } },
+    }));
+    const registry = createRegistry();
+    registry.register({
+      scheme: "fake",
+      async get() { throw new Error("backend exploded"); },
+      async set() {},
+      async delete() {},
+    });
+    const store = createStore({ ...deps, registry });
+    store.register({
+      plugin: "x",
+      defaults: { apiKey: "" },
+      schema: { apiKey: { type: "string", secret: true } },
+    });
+    await store.ready();
+    expect(store.get<{ apiKey: unknown }>("x").apiKey).toEqual({ $ref: "fake:x/apiKey" });
   });
 });
