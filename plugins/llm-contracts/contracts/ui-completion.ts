@@ -8,10 +8,25 @@ export interface CompletionItem {
   sortWeight?: number;
 }
 
+export interface CompletionContext {
+  line: string;
+  cursor: number;
+}
+
 export interface CompletionSource {
   id: string;
-  trigger: string;
-  list(query: string): CompletionItem[] | Promise<CompletionItem[]>;
+  /**
+   * Single-char activation. Set this OR `match`, not both. When set, the
+   * popup opens on this char at a word-start outside quotes/backticks.
+   */
+  trigger?: string;
+  /**
+   * Predicate-based activation. Set this OR `trigger`, not both. The TUI
+   * calls `match(line, cursor)` on every line/cursor change; a non-null
+   * return opens (or keeps open) a popup pinned to this source.
+   */
+  match?: (line: string, cursor: number) => { triggerPos: number; query: string } | null;
+  list(query: string, ctx?: CompletionContext): CompletionItem[] | Promise<CompletionItem[]>;
 }
 
 export interface UiCompletionService {
