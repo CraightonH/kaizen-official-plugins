@@ -1,6 +1,6 @@
 {
   "name": "llm-contracts",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Service contract definitions for the local harness. Pure types + defineService; no runtime behavior.",
   "type": "module",
   "exports": {

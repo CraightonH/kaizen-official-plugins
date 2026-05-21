@@ -51,3 +51,9 @@ export type {
   ConfigResolutionSource,
   FieldSchema,
 } from "./contracts/config-store";
+export type {
+  SecretsRegistryService,
+  SecretsResolver,
+  SecretRef,
+} from "./contracts/secrets-registry";
+export { isSecretRef } from "./contracts/secrets-registry";
