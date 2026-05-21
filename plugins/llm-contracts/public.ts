@@ -48,5 +48,6 @@ export type {
   ConfigSchema,
   ConfigScope,
   ConfigStatus,
+  ConfigResolutionSource,
   FieldSchema,
 } from "./contracts/config-store";

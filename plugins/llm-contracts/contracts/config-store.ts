@@ -3,7 +3,7 @@
 export type ConfigScope = "home" | "project";
 
 export type FieldSchema =
-  | { type: "string"; min?: number; max?: number; pattern?: string; enum?: string[] }
+  | { type: "string"; min?: number; max?: number; pattern?: string; enum?: string[]; secret?: boolean }
   | { type: "number"; min?: number; max?: number; integer?: boolean }
   | { type: "boolean" }
   | { type: "array"; items: FieldSchema; min?: number; max?: number }
@@ -23,13 +23,20 @@ export interface ConfigSpec<T> {
   envVars?: Partial<Record<keyof T & string, string>>;
 }
 
+export type ConfigResolutionSource =
+  | "default"
+  | "home"
+  | "project"
+  | "env"
+  | `secret:${string}`;
+
 export interface ConfigStatus {
   plugin: string;
   homePath: string;
   projectPath: string;
   homeExists: boolean;
   projectExists: boolean;
-  resolution: Record<string, "default" | "home" | "project" | "env">;
+  resolution: Record<string, ConfigResolutionSource>;
 }
 
 export interface ConfigStoreService {
@@ -38,6 +45,9 @@ export interface ConfigStoreService {
   set<T>(plugin: string, value: Partial<T>, scope?: ConfigScope): Promise<void>;
   watch<T>(plugin: string, cb: (next: T) => void): () => void;
   list(): ConfigStatus[];
+  // `ready()` is added to this interface in Task 8.
+  // `unset()` is added in Task 10.
+  // `getSpec()` is added in Task 12.
 }
 
 export const CONTRACT_ID = "config:store" as const;
