@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { matches, deriveDomain, matchesAny } from "../matcher.ts";
+import { matches, deriveDomain, matchesAny, matchRule, matchesAnyRule } from "../matcher.ts";
 import { parseRule, compilePattern } from "../matcher.ts";
 
 describe("matches", () => {
@@ -137,5 +137,68 @@ describe("compilePattern", () => {
   it("anchors the match", () => {
     const re = compilePattern("foo");
     expect(re.test("xfoox")).toBe(false);
+  });
+});
+
+describe("matchRule (name-only rules)", () => {
+  it("falls back to name match when rule has no pattern", () => {
+    expect(matchRule("fs:read_file", {}, "fs:read_file")).toBe(true);
+    expect(matchRule("fs:read_file", {}, "fs:*")).toBe(true);
+    expect(matchRule("fs:write_file", {}, "fs:read_file")).toBe(false);
+  });
+
+  it("ignores args when rule has no pattern", () => {
+    expect(matchRule("bash", { command: "rm -rf /" }, "bash")).toBe(true);
+  });
+});
+
+describe("matchRule (arg patterns)", () => {
+  it("matches when a string leaf glob-matches the pattern", () => {
+    expect(matchRule("bash", { command: "ls -la" }, "bash(ls *)")).toBe(true);
+    expect(matchRule("bash", { command: "git status" }, "bash(git *)")).toBe(true);
+  });
+
+  it("does not match when no string leaf matches", () => {
+    expect(matchRule("bash", { command: "rm -rf /" }, "bash(ls *)")).toBe(false);
+  });
+
+  it("does not match when name differs", () => {
+    expect(matchRule("read", { command: "ls" }, "bash(ls *)")).toBe(false);
+  });
+
+  it("returns false when args have no string leaves", () => {
+    expect(matchRule("bash", { count: 5 }, "bash(ls *)")).toBe(false);
+  });
+
+  it("matches nested string leaves", () => {
+    expect(
+      matchRule("web_search", { params: { url: "https://github.com/x" } }, "web_search(*github.com/*)"),
+    ).toBe(true);
+  });
+
+  it("skips malformed rules silently (returns false)", () => {
+    expect(matchRule("bash", { command: "ls" }, "bash(ls")).toBe(false);
+  });
+});
+
+describe("matchesAnyRule", () => {
+  it("returns true on first matching rule", () => {
+    expect(
+      matchesAnyRule("bash", { command: "ls -la" }, ["bash(rm *)", "bash(ls *)"]),
+    ).toBe(true);
+  });
+
+  it("returns false when no rule matches", () => {
+    expect(matchesAnyRule("bash", { command: "ls -la" }, ["bash(rm *)"])).toBe(false);
+  });
+
+  it("returns false on empty rule list", () => {
+    expect(matchesAnyRule("bash", { command: "ls" }, [])).toBe(false);
+  });
+
+  it("mixes name-only and pattern rules in one list", () => {
+    expect(
+      matchesAnyRule("bash", { command: "rm -rf /" }, ["read", "bash(ls *)", "bash"]),
+    ).toBe(true);
   });
 });

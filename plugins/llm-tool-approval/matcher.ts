@@ -1,3 +1,5 @@
+import { stringLeaves } from "./string-leaves.ts";
+
 /**
  * True iff `name` matches `rule`. Rule is either an exact string, the
  * catch-all `*`, or a prefix glob of the form `<prefix>:*` where the `*` is
@@ -97,4 +99,35 @@ export function compilePattern(pattern: string): RegExp {
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * True iff the given tool call (`name`, `args`) matches `rule`.
+ *
+ * Name-only rules behave exactly like `matches()`. Argument-pattern rules
+ * additionally require at least one string leaf in `args` to glob-match the
+ * pattern. Malformed rules return false silently — callers warn at load time.
+ */
+export function matchRule(name: string, args: unknown, rule: string): boolean {
+  const parsed = parseRule(rule);
+  if (!parsed) return false;
+  if (!matches(name, parsed.name)) return false;
+  if (parsed.pattern === undefined) return true;
+  const re = compilePattern(parsed.pattern);
+  const leaves = stringLeaves(args);
+  for (const leaf of leaves) {
+    if (re.test(leaf)) return true;
+  }
+  return false;
+}
+
+export function matchesAnyRule(
+  name: string,
+  args: unknown,
+  rules: ReadonlyArray<string>,
+): boolean {
+  for (const r of rules) {
+    if (matchRule(name, args, r)) return true;
+  }
+  return false;
 }
