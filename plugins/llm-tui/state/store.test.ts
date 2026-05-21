@@ -102,7 +102,7 @@ describe("TuiStore", () => {
 
   it("openPopup, setPopupItems, movePopup, closePopup", () => {
     const s = new TuiStore();
-    s.openPopup("/", "");
+    s.openPopup({ sourceId: "stub", trigger: "/", query: "", anchor: 0 });
     expect(s.snapshot().popup?.trigger).toBe("/");
     expect(s.snapshot().popup?.selectedIndex).toBe(0);
 
@@ -124,9 +124,27 @@ describe("TuiStore", () => {
     expect(s.snapshot().popup).toBeNull();
   });
 
+  it("openPopup records sourceId and trigger for char sources", () => {
+    const s = new TuiStore();
+    s.openPopup({ sourceId: "src1", trigger: "/", query: "", anchor: 3 });
+    const p = s.snapshot().popup;
+    expect(p?.sourceId).toBe("src1");
+    expect(p?.trigger).toBe("/");
+    expect(p?.anchor).toBe(3);
+  });
+
+  it("openPopup records sourceId only for match-based sources", () => {
+    const s = new TuiStore();
+    s.openPopup({ sourceId: "args", query: "", anchor: 12 });
+    const p = s.snapshot().popup;
+    expect(p?.sourceId).toBe("args");
+    expect(p?.trigger).toBeUndefined();
+    expect(p?.anchor).toBe(12);
+  });
+
   it("setPopupQuery updates query and resets selection to 0", () => {
     const s = new TuiStore();
-    s.openPopup("/", "");
+    s.openPopup({ sourceId: "stub", trigger: "/", query: "", anchor: 0 });
     s.setPopupItems([{ label: "/a", insertText: "/a" }, { label: "/b", insertText: "/b" }]);
     s.movePopup(1);
     s.setPopupQuery("a");

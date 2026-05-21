@@ -76,13 +76,23 @@ export interface CompletionItem {
 }
 
 export interface PopupState {
-  trigger: string;
+  /** Source id this popup is pinned to. */
+  sourceId: string;
+  /**
+   * Single-char trigger when the popup was opened by a char source.
+   * Undefined for match-based sources.
+   */
+  trigger?: string;
   query: string;
   items: CompletionItem[];
   selectedIndex: number;
-  // Position in the input value where the trigger character sits. Used by
-  // InputBox to compute the substring to replace on accept.
-  triggerPos: number;
+  /**
+   * Character index in the input value where the completed token starts.
+   * For char-triggered popups, this is the position of the trigger char.
+   * For match-based popups, this is wherever the source decided.
+   * Used by InputBox to compute the substring to replace on accept.
+   */
+  anchor: number;
 }
 
 export type ViewMode = "chat" | "history";
@@ -417,8 +427,15 @@ export class TuiStore {
     this._emit();
   }
 
-  openPopup(trigger: string, query: string, triggerPos = 0): void {
-    this._popup = { trigger, query, items: [], selectedIndex: 0, triggerPos };
+  openPopup(args: { sourceId: string; trigger?: string; query: string; anchor: number }): void {
+    this._popup = {
+      sourceId: args.sourceId,
+      trigger: args.trigger,
+      query: args.query,
+      items: [],
+      selectedIndex: 0,
+      anchor: args.anchor,
+    };
     this._emit();
   }
 
