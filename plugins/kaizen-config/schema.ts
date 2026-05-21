@@ -23,6 +23,10 @@ export function validate<T>(value: unknown, schema: ConfigSchema<T>): Validation
 function walk(value: unknown, schema: FieldSchema, path: string, errors: ValidationError[]): void {
   switch (schema.type) {
     case "string": {
+      if (schema.secret && typeof value === "object" && value !== null && !Array.isArray(value)
+          && typeof (value as { $ref?: unknown }).$ref === "string") {
+        return;
+      }
       if (typeof value !== "string") return push(errors, path, "must be a string");
       if (schema.min !== undefined && value.length < schema.min) push(errors, path, `length < ${schema.min}`);
       if (schema.max !== undefined && value.length > schema.max) push(errors, path, `length > ${schema.max}`);

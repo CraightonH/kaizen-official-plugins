@@ -198,3 +198,35 @@ describe("store — list", () => {
     expect(rows[0].projectExists).toBe(false);
   });
 });
+
+describe("store — secret refs on load", () => {
+  it("returns the SecretRef sentinel when value is a $ref and no backend resolves", () => {
+    const { deps, fs } = makeDeps();
+    fs.files.set(deps.homePath, JSON.stringify({
+      plugins: { x: { apiKey: { $ref: "keychain:x/apiKey" } } },
+    }));
+    const store = createStore(deps);
+    store.register({
+      plugin: "x",
+      defaults: { apiKey: "" },
+      schema: { apiKey: { type: "string", secret: true } },
+    });
+    const v = store.get<{ apiKey: string | { $ref: string } }>("x");
+    expect(v.apiKey).toEqual({ $ref: "keychain:x/apiKey" });
+  });
+
+  it("reports secret:<scheme> resolution for ref-valued fields", () => {
+    const { deps, fs } = makeDeps();
+    fs.files.set(deps.homePath, JSON.stringify({
+      plugins: { x: { apiKey: { $ref: "keychain:x/apiKey" } } },
+    }));
+    const store = createStore(deps);
+    store.register({
+      plugin: "x",
+      defaults: { apiKey: "" },
+      schema: { apiKey: { type: "string", secret: true } },
+    });
+    const status = store.list().find((s) => s.plugin === "x")!;
+    expect(status.resolution.apiKey).toBe("secret:keychain");
+  });
+});

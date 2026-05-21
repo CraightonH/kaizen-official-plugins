@@ -1,7 +1,7 @@
 // plugins/kaizen-config/envvars.ts
 import type { ConfigSchema, FieldSchema } from "./schema.ts";
 
-export type ResolutionSource = "default" | "home" | "project" | "env";
+export type ResolutionSource = "default" | "home" | "project" | "env" | `secret:${string}`;
 
 export interface EnvOverrideResult<T> {
   value: T;

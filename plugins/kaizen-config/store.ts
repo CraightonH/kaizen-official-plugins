@@ -5,6 +5,7 @@ import type {
   ConfigStoreService,
   ConfigStatus,
 } from "llm-contracts/public";
+import { isSecretRef } from "llm-contracts/public";
 import { validate, type ConfigSchema } from "./schema.ts";
 import { applyEnvOverrides, type ResolutionSource } from "./envvars.ts";
 import { mergePluginSection, type HarnessConfigFile } from "./atomic-write.ts";
@@ -174,7 +175,8 @@ function resolve(
       };
     }
   }
-  return { ok: true, value: withEnv, resolution: finalRes };
+  const taggedRes = tagSecretResolution(withEnv as Record<string, unknown>, finalRes);
+  return { ok: true, value: withEnv, resolution: taggedRes };
 }
 
 function mergeLayers(
@@ -193,6 +195,20 @@ function mergeLayers(
         out[k] = v;
       }
     }
+  }
+  return out;
+}
+
+function tagSecretResolution(
+  merged: Record<string, unknown>,
+  resolution: Record<string, ResolutionSource>,
+): Record<string, ResolutionSource> {
+  const out: Record<string, ResolutionSource> = { ...resolution };
+  for (const [k, v] of Object.entries(merged)) {
+    if (!isSecretRef(v)) continue;
+    const idx = v.$ref.indexOf(":");
+    const scheme = idx > 0 ? v.$ref.slice(0, idx) : "unknown";
+    out[k] = `secret:${scheme}` as ResolutionSource;
   }
   return out;
 }
