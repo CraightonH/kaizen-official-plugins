@@ -5,6 +5,7 @@ import type {
   UiPromptService,
 } from "llm-contracts/public";
 import { deriveDomain, matchesAnyRule } from "./matcher.ts";
+import { suggestPattern } from "./suggest-pattern.ts";
 import { bashSafety } from "./bash-safety.ts";
 
 export interface RuleSet {
@@ -56,26 +57,37 @@ export function makeSubscriber(deps: SubscriberDeps): Subscriber {
       ? `⚠ bash safety: ${safetyReason}\n${deps.summarize(payload.name, payload.args)}`
       : deps.summarize(payload.name, payload.args);
 
+    const suggestion = safetyReason ? null : suggestPattern(payload.name, payload.args);
+
+    const denyOption = {
+      id: "deny" as const,
+      label: `Deny`,
+      expandsTo: { kind: "text" as const, placeholder: "Reason (optional)" },
+    };
+
     const options: UiPromptOptionsRequest["options"] = safetyReason
       ? [
           { id: "approve-once", label: `Approve Once          (${payload.name})` },
-          {
-            id: "deny",
-            label: `Deny`,
-            expandsTo: { kind: "text" as const, placeholder: "Reason (optional)" },
-          },
+          denyOption,
         ]
       : [
           { id: "approve-once", label: `Approve Once          (${payload.name})` },
           { id: "approve-always", label: `Approve Always        (${payload.name})` },
+          ...(suggestion
+            ? [{
+                id: "approve-pattern-always",
+                label: `Approve Pattern Always (${payload.name}(${suggestion}))`,
+                expandsTo: {
+                  kind: "text" as const,
+                  placeholder: "Pattern (edit or clear to approve once)",
+                  defaultValue: suggestion,
+                },
+              }]
+            : []),
           ...(domain
             ? [{ id: "approve-domain-always", label: `Approve Domain Always (${domain})` }]
             : []),
-          {
-            id: "deny",
-            label: `Deny`,
-            expandsTo: { kind: "text" as const, placeholder: "Reason (optional)" },
-          },
+          denyOption,
         ];
     const req: UiPromptOptionsRequest = {
       title: "Approve tool call?",
@@ -100,6 +112,14 @@ export function makeSubscriber(deps: SubscriberDeps): Subscriber {
           return;
         }
         await tryPersist(deps, domain);
+        return;
+      }
+      case "approve-pattern-always": {
+        const raw = (result.text ?? "").trim();
+        if (raw.length === 0) {
+          return; // user cleared → approve-once
+        }
+        await tryPersist(deps, `${payload.name}(${raw})`);
         return;
       }
       case "deny": {

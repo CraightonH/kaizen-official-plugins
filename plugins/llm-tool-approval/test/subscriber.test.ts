@@ -294,3 +294,93 @@ describe("subscriber — bash safety override", () => {
     expect(ids).toEqual(["approve-once", "deny"]);
   });
 });
+
+describe("subscriber — Approve Pattern Always", () => {
+  it("includes the option with a suggested pattern when args have string leaves", async () => {
+    let captured: any = null;
+    const sub = makeSubscriber(makeDeps({
+      prompt: {
+        requestOption: async (req) => { captured = req; return { id: "approve-once" }; },
+        requestText: async () => "",
+      },
+    }));
+    await sub(mkPayload({ name: "bash", args: { command: "git status" } }));
+    const opt = captured.options.find((o: any) => o.id === "approve-pattern-always");
+    expect(opt).toBeDefined();
+    expect(opt.label).toContain("bash(git *)");
+    expect(opt.expandsTo).toEqual({
+      kind: "text",
+      placeholder: "Pattern (edit or clear to approve once)",
+      defaultValue: "git *",
+    });
+  });
+
+  it("omits the option when args produce no string leaves", async () => {
+    let captured: any = null;
+    const sub = makeSubscriber(makeDeps({
+      prompt: {
+        requestOption: async (req) => { captured = req; return { id: "approve-once" }; },
+        requestText: async () => "",
+      },
+    }));
+    await sub(mkPayload({ name: "axiom_record", args: { n: 5 } }));
+    const ids = captured.options.map((o: any) => o.id);
+    expect(ids).not.toContain("approve-pattern-always");
+  });
+
+  it("persists tool(pattern) when user submits a pattern", async () => {
+    const persisted: string[] = [];
+    const sub = makeSubscriber(makeDeps({
+      prompt: {
+        requestOption: async () => ({ id: "approve-pattern-always", text: "git *" }),
+        requestText: async () => "",
+      },
+      persistAllow: (entry) => { persisted.push(entry); },
+    }));
+    const p = mkPayload({ name: "bash", args: { command: "git status" } });
+    await sub(p);
+    expect(persisted).toEqual(["bash(git *)"]);
+    expect(p.args).toEqual({ command: "git status" });
+  });
+
+  it("falls back to approve-once when the user clears the input", async () => {
+    const persisted: string[] = [];
+    const sub = makeSubscriber(makeDeps({
+      prompt: {
+        requestOption: async () => ({ id: "approve-pattern-always", text: "" }),
+        requestText: async () => "",
+      },
+      persistAllow: (entry) => { persisted.push(entry); },
+    }));
+    const p = mkPayload({ name: "bash", args: { command: "git status" } });
+    await sub(p);
+    expect(persisted).toEqual([]);
+    expect(p.args).toEqual({ command: "git status" });
+  });
+
+  it("falls back to approve-once when whitespace-only text is submitted", async () => {
+    const persisted: string[] = [];
+    const sub = makeSubscriber(makeDeps({
+      prompt: {
+        requestOption: async () => ({ id: "approve-pattern-always", text: "   " }),
+        requestText: async () => "",
+      },
+      persistAllow: (entry) => { persisted.push(entry); },
+    }));
+    await sub(mkPayload({ name: "bash", args: { command: "git status" } }));
+    expect(persisted).toEqual([]);
+  });
+
+  it("safety-flagged calls do not offer the pattern option", async () => {
+    let captured: any = null;
+    const sub = makeSubscriber(makeDeps({
+      prompt: {
+        requestOption: async (req) => { captured = req; return { id: "approve-once" }; },
+        requestText: async () => "",
+      },
+    }));
+    await sub(mkPayload({ name: "bash", args: { command: "ls; rm" } }));
+    const ids = captured.options.map((o: any) => o.id);
+    expect(ids).not.toContain("approve-pattern-always");
+  });
+});
