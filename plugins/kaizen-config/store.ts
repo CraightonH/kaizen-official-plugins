@@ -164,6 +164,29 @@ export function createStore(deps: StoreDeps): ConfigStoreService {
       for (const { key, value } of secretWrites) cv[key] = value;
       for (const cb of e.watchers) cb(e.cachedValue);
     },
+    async unset(plugin: string, key: string, scope: ConfigScope = "home"): Promise<void> {
+      const e = entries.get(plugin);
+      if (!e) throw new Error(`kaizen-config: plugin '${plugin}' is not registered`);
+      const path = scope === "home" ? deps.homePath : deps.projectPath;
+      const current = scope === "home" ? home.file : project.file;
+      const section = { ...(current.plugins?.[plugin] ?? {}) };
+      const wasRef = isSecretRef(section[key]);
+      const refValue = section[key] as { $ref: string } | undefined;
+      delete section[key];
+      const nextPlugins = { ...current.plugins, [plugin]: section };
+      const next = { ...current, plugins: nextPlugins };
+      deps.writeFile(path, next);
+      if (scope === "home") home = { file: next, exists: true };
+      else project = { file: next, exists: true };
+      if (wasRef && refValue && deps.registry) {
+        try { await deps.registry.delete(refValue); }
+        catch (err) { deps.log(`kaizen-config: backend delete failed for ${refValue.$ref}: ${(err as Error).message}`); }
+      }
+      const r = resolve(plugin, e.spec, home.file, project.file, deps);
+      e.cachedValue = r.value;
+      e.cachedResolution = r.resolution;
+      for (const cb of e.watchers) cb(e.cachedValue);
+    },
     watch<T>(plugin: string, cb: (v: T) => void): () => void {
       const e = entries.get(plugin);
       if (!e) throw new Error(`kaizen-config: plugin '${plugin}' is not registered`);

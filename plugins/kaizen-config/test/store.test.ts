@@ -320,6 +320,73 @@ describe("store — set() secret-aware routing", () => {
   });
 });
 
+describe("store — unset()", () => {
+  it("removes a non-secret key from the file", async () => {
+    const { deps, fs } = makeDeps();
+    fs.files.set(deps.homePath, JSON.stringify({
+      plugins: { x: { model: "gpt-4", baseUrl: "https://example" } },
+    }));
+    const registry = createRegistry();
+    const store = createStore({ ...deps, registry });
+    store.register({ plugin: "x", defaults: { model: "", baseUrl: "" }, schema: {} });
+    await store.unset("x", "model");
+    const onDisk = JSON.parse(fs.files.get(deps.homePath)!);
+    expect(onDisk.plugins.x).toEqual({ baseUrl: "https://example" });
+  });
+
+  it("deletes secret from backend when value is a $ref", async () => {
+    const { deps, fs } = makeDeps();
+    const backendData = new Map<string, string>([["x/apiKey", "tvly-abc"]]);
+    fs.files.set(deps.homePath, JSON.stringify({
+      plugins: { x: { apiKey: { $ref: "fake:x/apiKey" } } },
+    }));
+    const registry = createRegistry();
+    registry.register({
+      scheme: "fake",
+      async get(k) { const v = backendData.get(k); if (v === undefined) throw new Error("nope"); return v; },
+      async set(k, v) { backendData.set(k, v); },
+      async delete(k) { backendData.delete(k); },
+    });
+    const store = createStore({ ...deps, registry });
+    store.register({
+      plugin: "x",
+      defaults: { apiKey: "" },
+      schema: { apiKey: { type: "string", secret: true } },
+    });
+    await store.unset("x", "apiKey");
+    expect(backendData.has("x/apiKey")).toBe(false);
+    const onDisk = JSON.parse(fs.files.get(deps.homePath)!);
+    expect(onDisk.plugins.x ?? {}).toEqual({});
+  });
+
+  it("soft-succeeds when backend has already lost the entry", async () => {
+    const { deps, fs } = makeDeps();
+    fs.files.set(deps.homePath, JSON.stringify({
+      plugins: { x: { apiKey: { $ref: "fake:x/apiKey" } } },
+    }));
+    const registry = createRegistry();
+    registry.register({
+      scheme: "fake",
+      async get() { throw new Error("gone"); },
+      async set() {},
+      async delete() { throw new Error("already gone"); },
+    });
+    const store = createStore({ ...deps, registry });
+    store.register({
+      plugin: "x",
+      defaults: { apiKey: "" },
+      schema: { apiKey: { type: "string", secret: true } },
+    });
+    await store.unset("x", "apiKey");
+  });
+
+  it("throws when plugin is not registered", async () => {
+    const { deps } = makeDeps();
+    const store = createStore({ ...deps, registry: createRegistry() });
+    await expect(store.unset("missing", "k")).rejects.toThrow(/not registered/);
+  });
+});
+
 describe("store — ready() with backend", () => {
   it("ready() resolves $refs against the registered backend", async () => {
     const { deps, fs } = makeDeps();

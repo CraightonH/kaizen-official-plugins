@@ -46,6 +46,7 @@ export interface ConfigStoreService {
   watch<T>(plugin: string, cb: (next: T) => void): () => void;
   list(): ConfigStatus[];
   ready(): Promise<void>;
+  unset(plugin: string, key: string, scope?: ConfigScope): Promise<void>;
 }
 
 export const CONTRACT_ID = "config:store" as const;
