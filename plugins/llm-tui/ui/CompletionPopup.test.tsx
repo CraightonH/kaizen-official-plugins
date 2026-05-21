@@ -5,7 +5,7 @@ import { CompletionPopup } from "./CompletionPopup.tsx";
 import type { PopupState } from "../state/store.ts";
 
 function popup(items: PopupState["items"], selectedIndex = 0, query = ""): PopupState {
-  return { trigger: "/", query, items, selectedIndex, triggerPos: 0 };
+  return { sourceId: "stub", trigger: "/", query, items, selectedIndex, anchor: 0 };
 }
 
 describe("CompletionPopup", () => {

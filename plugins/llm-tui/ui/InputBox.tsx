@@ -134,7 +134,8 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
   const value = snap.input.value;
   const cursor = snap.input.cursor;
 
-  const refreshPopupItems = useCallback((trigger: string, q: string) => {
+  const refreshPopupItems = useCallback((trigger: string | undefined, q: string) => {
+    if (!trigger) return;
     const my = ++queryToken.current;
     void registry.query(trigger, q).then((items) => {
       if (my !== queryToken.current) return;
@@ -157,13 +158,17 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
     // Update popup query if open.
     const cur = store.snapshot().popup;
     if (cur) {
-      const tp = cur.triggerPos;
-      if (newCursor <= tp || newValue[tp] !== cur.trigger) {
-        store.closePopup();
-      } else {
-        const q = newValue.slice(tp + 1, newCursor);
-        store.setPopupQuery(q);
+      const tp = cur.anchor;
+      if (cur.trigger !== undefined) {
+        // Char-triggered popup: close when cursor moves before anchor or trigger char is deleted.
+        if (newCursor <= tp || newValue[tp] !== cur.trigger) {
+          store.closePopup();
+        } else {
+          const q = newValue.slice(tp + 1, newCursor);
+          store.setPopupQuery(q);
+        }
       }
+      // Match-based path will be handled in Task 7.
     }
   }, [store]);
 
@@ -173,7 +178,7 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
     if (cur.items.length === 0) return false;
     const item = cur.items[cur.selectedIndex];
     if (!item) return false;
-    const before = value.slice(0, cur.triggerPos);
+    const before = value.slice(0, cur.anchor);
     const after = value.slice(cursor);
     const next = before + item.insertText + after;
     const nextCursor = before.length + item.insertText.length;
@@ -446,7 +451,7 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
             curPos = newCursor;
             store.setInput(curVal, curPos);
             setHistIdx(null);
-            store.openPopup(ch, "", triggerPos);
+            store.openPopup({ sourceId: `char:${ch}`, trigger: ch, query: "", anchor: triggerPos });
             didOpenPopup = true;
             continue;
           }
@@ -458,7 +463,7 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
         // If popup is open, update query or close if cursor passed trigger.
         const cur = store.snapshot().popup;
         if (cur) {
-          const tp = cur.triggerPos;
+          const tp = cur.anchor;
           if (curPos <= tp || curVal[tp] !== cur.trigger) {
             store.setInput(curVal, curPos);
             setHistIdx(null);
