@@ -4,13 +4,19 @@ Per-tool-call approval gate for the local harness. Subscribes to `tool:before-ex
 
 ## Config
 
-Three sources, all optional. Schema: `{ "allow": string[], "deny": string[] }`.
+Storage is mediated by `kaizen-config`, which keeps a single file per harness rather than one per plugin. The plugin's section sits under `plugins["llm-tool-approval"]` with shape `{ "allow": string[], "deny": string[] }`.
 
-| Path | Role |
-|---|---|
-| `<plugin>/defaults.json` | Shipped baseline |
-| `~/.kaizen/plugins/llm-tool-approval/config.json` | Global user-managed |
-| `<cwd>/.kaizen/plugins/llm-tool-approval/config.json` | Project user-managed; prompt-driven writes go here |
+Three layers, all optional, merged in this order (later layers win per-field):
+
+| Layer | Path | Role |
+|---|---|---|
+| Defaults | `<plugin>/defaults.json` (shipped) | Baseline rules |
+| Home | `~/.kaizen/harnesses/<harnessKey>/config.json` | Per-user, applies anywhere that harness runs |
+| Project | `<cwd>/.kaizen/harnesses/<harnessKey>/config.json` | Per-directory; **prompt-driven writes go here** |
+
+`<harnessKey>` is derived from the harness identity by `kaizen-config` — e.g. a marketplace ref `official/local@0.1.0` → `official_local`, a local file `./harnesses/local.json` → `local_local`. Run `/approval:status` to see the exact resolved paths for your current session.
+
+Writes from the prompt only append the new entry to the **project** layer; defaults and home-scope entries are not re-stamped into the project file.
 
 ### Match semantics
 
@@ -43,7 +49,12 @@ The "Approve Domain Always" option derives from the tool name by taking everythi
 
 ### Approve Pattern Always
 
-When the call has string-typed args and no rule has matched, the prompt offers an extra option, **Approve Pattern Always**, with a suggested pattern derived from the call (e.g. `bash git status` → `git *`, `web_search https://github.com/x/y` → `*github.com/*`, `read /Users/chancock/foo` → `/Users/chancock/*`). The user can edit or clear the suggestion. Submitting an empty pattern falls back to **Approve Once** (no persist). Submitting a non-empty pattern persists `tool(pattern)` to the same project/global config target as the other "always" options.
+When the call has string-typed args and no rule has matched, the prompt offers an extra option, **Approve Pattern Always**, with a suggested pattern derived from the call (e.g. `bash git status` → `git *`, `web_search https://github.com/x/y` → `*github.com/*`, `read /Users/chancock/foo` → `/Users/chancock/*`).
+
+- **Enter on the highlighted row** persists the suggested pattern as-is.
+- **Tab** opens an inline editor pre-filled with the suggestion. Edit and **Enter** to persist your version; **clear and Enter** to fall back to Approve Once (no persist).
+
+The persisted rule is `tool(pattern)` written to the project layer (same target as the other "always" options).
 
 ## Slash commands
 
@@ -60,6 +71,6 @@ When the call has string-typed args and no rule has matched, the prompt offers a
 Manifest order matters: load **after** `llm-hooks-shell` so hooks pre-empt the prompt.
 
 ````
-"official/llm-hooks-shell@0.1.1",
-"official/llm-tool-approval@0.1.0",
+"official/llm-hooks-shell@0.1.2",
+"official/llm-tool-approval@0.2.2",
 ````
