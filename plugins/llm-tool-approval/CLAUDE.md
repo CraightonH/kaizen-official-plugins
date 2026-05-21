@@ -5,15 +5,23 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 ## Module map
 
 ```
-index.ts        Plugin lifecycle. Reads services, wires the subscriber + slash + status item.
-                Only file that touches `ctx`.
-matcher.ts      Pure: domain derivation + match logic (exact, prefix glob, catch-all).
-config.ts      Pure functions + small fs surface. Loads three sources, picks write target,
-                atomic write, dedupe + sort.
-subscriber.ts  Pure handler. DI for ui:prompt, matcher, config, channel/notice helpers.
-                Implements the tool:before-execute logic.
-slash.ts       Three slash commands. Pure aside from the slash-registry registration call.
-defaults.json  Shipped baseline allow-list.
+index.ts             Plugin lifecycle. Reads services, wires the subscriber + slash + status item.
+                     Only file that touches `ctx`.
+matcher.ts           Pure: domain derivation + match logic. Existing name-only matchers
+                     (matches / matchesAny / deriveDomain) + parseRule / compilePattern /
+                     matchRule / matchesAnyRule for argument-aware rules.
+string-leaves.ts     Pure: DFS extractor for string-typed leaves in tool args.
+bash-safety.ts       Pure: detects shell control characters in a bash command string.
+                     First-match-wins; over-flags quoted metacharacters on purpose.
+suggest-pattern.ts   Pure: derives a default pattern for "Approve Pattern Always"
+                     (bash → first token + *, URL → *host/*, path → first two segments + /*).
+config.ts            Pure functions + small fs surface. Loads three sources, picks write target,
+                     atomic write, dedupe + sort.
+subscriber.ts        Pure handler. DI for ui:prompt, matcher, config, channel/notice helpers.
+                     Implements deny → bash-safety → allow → prompt; renders the
+                     Approve Pattern Always option.
+slash.ts             Three slash commands. Pure aside from the slash-registry registration call.
+defaults.json        Shipped baseline allow-list.
 ```
 
 ## Invariants
@@ -24,6 +32,11 @@ defaults.json  Shipped baseline allow-list.
 - **Prompt is the only place that writes config.** Approve Once does not touch disk. "Approve Always" / "Approve Domain Always" append to project config (or global if no project).
 - **Write failure ≠ approval failure.** If the persistence write fails, still resolve as approve-once and write a notice. The foreground intent is the user's decision; bookkeeping is best-effort.
 - **No `useService("ui:prompt")` until `harness:start`.** Service lookup at `setup()` may race with `llm-tui`'s `provideService`. Defer to `harness:start` like `llm-tools-registry` does.
+- **Deny is absolute.** Bash safety overrides `allow` but never `deny`.
+- **Bash safety override only applies to `name === "bash"`** and inspects `args.command`. Other tools are unaffected.
+- **Safety-flagged prompts hide Always / Domain Always / Pattern Always options.** A chained or unparseable command cannot be sensibly persisted as a future allow rule.
+- **Arg patterns are evaluated per-rule, never aggregated across rules.** Two pattern rules in `allow` do not combine — each must independently match its own pattern against some string leaf.
+- **Pattern matching is "any string leaf matches".** Pattern rules over-match for multi-string args; documented in README.
 
 ## Local deploy
 
