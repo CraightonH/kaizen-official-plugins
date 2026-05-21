@@ -23,6 +23,6 @@
     "official/llm-agents@0.2.2",
     "official/llm-status-items@0.1.1",
     "official/llm-hooks-shell@0.1.2",
-    "official/llm-tool-approval@0.2.0"
+    "official/llm-tool-approval@0.2.1"
   ]
 }

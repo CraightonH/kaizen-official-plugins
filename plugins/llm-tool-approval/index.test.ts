@@ -106,7 +106,7 @@ describe("llm-tool-approval plugin", () => {
     await ctx.emit("harness:start", {});
     const sub = handlers["tool:before-execute"]?.[0];
     expect(sub).toBeDefined();
-    // pick a name that does NOT match any shipped default (defaults include execute_typescript, llm-skills:*, etc.)
+    // pick a name that does NOT match any shipped default (defaults include llm-skills:*, llm-memory:*, etc.)
     const payload: ToolBeforeExecutePayload = { name: "mcp:github:list_issues", args: { state: "open" }, callId: "c1" };
     await sub(payload);
     const prompt = services.get("ui:prompt") as any;

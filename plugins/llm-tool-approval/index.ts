@@ -10,6 +10,7 @@ import type {
 import defaultsRaw from "./defaults.json" with { type: "json" };
 import { makeSubscriber, type Subscriber } from "./subscriber.ts";
 import { registerSlashCommands, type SlashRegistryLike, type ApprovalState } from "./slash.ts";
+import { persistProjectAllow } from "./persist.ts";
 
 export interface ToolApprovalConfig {
   allow: string[];
@@ -55,12 +56,7 @@ const plugin: KaizenPlugin = {
     };
 
     const persistAllow = async (entry: string): Promise<void> => {
-      const current = rules();
-      await cfgSvc.set<ToolApprovalConfig>(
-        "llm-tool-approval",
-        { allow: dedupeSort([...current.allow, entry]) },
-        "project",
-      );
+      await persistProjectAllow("llm-tool-approval", entry, { cfgSvc, log: ctx.log });
     };
 
     let teardowns: Array<() => void> = [];
@@ -142,8 +138,5 @@ function safeJsonStringify(v: unknown): string {
   try { return JSON.stringify(v, null, 2); } catch { return String(v); }
 }
 
-function dedupeSort(arr: string[]): string[] {
-  return [...new Set(arr)].sort();
-}
 
 export default plugin;
