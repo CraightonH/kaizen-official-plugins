@@ -115,7 +115,16 @@ export function makeSubscriber(deps: SubscriberDeps): Subscriber {
         return;
       }
       case "approve-pattern-always": {
-        const raw = (result.text ?? "").trim();
+        // text === undefined: option selected but the TUI never opened the
+        // text field (Enter on highlight, no Tab-expand). Use the suggestion
+        // shown on the option label.
+        // text === "" (or whitespace): user explicitly cleared → approve-once.
+        const text = result.text;
+        if (text === undefined) {
+          if (suggestion) await tryPersist(deps, `${payload.name}(${suggestion})`);
+          return;
+        }
+        const raw = text.trim();
         if (raw.length === 0) {
           return; // user cleared → approve-once
         }

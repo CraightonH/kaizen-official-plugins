@@ -1,6 +1,6 @@
 {
   "name": "llm-tool-approval",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Per-tool-call approval gate. Prompts the user (Approve Once / Always / Domain Always / Deny) before any tool call runs.",
   "type": "module",
   "exports": {

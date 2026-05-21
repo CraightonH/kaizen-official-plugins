@@ -343,6 +343,19 @@ describe("subscriber — Approve Pattern Always", () => {
     expect(p.args).toEqual({ command: "git status" });
   });
 
+  it("uses the suggestion when result.text is undefined (Enter on highlight, no Tab-expand)", async () => {
+    const persisted: string[] = [];
+    const sub = makeSubscriber(makeDeps({
+      prompt: {
+        requestOption: async () => ({ id: "approve-pattern-always" }),
+        requestText: async () => "",
+      },
+      persistAllow: (entry) => { persisted.push(entry); },
+    }));
+    await sub(mkPayload({ name: "bash", args: { command: "git status" } }));
+    expect(persisted).toEqual(["bash(git *)"]);
+  });
+
   it("falls back to approve-once when the user clears the input", async () => {
     const persisted: string[] = [];
     const sub = makeSubscriber(makeDeps({
