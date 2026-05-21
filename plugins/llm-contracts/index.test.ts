@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import plugin from "../index.ts";
+import plugin from "./index.ts";
 
 describe("llm-contracts defineService", () => {
   it("calls defineService for every declared contract", async () => {
