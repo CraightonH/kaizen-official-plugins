@@ -1,5 +1,6 @@
 // plugins/kaizen-config/slash.ts
-import type { ConfigStoreService, SlashCommandManifest, SlashCommandHandler } from "llm-contracts/public";
+import type { ConfigStoreService, SlashCommandManifest, SlashCommandHandler, ConfigSchema, FieldSchema } from "llm-contracts/public";
+import { redactSnapshot, redactValue } from "./secrets/redact.ts";
 
 export interface SlashRegistryLike {
   register(manifest: SlashCommandManifest, handler: SlashCommandHandler): () => void;
@@ -38,17 +39,27 @@ export function registerSlashCommands(reg: SlashRegistryLike, deps: SlashDeps): 
   offs.push(reg.register(
     {
       name: "config:get",
-      description: "Print the merged config for a plugin. Usage: /config:get <plugin> [key.path]",
+      description: "Print the merged config for a plugin. Usage: /config:get <plugin> [key.path] [--reveal]",
       source: "plugin",
     },
     async (ctx) => {
-      const [plugin, keyPath] = ctx.args.trim().split(/\s+/);
-      if (!plugin) return ctx.print("Usage: /config:get <plugin> [key.path]");
+      const tokens = ctx.args.trim().split(/\s+/).filter(Boolean);
+      const reveal = tokens.includes("--reveal");
+      const rest = tokens.filter((t) => t !== "--reveal");
+      const plugin = rest[0];
+      const keyPath = rest[1];
+      if (!plugin) return ctx.print("Usage: /config:get <plugin> [key.path] [--reveal]");
       let value: unknown;
       try { value = deps.store.get(plugin); }
       catch (err) { return ctx.print(`Error: ${(err as Error).message}`); }
+      const spec = deps.store.getSpec?.(plugin);
+      const schema = spec?.schema as ConfigSchema<Record<string, unknown>> | undefined;
+      if (!reveal && schema) value = redactSnapshot(value as Record<string, unknown>, schema);
       if (keyPath) {
+        const fieldKey = keyPath.split(".")[0]!;
+        const fieldSchema = schema?.[fieldKey] as FieldSchema | undefined;
         value = keyPath.split(".").reduce<any>((v, k) => (v == null ? v : v[k]), value);
+        if (!reveal && fieldSchema) value = redactValue(value, fieldSchema);
       }
       await ctx.print(JSON.stringify(value, null, 2));
     },

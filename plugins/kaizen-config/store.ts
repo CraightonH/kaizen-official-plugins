@@ -207,6 +207,9 @@ export function createStore(deps: StoreDeps): ConfigStoreService {
       if (!readyPromise) readyPromise = resolveAll();
       return readyPromise;
     },
+    getSpec(plugin: string): ConfigSpec<unknown> | undefined {
+      return entries.get(plugin)?.spec;
+    },
   };
 }
 

@@ -22,6 +22,7 @@ function makeStore(over: Partial<ConfigStoreService> = {}): ConfigStoreService {
     register: () => {},
     get: (p: string) => ({ x: 1, plugin: p }),
     set: async () => {},
+    unset: async () => {},
     watch: () => () => {},
     list: () => [{
       plugin: "openai-llm",
@@ -31,6 +32,8 @@ function makeStore(over: Partial<ConfigStoreService> = {}): ConfigStoreService {
       projectExists: false,
       resolution: { baseUrl: "home", apiKey: "env" },
     }],
+    ready: async () => {},
+    getSpec: () => undefined,
     ...over,
   } as ConfigStoreService;
 }
@@ -118,6 +121,53 @@ describe("/config set", () => {
     const cmd = registered.find((r) => r.manifest.name === "config:set")!;
     await call(cmd.handler, "openai-llm retry.maxAttempts=5");
     expect(calls[0].v).toEqual({ retry: { maxAttempts: 5 } });
+  });
+});
+
+describe("/config:get — secret redaction", () => {
+  it("redacts secret-marked fields by default", async () => {
+    const { reg, registered } = makeRegistry();
+    const deps = makeDeps({
+      store: makeStore({
+        get: (_p: string) => ({ apiKey: "tvly-abc", model: "gpt-4" }),
+        list: () => [{
+          plugin: "x",
+          homePath: "/h",
+          projectPath: "/p",
+          homeExists: true,
+          projectExists: false,
+          resolution: { apiKey: "secret:keychain", model: "home" },
+        }],
+        getSpec: (_p: string) => ({
+          plugin: "x",
+          defaults: { apiKey: "", model: "" },
+          schema: { apiKey: { type: "string", secret: true }, model: { type: "string" } },
+        }),
+      } as any),
+    });
+    registerSlashCommands(reg, deps);
+    const handler = registered.find((r) => r.manifest.name === "config:get")!.handler;
+    const out = await call(handler, "x");
+    expect(out).toContain("<redacted");
+    expect(out).not.toContain("tvly-abc");
+  });
+
+  it("reveals plaintext when --reveal is passed", async () => {
+    const { reg, registered } = makeRegistry();
+    const deps = makeDeps({
+      store: makeStore({
+        get: () => ({ apiKey: "tvly-abc" }),
+        getSpec: (_p: string) => ({
+          plugin: "x",
+          defaults: { apiKey: "" },
+          schema: { apiKey: { type: "string", secret: true } },
+        }),
+      } as any),
+    });
+    registerSlashCommands(reg, deps);
+    const handler = registered.find((r) => r.manifest.name === "config:get")!.handler;
+    const out = await call(handler, "x --reveal");
+    expect(out).toContain("tvly-abc");
   });
 });
 

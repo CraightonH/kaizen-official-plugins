@@ -47,6 +47,7 @@ export interface ConfigStoreService {
   list(): ConfigStatus[];
   ready(): Promise<void>;
   unset(plugin: string, key: string, scope?: ConfigScope): Promise<void>;
+  getSpec(plugin: string): ConfigSpec<unknown> | undefined;
 }
 
 export const CONTRACT_ID = "config:store" as const;
