@@ -26,7 +26,7 @@ describe("plugin setup", () => {
     try {
       const calls: any[] = [];
       const { ctx, logs } = makeCtx({}, { register: (r: unknown) => { calls.push(r); return () => {}; } });
-      const { default: plugin } = await import("../index.ts");
+      const { default: plugin } = await import("./index.ts");
       await plugin.setup(ctx as any);
       expect(calls).toHaveLength(0);
       expect(logs.join("\n")).toMatch(/non-darwin|not supported/);
@@ -41,7 +41,7 @@ describe("plugin setup", () => {
     try {
       const calls: any[] = [];
       const { ctx } = makeCtx({}, { register: (r: any) => { calls.push(r); return () => {}; } });
-      const { default: plugin } = await import("../index.ts");
+      const { default: plugin } = await import("./index.ts");
       await plugin.setup(ctx as any);
       expect(calls).toHaveLength(1);
       expect(calls[0].scheme).toBe("keychain");
