@@ -215,7 +215,8 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, sources, th
           store.setPopupQuery(q);
         }
       }
-      // Match-based path will be handled in Task 7.
+      // Match-based popups update via the value/cursor effect below — no
+      // mutation needed here; setInput already kicked the effect dependency.
     }
   }, [store]);
 
