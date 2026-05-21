@@ -8,9 +8,11 @@ function resolutionDetail(homeExists: boolean, projectExists: boolean): string {
 }
 
 export async function pluginCompletions(store: ConfigStoreService): Promise<CompletionItem[]> {
+  // Trailing space pushes the cursor past the token so the next slot's
+  // match predicate fires instead of re-suggesting plugins.
   return store.list().map((row) => ({
     label: row.plugin,
-    insertText: row.plugin,
+    insertText: `${row.plugin} `,
     detail: resolutionDetail(row.homeExists, row.projectExists),
   }));
 }
@@ -34,16 +36,19 @@ export async function keyEqualsValueCompletions(
     if (!field) continue;
     const f = field as FieldSchema;
     const detail = fieldDetail(f);
+    // Terminal value picks get a trailing space so the cursor lands past the
+    // token and the next match (flag slot) can fire. Free-form `key=` is left
+    // unterminated because the user types the value next.
     if (f.type === "boolean") {
-      items.push({ label: `${key}=true`, insertText: `${key}=true`, detail });
-      items.push({ label: `${key}=false`, insertText: `${key}=false`, detail });
+      items.push({ label: `${key}=true`, insertText: `${key}=true `, detail });
+      items.push({ label: `${key}=false`, insertText: `${key}=false `, detail });
     } else if (f.type === "enum") {
       for (const v of f.values) {
-        items.push({ label: `${key}=${v}`, insertText: `${key}=${v}`, detail });
+        items.push({ label: `${key}=${v}`, insertText: `${key}=${v} `, detail });
       }
     } else if (f.type === "string" && f.enum) {
       for (const v of f.enum) {
-        items.push({ label: `${key}=${v}`, insertText: `${key}=${v}`, detail });
+        items.push({ label: `${key}=${v}`, insertText: `${key}=${v} `, detail });
       }
     } else {
       items.push({ label: key, insertText: `${key}=`, detail });
@@ -63,7 +68,8 @@ export async function keyOnlyCompletions(
   const items: CompletionItem[] = [];
   for (const [key, field] of Object.entries(schema)) {
     if (!field) continue;
-    items.push({ label: key, insertText: key, detail: fieldDetail(field as FieldSchema) });
+    // Terminal pick for /config:get / /config:unset; user moves on to flags or submit.
+    items.push({ label: key, insertText: `${key} `, detail: fieldDetail(field as FieldSchema) });
   }
   return items;
 }

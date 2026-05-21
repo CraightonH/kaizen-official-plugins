@@ -38,6 +38,11 @@ describe("pluginCompletions", () => {
     expect(items.find(i => i.label === "kaizen-config")?.detail).toBe("home");
     expect(items.find(i => i.label === "openai-llm")?.detail).toBe("project");
   });
+
+  it("appends a trailing space to insertText so the next slot fires", async () => {
+    const items = await pluginCompletions(makeStore());
+    for (const it of items) expect(it.insertText.endsWith(" ")).toBe(true);
+  });
 });
 
 describe("keyEqualsValueCompletions", () => {
@@ -65,6 +70,16 @@ describe("keyEqualsValueCompletions", () => {
     const items = await keyEqualsValueCompletions(makeStore(), ["nope"]);
     expect(items).toEqual([]);
   });
+
+  it("terminal value picks get a trailing space; free-form `key=` does not", async () => {
+    const items = await keyEqualsValueCompletions(makeStore(), ["kaizen-config"]);
+    const enabledTrue = items.find(i => i.label === "enabled=true")!;
+    const backendEnv = items.find(i => i.label === "backend=env")!;
+    const url = items.find(i => i.label === "url")!;
+    expect(enabledTrue.insertText.endsWith(" ")).toBe(true);
+    expect(backendEnv.insertText.endsWith(" ")).toBe(true);
+    expect(url.insertText).toBe("url=");
+  });
 });
 
 describe("keyOnlyCompletions", () => {
@@ -73,5 +88,10 @@ describe("keyOnlyCompletions", () => {
     const labels = items.map(i => i.label);
     expect(labels.sort()).toEqual(["apiKey", "backend", "enabled", "url"].sort());
     for (const it of items) expect(it.insertText.includes("=")).toBe(false);
+  });
+
+  it("appends a trailing space to insertText so the next slot fires", async () => {
+    const items = await keyOnlyCompletions(makeStore(), ["kaizen-config"]);
+    for (const it of items) expect(it.insertText.endsWith(" ")).toBe(true);
   });
 });

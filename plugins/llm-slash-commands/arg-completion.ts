@@ -108,7 +108,8 @@ export function buildArgCompletionSource(registry: SlashRegistryService): Comple
         .filter((f) => !present.has(f.name))
         .map<CompletionItem>((f) => ({
           label: f.name,
-          insertText: f.name,
+          // Trailing space so a subsequent flag can be picked without manual spacing.
+          insertText: `${f.name} `,
           detail: f.description,
         }));
     },
