@@ -15,12 +15,13 @@ import { LiveToolCalls } from "./LiveToolCalls.tsx";
 import { PromptBox } from "./PromptBox.tsx";
 import { renderMarkdown } from "./markdown.ts";
 import type { ToolRendererRegistry } from "../tool-renderers/registry.ts";
+import type { CompletionSource } from "llm-contracts/public";
 
 export interface AppProps {
   store: TuiStore;
   registry: CompletionRegistry;
   toolRenderers: ToolRendererRegistry;
-  triggers: Set<string>;
+  sources: Map<string, CompletionSource>;
   theme: TuiTheme;
   onSubmit: (text: string) => void;
   onCancel?: () => void;
@@ -28,7 +29,7 @@ export interface AppProps {
   copyToClipboard?: (text: string) => Promise<CopyResult>;
 }
 
-export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, triggers, theme, onSubmit, onCancel, onExit, copyToClipboard }) => {
+export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, sources, theme, onSubmit, onCancel, onExit, copyToClipboard }) => {
   const snap = useSyncExternalStore(
     (cb) => store.subscribe(cb),
     () => store.snapshot(),
@@ -134,7 +135,7 @@ export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, trigge
           <InputBox
             store={store}
             registry={registry}
-            triggers={triggers}
+            sources={sources}
             theme={theme}
             onSubmit={onSubmit}
             onCancel={onCancel}

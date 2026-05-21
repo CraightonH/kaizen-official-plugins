@@ -1,7 +1,7 @@
 import React from "react";
 import { render } from "ink";
 import type { KaizenPlugin } from "kaizen/types";
-import type { UiChannelService, UiTheme, UiThemeService, UiStatusService, UiCompletionService, UiToolRendererService, UiPromptService, WriteOptions } from "llm-contracts/public";
+import type { UiChannelService, UiTheme, UiThemeService, UiStatusService, UiCompletionService, UiToolRendererService, UiPromptService, WriteOptions, CompletionSource } from "llm-contracts/public";
 import { TuiStore } from "./state/store.ts";
 import { makeCompletionRegistry } from "./completion/registry.ts";
 import { makeToolRendererRegistry } from "./tool-renderers/registry.ts";
@@ -56,34 +56,16 @@ const plugin: KaizenPlugin = {
     // renderer with the same toolName.
     for (const r of defaultRenderers(theme)) toolRenderers.service.register(r);
 
-    // Triggers are derived from registered sources. We track the set live by
-    // wrapping register() so the InputBox always sees the current trigger map
-    // without re-rendering on every registration.
-    const triggers = new Set<string>();
-    const refCount = new Map<string, number>();
-    const registeredSources = new Map<string, { trigger: string; ref: object }>();
+    // Track registered sources by id. The InputBox derives both char-trigger
+    // activation and match-based activation (Task 7) from this map.
+    const sources = new Map<string, CompletionSource>();
     const origRegister = registry.service.register;
-    const decrementTrigger = (trigger: string) => {
-      const n = (refCount.get(trigger) ?? 1) - 1;
-      if (n <= 0) {
-        refCount.delete(trigger);
-        triggers.delete(trigger);
-      } else {
-        refCount.set(trigger, n);
-      }
-    };
     registry.service.register = (source) => {
-      const previous = registeredSources.get(source.id);
-      if (previous) decrementTrigger(previous.trigger);
-      registeredSources.set(source.id, { trigger: source.trigger, ref: source });
-      triggers.add(source.trigger);
-      refCount.set(source.trigger, (refCount.get(source.trigger) ?? 0) + 1);
+      sources.set(source.id, source);
       const off = origRegister(source);
       return () => {
+        if (sources.get(source.id) === source) sources.delete(source.id);
         off();
-        if (registeredSources.get(source.id)?.ref !== source) return;
-        registeredSources.delete(source.id);
-        decrementTrigger(source.trigger);
       };
     };
 
@@ -287,7 +269,7 @@ const plugin: KaizenPlugin = {
         store={store}
         registry={registry}
         toolRenderers={toolRenderers}
-        triggers={triggers}
+        sources={sources}
         theme={theme}
         onSubmit={onSubmit}
         onCancel={onCancel}

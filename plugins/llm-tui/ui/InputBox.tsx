@@ -5,12 +5,13 @@ import type { TuiStore } from "../state/store.ts";
 import type { CompletionRegistry } from "../completion/registry.ts";
 import type { TuiTheme } from "../theme/loader.ts";
 import type { CopyResult } from "../clipboard.ts";
+import type { CompletionSource } from "llm-contracts/public";
 import { CompletionPopup } from "./CompletionPopup.tsx";
 
 export interface InputBoxProps {
   store: TuiStore;
   registry: CompletionRegistry;
-  triggers: Set<string>;
+  sources: Map<string, CompletionSource>;
   theme: TuiTheme;
   onSubmit: (text: string) => void;
   onCancel?: () => void;
@@ -112,7 +113,7 @@ function snapCursor(s: string, pos: number, direction: -1 | 1): number {
   return direction < 0 ? ph.start : ph.end;
 }
 
-export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, theme, onSubmit, onCancel, onExit, copyToClipboard }) => {
+export const InputBox: React.FC<InputBoxProps> = ({ store, registry, sources, theme, onSubmit, onCancel, onExit, copyToClipboard }) => {
   const snap = useSyncExternalStore(
     (cb) => store.subscribe(cb),
     () => store.snapshot(),
@@ -129,6 +130,14 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
   const ctrlCTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Cleanup any pending arm timer on unmount.
   useEffect(() => () => { if (ctrlCTimer.current) clearTimeout(ctrlCTimer.current); }, []);
+
+  const charTriggers = React.useMemo(() => {
+    const m = new Map<string, CompletionSource>();
+    for (const s of sources.values()) {
+      if (s.trigger) m.set(s.trigger, s);
+    }
+    return m;
+  }, [sources]);
 
   const popup = snap.popup;
   const value = snap.input.value;
@@ -442,7 +451,8 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
         const next = curVal.slice(0, curPos) + ch + curVal.slice(curPos);
         const newCursor = curPos + 1;
 
-        if (triggers.has(ch)) {
+        const charSource = charTriggers.get(ch);
+        if (charSource) {
           const triggerPos = curPos; // position where the new char now sits
           const okWordStart = atWordStart(next, triggerPos);
           const okOutsideQuote = !insideQuoteOrBacktick(next, triggerPos);
@@ -451,9 +461,7 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
             curPos = newCursor;
             store.setInput(curVal, curPos);
             setHistIdx(null);
-            // Transitional: Task 6 replaces this synthetic `char:${ch}` sourceId
-            // with the actual matched source's id once sources are tracked by id.
-            store.openPopup({ sourceId: `char:${ch}`, trigger: ch, query: "", anchor: triggerPos });
+            store.openPopup({ sourceId: charSource.id, trigger: ch, query: "", anchor: triggerPos });
             didOpenPopup = true;
             continue;
           }
