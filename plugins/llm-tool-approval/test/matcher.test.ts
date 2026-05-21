@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { matches, deriveDomain, matchesAny } from "../matcher.ts";
+import { parseRule, compilePattern } from "../matcher.ts";
 
 describe("matches", () => {
   it("exact name", () => {
@@ -61,5 +62,80 @@ describe("matchesAny", () => {
   });
   it("returns false on empty rule list", () => {
     expect(matchesAny("fs:read_file", [])).toBe(false);
+  });
+});
+
+describe("parseRule", () => {
+  it("returns name-only for rules with no parentheses", () => {
+    expect(parseRule("fs:read_file")).toEqual({ name: "fs:read_file" });
+    expect(parseRule("mcp:github:*")).toEqual({ name: "mcp:github:*" });
+    expect(parseRule("*")).toEqual({ name: "*" });
+  });
+
+  it("splits name and pattern when parentheses are present", () => {
+    expect(parseRule("bash(ls *)")).toEqual({ name: "bash", pattern: "ls *" });
+    expect(parseRule("web_search(*github.com/*)")).toEqual({
+      name: "web_search",
+      pattern: "*github.com/*",
+    });
+  });
+
+  it("allows prefix-glob names with patterns", () => {
+    expect(parseRule("mcp:github:*(foo)")).toEqual({
+      name: "mcp:github:*",
+      pattern: "foo",
+    });
+  });
+
+  it("returns null for malformed rules", () => {
+    expect(parseRule("bash(ls")).toBeNull();   // unclosed
+    expect(parseRule("bash)")).toBeNull();     // close without open
+    expect(parseRule("(pat)")).toBeNull();     // empty name
+    expect(parseRule("bash()")).toBeNull();    // empty pattern
+    expect(parseRule("bash(a)b")).toBeNull();  // trailing junk after )
+  });
+
+  it("ignores empty / non-string input", () => {
+    expect(parseRule("")).toBeNull();
+    expect(parseRule(undefined as unknown as string)).toBeNull();
+  });
+});
+
+describe("compilePattern", () => {
+  it("compiles literal patterns to anchored regex", () => {
+    const re = compilePattern("ls");
+    expect(re.test("ls")).toBe(true);
+    expect(re.test("ls -la")).toBe(false);
+  });
+
+  it("translates * to any-character sequence (including /)", () => {
+    const re = compilePattern("ls *");
+    expect(re.test("ls -la")).toBe(true);
+    expect(re.test("ls /tmp/a/b")).toBe(true);
+    expect(re.test("rm -rf /")).toBe(false);
+  });
+
+  it("translates ? to one character", () => {
+    const re = compilePattern("a?c");
+    expect(re.test("abc")).toBe(true);
+    expect(re.test("ac")).toBe(false);
+    expect(re.test("abbc")).toBe(false);
+  });
+
+  it("supports character classes", () => {
+    const re = compilePattern("[abc]oo");
+    expect(re.test("aoo")).toBe(true);
+    expect(re.test("doo")).toBe(false);
+  });
+
+  it("escapes regex metacharacters in the source pattern", () => {
+    const re = compilePattern("a.b+c");
+    expect(re.test("a.b+c")).toBe(true);
+    expect(re.test("axbxxc")).toBe(false);
+  });
+
+  it("anchors the match", () => {
+    const re = compilePattern("foo");
+    expect(re.test("xfoox")).toBe(false);
   });
 });
