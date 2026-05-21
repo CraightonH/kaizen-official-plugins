@@ -223,3 +223,74 @@ describe("subscriber — prompt construction", () => {
     expect(deny.expandsTo).toEqual({ kind: "text", placeholder: "Reason (optional)" });
   });
 });
+
+describe("subscriber — bash safety override", () => {
+  it("force-prompts when bash command has shell metacharacters even if name-allow rule would approve", async () => {
+    let captured: any = null;
+    const promptSpy = mock(async (req: any) => { captured = req; return { id: "approve-once" }; });
+    const sub = makeSubscriber(makeDeps({
+      rules: () => ({ allow: ["bash"], deny: [] }),
+      prompt: { requestOption: promptSpy, requestText: async () => "" },
+    }));
+    const p = mkPayload({ name: "bash", args: { command: "ls; rm -rf /" } });
+    await sub(p);
+    expect(promptSpy).toHaveBeenCalled();
+    expect(captured.body).toContain("⚠ bash safety: command separator ;");
+    const ids = captured.options.map((o: any) => o.id);
+    expect(ids).toEqual(["approve-once", "deny"]);
+  });
+
+  it("force-prompts when bash command has shell metacharacters even if pattern-allow rule would approve", async () => {
+    let captured: any = null;
+    const sub = makeSubscriber(makeDeps({
+      rules: () => ({ allow: ["bash(ls *)"], deny: [] }),
+      prompt: {
+        requestOption: async (req) => { captured = req; return { id: "approve-once" }; },
+        requestText: async () => "",
+      },
+    }));
+    await sub(mkPayload({ name: "bash", args: { command: "ls; rm -rf /" } }));
+    expect(captured.body).toContain("⚠ bash safety:");
+  });
+
+  it("does NOT override deny — denied bash calls stay denied without prompt", async () => {
+    const promptSpy = mock(async () => ({ id: "approve-once" as const }));
+    const sub = makeSubscriber(makeDeps({
+      rules: () => ({ allow: [], deny: ["bash"] }),
+      prompt: { requestOption: promptSpy, requestText: async () => "" },
+    }));
+    const p = mkPayload({ name: "bash", args: { command: "ls; rm" } });
+    await sub(p);
+    expect(promptSpy).not.toHaveBeenCalled();
+    expect(p.args).toBe(CANCEL_TOOL);
+  });
+
+  it("does NOT override allow for clean bash commands", async () => {
+    const promptSpy = mock(async () => ({ id: "approve-once" as const }));
+    const sub = makeSubscriber(makeDeps({
+      rules: () => ({ allow: ["bash(ls *)"], deny: [] }),
+      prompt: { requestOption: promptSpy, requestText: async () => "" },
+    }));
+    const p = mkPayload({ name: "bash", args: { command: "ls -la" } });
+    await sub(p);
+    expect(promptSpy).not.toHaveBeenCalled();
+    expect(p.args).toEqual({ command: "ls -la" });
+  });
+
+  it("safety override hides Approve Always and Approve Domain Always", async () => {
+    let captured: any = null;
+    const sub = makeSubscriber(makeDeps({
+      rules: () => ({ allow: [], deny: [] }),
+      prompt: {
+        requestOption: async (req) => { captured = req; return { id: "approve-once" }; },
+        requestText: async () => "",
+      },
+    }));
+    await sub(mkPayload({ name: "bash", args: { command: "echo `whoami`" } }));
+    const ids = captured.options.map((o: any) => o.id);
+    expect(ids).not.toContain("approve-always");
+    expect(ids).not.toContain("approve-domain-always");
+    expect(ids).not.toContain("approve-pattern-always");
+    expect(ids).toEqual(["approve-once", "deny"]);
+  });
+});

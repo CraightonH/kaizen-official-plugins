@@ -5,6 +5,7 @@ import type {
   UiPromptService,
 } from "llm-contracts/public";
 import { deriveDomain, matchesAnyRule } from "./matcher.ts";
+import { bashSafety } from "./bash-safety.ts";
 
 export interface RuleSet {
   allow: string[];
@@ -39,26 +40,46 @@ export function makeSubscriber(deps: SubscriberDeps): Subscriber {
       deps.writeNotice(`✗ approval gate: ${payload.name} denied by rule`);
       return;
     }
-    if (matchesAnyRule(payload.name, payload.args, allow)) {
+
+    let safetyReason: string | null = null;
+    if (payload.name === "bash") {
+      const cmd = (payload.args as { command?: unknown } | undefined)?.command;
+      safetyReason = bashSafety(cmd);
+    }
+
+    if (!safetyReason && matchesAnyRule(payload.name, payload.args, allow)) {
       return;
     }
 
     const domain = deriveDomain(payload.name);
-    const options: UiPromptOptionsRequest["options"] = [
-      { id: "approve-once", label: `Approve Once          (${payload.name})` },
-      { id: "approve-always", label: `Approve Always        (${payload.name})` },
-      ...(domain
-        ? [{ id: "approve-domain-always", label: `Approve Domain Always (${domain})` }]
-        : []),
-      {
-        id: "deny",
-        label: `Deny`,
-        expandsTo: { kind: "text" as const, placeholder: "Reason (optional)" },
-      },
-    ];
+    const body = safetyReason
+      ? `⚠ bash safety: ${safetyReason}\n${deps.summarize(payload.name, payload.args)}`
+      : deps.summarize(payload.name, payload.args);
+
+    const options: UiPromptOptionsRequest["options"] = safetyReason
+      ? [
+          { id: "approve-once", label: `Approve Once          (${payload.name})` },
+          {
+            id: "deny",
+            label: `Deny`,
+            expandsTo: { kind: "text" as const, placeholder: "Reason (optional)" },
+          },
+        ]
+      : [
+          { id: "approve-once", label: `Approve Once          (${payload.name})` },
+          { id: "approve-always", label: `Approve Always        (${payload.name})` },
+          ...(domain
+            ? [{ id: "approve-domain-always", label: `Approve Domain Always (${domain})` }]
+            : []),
+          {
+            id: "deny",
+            label: `Deny`,
+            expandsTo: { kind: "text" as const, placeholder: "Reason (optional)" },
+          },
+        ];
     const req: UiPromptOptionsRequest = {
       title: "Approve tool call?",
-      body: deps.summarize(payload.name, payload.args),
+      body,
       options,
       defaultId: "approve-once",
       cancelId: "deny",
