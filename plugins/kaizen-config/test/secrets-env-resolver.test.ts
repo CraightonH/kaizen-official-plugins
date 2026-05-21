@@ -15,16 +15,16 @@ describe("env-resolver", () => {
 
   it("throws a clear error when the env var is unset", async () => {
     const r = createEnvResolver({});
-    expect(r.get("MISSING")).rejects.toThrow(/env:MISSING/);
+    await expect(r.get("MISSING")).rejects.toThrow(/env:MISSING/);
   });
 
   it("throws on set()", async () => {
     const r = createEnvResolver({});
-    expect(r.set?.("X", "y")).rejects.toThrow(/read-only/);
+    await expect(r.set?.("X", "y")).rejects.toThrow(/read-only/);
   });
 
   it("throws on delete()", async () => {
     const r = createEnvResolver({});
-    expect(r.delete?.("X")).rejects.toThrow(/read-only/);
+    await expect(r.delete?.("X")).rejects.toThrow(/read-only/);
   });
 });
