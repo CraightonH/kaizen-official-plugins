@@ -451,6 +451,8 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, triggers, t
             curPos = newCursor;
             store.setInput(curVal, curPos);
             setHistIdx(null);
+            // Transitional: Task 6 replaces this synthetic `char:${ch}` sourceId
+            // with the actual matched source's id once sources are tracked by id.
             store.openPopup({ sourceId: `char:${ch}`, trigger: ch, query: "", anchor: triggerPos });
             didOpenPopup = true;
             continue;
