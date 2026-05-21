@@ -118,6 +118,28 @@ export function registerSlashCommands(reg: SlashRegistryLike, deps: SlashDeps): 
 
   offs.push(reg.register(
     {
+      name: "config:unset",
+      description: "Remove a config key. Usage: /config:unset <plugin> <key> [--project]",
+      source: "plugin",
+    },
+    async (ctx) => {
+      const tokens = ctx.args.trim().split(/\s+/).filter(Boolean);
+      const scope = tokens.includes("--project") ? "project" : "home";
+      const rest = tokens.filter((t) => t !== "--project");
+      const plugin = rest[0];
+      const key = rest[1];
+      if (!plugin || !key) return ctx.print("Usage: /config:unset <plugin> <key> [--project]");
+      try {
+        await deps.store.unset(plugin, key, scope);
+        await ctx.print(`Unset ${plugin}.${key} (${scope}).`);
+      } catch (err) {
+        await ctx.print(`Error: ${(err as Error).message}`);
+      }
+    },
+  ));
+
+  offs.push(reg.register(
+    {
       name: "config:edit",
       description: "Open the harness config file in $EDITOR. Usage: /config:edit [--project]",
       source: "plugin",

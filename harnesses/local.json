@@ -1,7 +1,7 @@
 {
   "plugins": [
     "official/llm-contracts@0.3.0",
-    "official/kaizen-config@0.1.0",
+    "official/kaizen-config@0.2.0",
     "official/llm-events@0.7.0",
     "official/llm-session-manager@0.1.2",
     "official/llm-tools-registry@0.3.0",

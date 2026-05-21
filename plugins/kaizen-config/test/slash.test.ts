@@ -205,6 +205,31 @@ describe("/config edit", () => {
   });
 });
 
+describe("/config:unset", () => {
+  it("registers and calls store.unset with the given key + scope", async () => {
+    const { reg, registered } = makeRegistry();
+    const calls: { plugin: string; key: string; scope?: string }[] = [];
+    const deps = makeDeps({
+      store: makeStore({
+        unset: async (plugin: string, key: string, scope?: string) => { calls.push({ plugin, key, scope }); },
+      } as any),
+    });
+    registerSlashCommands(reg, deps);
+    const handler = registered.find((r) => r.manifest.name === "config:unset")!.handler;
+    const out = await call(handler, "x apiKey --project");
+    expect(calls).toEqual([{ plugin: "x", key: "apiKey", scope: "project" }]);
+    expect(out).toMatch(/Unset x\.apiKey \(project\)/);
+  });
+
+  it("usage on bad args", async () => {
+    const { reg, registered } = makeRegistry();
+    registerSlashCommands(reg, makeDeps());
+    const handler = registered.find((r) => r.manifest.name === "config:unset")!.handler;
+    const out = await call(handler, "");
+    expect(out).toMatch(/Usage:/);
+  });
+});
+
 describe("/config:list — resolution + backends footer", () => {
   it("prints resolution column and registered backends in footer", async () => {
     const { reg, registered } = makeRegistry();
