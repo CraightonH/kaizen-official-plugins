@@ -13,6 +13,7 @@ export function validate<T>(value: unknown, schema: ConfigSchema<T>): Validation
     if (!fieldSchema) continue;
     if (!(key in value)) continue;
     const v = (value as Record<string, unknown>)[key];
+    if (v === undefined) continue;
     walk(v, fieldSchema as FieldSchema, key, errors);
   }
   return errors.length === 0

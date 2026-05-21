@@ -33,7 +33,6 @@ const plugin: KaizenPlugin = {
       const registry = ctx.useService<SecretsRegistryService>("secrets:registry");
       const resolver = createKeychainResolver(realSpawn);
       offs.push(registry.register(resolver));
-      ctx.log("kaizen-secrets-keychain: 'keychain' resolver registered");
     } catch (err) {
       ctx.log(`kaizen-secrets-keychain: secrets:registry unavailable (${(err as Error).message}); resolver not registered`);
     }
