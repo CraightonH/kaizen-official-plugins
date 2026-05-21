@@ -1,12 +1,14 @@
 // plugins/kaizen-config/index.ts
 import type { KaizenPlugin } from "kaizen/types";
-import type { ConfigStoreService, SlashRegistryService } from "llm-contracts/public";
+import type { ConfigStoreService, SecretsRegistryService, SlashRegistryService } from "llm-contracts/public";
 import { homedir } from "node:os";
 import { readFileSync, watch } from "node:fs";
 import { spawn } from "node:child_process";
 import { harnessKey, homeConfigPath, projectConfigPath, type HarnessIdentity } from "./paths.ts";
 import { atomicWriteJson } from "./atomic-write.ts";
 import { createStore, type StoreDeps } from "./store.ts";
+import { createRegistry } from "./secrets/registry.ts";
+import { createEnvResolver } from "./secrets/env-resolver.ts";
 import { registerSlashCommands } from "./slash.ts";
 
 const teardowns: Array<() => void> = [];
@@ -22,7 +24,7 @@ const plugin: KaizenPlugin = {
     },
   },
   services: {
-    provides: ["config:store"],
+    provides: ["config:store", "secrets:registry"],
     consumes: ["slash:registry"],
   },
 
@@ -33,6 +35,10 @@ const plugin: KaizenPlugin = {
     const key = harnessKey(identity);
     const homePath = homeConfigPath(home, key);
     const projectPath = projectConfigPath(cwd, key);
+
+    const registry = createRegistry();
+    registry.register(createEnvResolver(process.env as Record<string, string | undefined>));
+    ctx.provideService<SecretsRegistryService>("secrets:registry", registry);
 
     const deps: StoreDeps = {
       homePath,
@@ -59,10 +65,19 @@ const plugin: KaizenPlugin = {
       },
       env: process.env as Record<string, string | undefined>,
       log: ctx.log.bind(ctx),
+      registry,
     };
 
     const store = createStore(deps);
     ctx.provideService<ConfigStoreService>("config:store", store);
+
+    store.register({
+      plugin: "kaizen-config",
+      defaults: { defaultSecretBackend: undefined as string | undefined },
+      schema: {
+        defaultSecretBackend: { type: "string" },
+      },
+    });
 
     try {
       const slash = ctx.useService<SlashRegistryService>("slash:registry");

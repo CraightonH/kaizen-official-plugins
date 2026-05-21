@@ -67,4 +67,14 @@ describe("kaizen-config", () => {
     expect(typeof store.register).toBe("function");
     await plugin.stop?.(ctx);
   });
+
+  it("setup provides secrets:registry with env resolver always registered", async () => {
+    const ctx = makeCtx();
+    await plugin.setup!(ctx);
+    const reg: any = ctx.provided["secrets:registry"];
+    expect(reg).toBeDefined();
+    expect(reg.schemes()).toContain("env");
+    expect(reg.has("env")).toBe(true);
+    await plugin.stop?.(ctx);
+  });
 });
