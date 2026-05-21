@@ -47,6 +47,16 @@ function makeDeps(over: Partial<SlashDeps> = {}): SlashDeps {
     editor: "vi",
     log: () => {},
     spawnEditor: () => Promise.resolve(0),
+    registry: {
+      schemes: () => [],
+      readOnlySchemes: () => [],
+      has: () => false,
+      register: () => () => {},
+      resolve: async () => "",
+      store: async () => ({ $ref: "" }),
+      delete: async () => {},
+    } as any,
+    defaultSecretBackend: () => undefined,
     ...over,
   };
 }
@@ -192,5 +202,41 @@ describe("/config edit", () => {
     const cmd = registered.find((r) => r.manifest.name === "config:edit")!;
     await call(cmd.handler, "--project");
     expect(invocations[0].path).toBe("/p/config.json");
+  });
+});
+
+describe("/config:list — resolution + backends footer", () => {
+  it("prints resolution column and registered backends in footer", async () => {
+    const { reg, registered } = makeRegistry();
+    const fakeRegistry = {
+      schemes: () => ["env", "keychain"],
+      readOnlySchemes: () => ["env"],
+      has: (s: string) => ["env", "keychain"].includes(s),
+      register: () => () => {},
+      resolve: async () => "",
+      store: async () => ({ $ref: "" }),
+      delete: async () => {},
+    };
+    registerSlashCommands(reg, makeDeps({
+      store: makeStore({
+        list: () => [{
+          plugin: "x",
+          homePath: "/h",
+          projectPath: "/p",
+          homeExists: true,
+          projectExists: false,
+          resolution: { apiKey: "secret:keychain", model: "home" },
+        }],
+        get: (_p: string) => ({}),
+      }),
+      registry: fakeRegistry as any,
+      defaultSecretBackend: () => "keychain",
+    }));
+    const handler = registered.find((r) => r.manifest.name === "config:list")!.handler;
+    const out = await call(handler);
+    expect(out).toContain("apiKey: secret:keychain");
+    expect(out).toContain("Backends:");
+    expect(out).toContain("env       (read-only, built-in)");
+    expect(out).toContain("keychain  (default)");
   });
 });

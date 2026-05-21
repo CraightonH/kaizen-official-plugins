@@ -1,5 +1,5 @@
 // plugins/kaizen-config/slash.ts
-import type { ConfigStoreService, SlashCommandManifest, SlashCommandHandler, ConfigSchema, FieldSchema } from "llm-contracts/public";
+import type { ConfigStoreService, SecretsRegistryService, SlashCommandManifest, SlashCommandHandler, ConfigSchema, FieldSchema } from "llm-contracts/public";
 import { redactSnapshot, redactValue } from "./secrets/redact.ts";
 
 export interface SlashRegistryLike {
@@ -14,6 +14,8 @@ export interface SlashDeps {
   editor: string;
   log: (msg: string) => void;
   spawnEditor: (editor: string, path: string) => Promise<number>;
+  registry: SecretsRegistryService;
+  defaultSecretBackend: () => string | undefined;
 }
 
 export function registerSlashCommands(reg: SlashRegistryLike, deps: SlashDeps): Array<() => void> {
@@ -27,10 +29,30 @@ export function registerSlashCommands(reg: SlashRegistryLike, deps: SlashDeps): 
     },
     async (ctx) => {
       const rows = deps.store.list();
-      if (rows.length === 0) return ctx.print("No plugins registered with config:store.");
-      const lines = rows.map((r) =>
-        `${r.plugin}  home=${r.homeExists ? "yes" : "no"}  project=${r.projectExists ? "yes" : "no"}`,
-      );
+      const lines: string[] = [];
+      if (rows.length === 0) {
+        lines.push("No plugins registered with config:store.");
+      } else {
+        lines.push("Plugins:");
+        for (const r of rows) {
+          const res = Object.entries(r.resolution).map(([k, v]) => `${k}: ${v}`).join(", ");
+          lines.push(`  ${r.plugin}  home=${r.homeExists ? "yes" : "no"}  project=${r.projectExists ? "yes" : "no"}  [${res}]`);
+        }
+      }
+      const schemes = deps.registry.schemes();
+      const readOnly = new Set(deps.registry.readOnlySchemes());
+      const defaultScheme = deps.defaultSecretBackend();
+      if (schemes.length > 0) {
+        lines.push("", "Backends:");
+        for (const s of schemes) {
+          const flags: string[] = [];
+          if (readOnly.has(s)) flags.push("read-only");
+          if (s === "env") flags.push("built-in");
+          if (s === defaultScheme) flags.push("default");
+          const flagStr = flags.length ? `(${flags.join(", ")})` : "";
+          lines.push(`  ${s.padEnd(9)} ${flagStr}`);
+        }
+      }
       lines.push("", `Harness: ${deps.harnessKey}`, `Home: ${deps.homePath}`, `Project: ${deps.projectPath}`);
       await ctx.print(lines.join("\n"));
     },

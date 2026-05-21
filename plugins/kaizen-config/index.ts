@@ -93,6 +93,8 @@ const plugin: KaizenPlugin = {
           child.on("exit", (code) => resolve(code ?? 0));
           child.on("error", reject);
         }),
+        registry,
+        defaultSecretBackend: () => (store.get<{ defaultSecretBackend?: string }>("kaizen-config")).defaultSecretBackend,
       }));
     } catch (err) {
       ctx.log(`kaizen-config: slash:registry unavailable (${(err as Error).message}); /config commands disabled`);
