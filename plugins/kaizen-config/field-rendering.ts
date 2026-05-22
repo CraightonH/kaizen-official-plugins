@@ -86,3 +86,46 @@ export function renderFieldRow(input: RenderInputs): CompletionItem {
 
   return { label: input.key, insertText, detail };
 }
+
+const NO_CHECK_PAD = "  ";
+
+function enumValues(field: FieldSchema): readonly string[] | null {
+  if (field.type === "enum") return field.values;
+  if (field.type === "string" && field.enum) return field.enum;
+  return null;
+}
+
+function valueRow(
+  key: string,
+  value: string,
+  isCurrent: boolean,
+  typeTagStr: string,
+): CompletionItem {
+  const prefix = isCurrent ? CHECK_GLYPH : NO_CHECK_PAD;
+  return {
+    label: `${prefix}${value}`,
+    insertText: `${key}=${value} `,
+    detail: typeTagStr,
+  };
+}
+
+export function renderValueRows(input: RenderInputs, valueQuery: string): CompletionItem[] {
+  const tag = typeTag(input.field);
+  const current = input.currentValue;
+
+  if (input.field.type === "boolean") {
+    const all = ["true", "false"];
+    return all
+      .filter((v) => v.startsWith(valueQuery))
+      .map((v) => valueRow(input.key, v, current === (v === "true"), tag));
+  }
+
+  const enumVals = enumValues(input.field);
+  if (enumVals) {
+    return enumVals
+      .filter((v) => v.startsWith(valueQuery))
+      .map((v) => valueRow(input.key, v, current === v, tag));
+  }
+
+  return [];
+}

@@ -192,3 +192,112 @@ describe("renderFieldRow", () => {
     expect(row.detail).toBe("✓ 5432 · home  number");
   });
 });
+
+import { renderValueRows } from "./field-rendering.ts";
+
+describe("renderValueRows", () => {
+  it("emits two rows for booleans with ✓ on the current value", () => {
+    const rows = renderValueRows(inputs({
+      key: "thoughtsMarkdown",
+      field: { type: "boolean" },
+      currentValue: true,
+      source: "home",
+    }), "");
+    expect(rows.map(r => r.label)).toEqual(["✓ true", "  false"]);
+    expect(rows[0]!.detail).toBe("boolean");
+    expect(rows[1]!.detail).toBe("boolean");
+    expect(rows[0]!.insertText).toBe("thoughtsMarkdown=true ");
+    expect(rows[1]!.insertText).toBe("thoughtsMarkdown=false ");
+  });
+
+  it("emits ✓ on the matching boolean when current is false", () => {
+    const rows = renderValueRows(inputs({
+      key: "thoughtsMarkdown",
+      field: { type: "boolean" },
+      currentValue: false,
+      source: "home",
+    }), "");
+    expect(rows.map(r => r.label)).toEqual(["  true", "✓ false"]);
+  });
+
+  it("emits one row per enum value with ✓ on the current", () => {
+    const rows = renderValueRows(inputs({
+      key: "backend",
+      field: { type: "enum", values: ["env", "keychain", "bitwarden"] },
+      currentValue: "keychain",
+      source: "home",
+    }), "");
+    expect(rows.map(r => r.label)).toEqual(["  env", "✓ keychain", "  bitwarden"]);
+    expect(rows.map(r => r.detail)).toEqual(["enum", "enum", "enum"]);
+    expect(rows[0]!.insertText).toBe("backend=env ");
+    expect(rows[1]!.insertText).toBe("backend=keychain ");
+    expect(rows[2]!.insertText).toBe("backend=bitwarden ");
+  });
+
+  it("handles string-with-enum identically to type=enum", () => {
+    const rows = renderValueRows(inputs({
+      key: "backend",
+      field: { type: "string", enum: ["env", "keychain"] },
+      currentValue: "env",
+      source: "home",
+    }), "");
+    expect(rows.map(r => r.label)).toEqual(["✓ env", "  keychain"]);
+    expect(rows[0]!.detail).toBe("string");
+  });
+
+  it("filters rows by valueQuery prefix", () => {
+    const rows = renderValueRows(inputs({
+      key: "backend",
+      field: { type: "enum", values: ["env", "keychain", "bitwarden"] },
+      currentValue: "keychain",
+    }), "k");
+    expect(rows.map(r => r.label)).toEqual(["✓ keychain"]);
+  });
+
+  it("filters booleans by valueQuery prefix", () => {
+    const rows = renderValueRows(inputs({
+      key: "x",
+      field: { type: "boolean" },
+      currentValue: true,
+    }), "t");
+    expect(rows.map(r => r.label)).toEqual(["✓ true"]);
+  });
+
+  it("returns [] for free-form string fields (pre-fill on field row already handled it)", () => {
+    const rows = renderValueRows(inputs({
+      key: "url",
+      field: { type: "string" },
+      currentValue: "https://example.com",
+    }), "");
+    expect(rows).toEqual([]);
+  });
+
+  it("returns [] for number fields", () => {
+    const rows = renderValueRows(inputs({
+      key: "port",
+      field: { type: "number" },
+      currentValue: 5432,
+    }), "");
+    expect(rows).toEqual([]);
+  });
+
+  it("returns [] for secret fields (no value choices to surface)", () => {
+    const rows = renderValueRows(inputs({
+      key: "apiKey",
+      field: { type: "string", secret: true },
+      currentValue: "swordfish",
+    }), "");
+    expect(rows).toEqual([]);
+  });
+
+  it("when current is not one of the enum values, no row gets the ✓", () => {
+    const rows = renderValueRows(inputs({
+      key: "backend",
+      field: { type: "enum", values: ["env", "keychain"] },
+      currentValue: "legacy",
+      source: "home",
+      isSet: true,
+    }), "");
+    expect(rows.map(r => r.label)).toEqual(["  env", "  keychain"]);
+  });
+});
