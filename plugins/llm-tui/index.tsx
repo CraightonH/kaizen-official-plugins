@@ -274,7 +274,6 @@ const plugin: KaizenPlugin = {
         registry={registry}
         toolRenderers={toolRenderers}
         sources={sources}
-        theme={theme}
         onSubmit={onSubmit}
         onCancel={onCancel}
         onExit={onExit}

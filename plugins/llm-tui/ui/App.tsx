@@ -21,18 +21,18 @@ export interface AppProps {
   registry: CompletionRegistry;
   toolRenderers: ToolRendererRegistry;
   sources: Map<string, CompletionSource>;
-  theme: UiTheme;
   onSubmit: (text: string) => void;
   onCancel?: () => void;
   onExit?: () => void;
   copyToClipboard?: (text: string) => Promise<CopyResult>;
 }
 
-export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, sources, theme, onSubmit, onCancel, onExit, copyToClipboard }) => {
+export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, sources, onSubmit, onCancel, onExit, copyToClipboard }) => {
   const snap = useSyncExternalStore(
     (cb) => store.subscribe(cb),
     () => store.snapshot(),
   );
+  const theme = snap.theme;
 
   // Ctrl+R opens the /history audit view. The chat transcript is rendered
   // through Ink's <Static>, which prints each entry once to terminal

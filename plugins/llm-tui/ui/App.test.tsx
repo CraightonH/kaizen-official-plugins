@@ -21,7 +21,7 @@ describe("App", () => {
   it("renders prompt label and rounded box", async () => {
     const ctx = setup();
     const { lastFrame } = render(
-      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} sources={ctx.sources} onSubmit={() => {}} />,
     );
     await tick();
     expect(lastFrame()).toContain("kaizen");
@@ -31,7 +31,7 @@ describe("App", () => {
   it("appendOutput shows in the transcript", async () => {
     const ctx = setup();
     const { lastFrame } = render(
-      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} sources={ctx.sources} onSubmit={() => {}} />,
     );
     await tick();
     ctx.store.appendOutput("hello world");
@@ -42,7 +42,7 @@ describe("App", () => {
   it("setBusy renders SpinnerLine, then removes it", async () => {
     const ctx = setup();
     const { lastFrame } = render(
-      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} sources={ctx.sources} onSubmit={() => {}} />,
     );
     await tick();
     ctx.store.setBusy(true, "streaming");
@@ -56,7 +56,7 @@ describe("App", () => {
   it("upsertStatus renders into the status bar", async () => {
     const ctx = setup();
     const { lastFrame } = render(
-      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} sources={ctx.sources} onSubmit={() => {}} />,
     );
     await tick();
     ctx.store.upsertStatus("branch", "main");
@@ -68,7 +68,7 @@ describe("App", () => {
     const ctx = setup();
     ctx.store.appendUser("seeded prompt", { handoffFrom: "abc" });
     const { lastFrame } = render(
-      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} sources={ctx.sources} onSubmit={() => {}} />,
     );
     await tick();
     expect(lastFrame()).toContain("[handoff from abc]");
@@ -79,7 +79,7 @@ describe("App", () => {
     const ctx = setup();
     ctx.store.appendUser("plain prompt");
     const { lastFrame } = render(
-      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} sources={ctx.sources} onSubmit={() => {}} />,
     );
     await tick();
     expect(lastFrame()).toContain("plain prompt");
@@ -94,7 +94,7 @@ describe("App", () => {
     ctx.sources.set(src.id, src);
     ctx.reg.service.register(src);
     const { stdin, lastFrame } = render(
-      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+      <App store={ctx.store} registry={ctx.reg} toolRenderers={makeToolRendererRegistry()} sources={ctx.sources} onSubmit={() => {}} />,
     );
     await tick();
     stdin.write("/");
@@ -106,7 +106,7 @@ describe("App", () => {
     const s = new TuiStore({ theme: DEFAULT_THEME });
     s.appendOutput("**bold**");
     const { lastFrame } = render(
-      <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} sources={new Map()} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+      <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} sources={new Map()} onSubmit={() => {}} />,
     );
     await tick();
     const frame = lastFrame() ?? "";
@@ -118,7 +118,7 @@ describe("App", () => {
     const s = new TuiStore({ theme: DEFAULT_THEME });
     s.appendOutput("**bold**", { markdown: false });
     const { lastFrame } = render(
-      <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} sources={new Map()} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+      <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} sources={new Map()} onSubmit={() => {}} />,
     );
     await tick();
     expect((lastFrame() ?? "").includes("**bold**")).toBe(true);
@@ -128,7 +128,7 @@ describe("App", () => {
     const s = new TuiStore({ theme: DEFAULT_THEME });
     s.appendNotice("**plain**");
     const { lastFrame } = render(
-      <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} sources={new Map()} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+      <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} sources={new Map()} onSubmit={() => {}} />,
     );
     await tick();
     expect((lastFrame() ?? "").includes("**plain**")).toBe(true);
@@ -138,7 +138,7 @@ describe("App", () => {
     const s = new TuiStore({ theme: DEFAULT_THEME });
     s.appendNotice("**md**", { markdown: true });
     const { lastFrame } = render(
-      <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} sources={new Map()} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+      <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} sources={new Map()} onSubmit={() => {}} />,
     );
     await tick();
     const frame = lastFrame() ?? "";
@@ -150,7 +150,7 @@ describe("App", () => {
     const s = new TuiStore({ theme: DEFAULT_THEME });
     s.appendUser("**hi**", { markdown: true });
     const { lastFrame } = render(
-      <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} sources={new Map()} theme={DEFAULT_THEME} onSubmit={() => {}} />,
+      <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} sources={new Map()} onSubmit={() => {}} />,
     );
     await tick();
     const frame = lastFrame() ?? "";
