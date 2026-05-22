@@ -1,12 +1,12 @@
 import React from "react";
 import { render } from "ink";
 import type { KaizenPlugin } from "kaizen/types";
-import type { UiChannelService, UiTheme, UiThemeService, UiStatusService, UiCompletionService, UiToolRendererService, UiPromptService, WriteOptions, CompletionSource } from "llm-contracts/public";
+import type { UiChannelService, UiTheme, UiThemeService, UiStatusService, UiCompletionService, UiToolRendererService, UiPromptService, WriteOptions, CompletionSource, ConfigStoreService } from "llm-contracts/public";
 import { TuiStore } from "./state/store.ts";
 import { makeCompletionRegistry } from "./completion/registry.ts";
 import { makeToolRendererRegistry } from "./tool-renderers/registry.ts";
 import { defaultRenderers } from "./tool-renderers/defaults.tsx";
-import { loadTheme, realThemeDeps } from "./theme/loader.ts";
+import { BUILT_IN_THEME, THEME_SCHEMA } from "./theme/schema.ts";
 import { App } from "./ui/App.tsx";
 import { copyToClipboard } from "./clipboard.ts";
 import { createFallbackChannel, createFallbackPrompt } from "./fallback.ts";
@@ -17,7 +17,7 @@ const plugin: KaizenPlugin = {
   permissions: { tier: "unscoped" },
   services: {
     provides: ["ui:channel", "ui:completion-source", "ui:status", "ui:theme", "ui:tool-renderer", "ui:prompt"],
-    consumes: ["events:vocabulary"],
+    consumes: ["events:vocabulary", "config:store"],
   },
 
   async setup(ctx) {
@@ -33,18 +33,48 @@ const plugin: KaizenPlugin = {
     // ui:theme is defined on llm-contracts; this plugin provides the implementation.
     // ui:tool-renderer is defined on llm-contracts; this plugin provides the implementation.
 
-    // Theme: harness defaults from plugin config, user override from config file.
-    const harnessDefaults = (ctx.config as any)?.theme as Partial<UiTheme> | undefined;
-    const theme = await loadTheme(realThemeDeps(ctx.log, harnessDefaults));
-    const themeService: UiThemeService = { current: () => theme };
-    ctx.provideService<UiThemeService>("ui:theme", themeService);
-
     // Status bar: marker service, but also publish the empty value so consumers can wire dependencies.
     const statusService: UiStatusService = {};
     ctx.provideService<UiStatusService>("ui:status", statusService);
 
+    // Theme: backed by kaizen-config. Harness manifest may seed defaults via
+    // ctx.config.theme. /config:set llm-tui <field>=<value> updates live.
+    const harnessDefaults =
+      ((ctx.config as { theme?: Partial<UiTheme> } | undefined)?.theme ?? {}) as Partial<UiTheme>;
+
+    let currentTheme: UiTheme = { ...BUILT_IN_THEME, ...harnessDefaults };
+
+    // Store first — the watch callback below needs to push into store.setTheme().
+    const store = new TuiStore({ theme: currentTheme });
+
+    let teardownConfigWatch: (() => void) | null = null;
+
+    try {
+      ctx.consumeService("config:store");
+      const cfgStore = ctx.useService<ConfigStoreService>("config:store");
+      cfgStore.register<UiTheme>({
+        plugin: "llm-tui",
+        defaults: currentTheme,
+        schema: THEME_SCHEMA,
+      });
+      currentTheme = cfgStore.get<UiTheme>("llm-tui");
+      store.setTheme(currentTheme);
+      teardownConfigWatch = cfgStore.watch<UiTheme>("llm-tui", (next) => {
+        try {
+          currentTheme = next;
+          store.setTheme(next);
+        } catch (err) {
+          ctx.log(`llm-tui: failed to apply theme update: ${(err as Error).message}`);
+        }
+      });
+    } catch (err) {
+      ctx.log(`llm-tui: config:store unavailable (${(err as Error).message}); using static defaults`);
+    }
+
+    const themeService: UiThemeService = { current: () => currentTheme };
+    ctx.provideService<UiThemeService>("ui:theme", themeService);
+
     // Store + completion registry are shared between the channel + UI.
-    const store = new TuiStore({ theme });
     const registry = makeCompletionRegistry();
     ctx.provideService<UiCompletionService>("ui:completion-source", registry.service);
     const toolRenderers = makeToolRendererRegistry();
@@ -300,9 +330,11 @@ const plugin: KaizenPlugin = {
     ctx.provideService<UiPromptService>("ui:prompt", uiPrompt);
 
     (plugin as any).__ink = inkApp;
+    (plugin as any).__configWatch = teardownConfigWatch;
   },
 
   async stop() {
+    try { (plugin as any).__configWatch?.(); } catch { /* ignore */ }
     const inkApp = (plugin as any).__ink;
     if (inkApp) {
       try { inkApp.unmount(); } catch { /* ignore */ }

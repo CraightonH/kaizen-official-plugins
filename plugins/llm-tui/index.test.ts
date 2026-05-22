@@ -1,15 +1,28 @@
 import { describe, it, expect, mock } from "bun:test";
 import plugin, { createTuiChannel } from "./index.tsx";
 import { TuiStore } from "./state/store.ts";
-import type { UiPromptService } from "llm-contracts/public";
+import type { UiPromptService, ConfigStoreService } from "llm-contracts/public";
 import { BUILT_IN_THEME } from "./theme/schema.ts";
 
+const fakeConfigStore: ConfigStoreService = {
+  register: () => {},
+  get: <T>() => (BUILT_IN_THEME as unknown as T),
+  set: async () => {},
+  unset: async () => {},
+  watch: () => () => {},
+  getSpec: () => undefined,
+};
+
 function makeCtx(overrides: { config?: Record<string, unknown> } = {}) {
-  const provided: Record<string, unknown> = {};
+  const provided: Record<string, unknown> = {
+    "config:store": fakeConfigStore,
+  };
+  const consumed: string[] = [];
   const subs: Record<string, Function[]> = {};
   const emitted: Array<{ event: string; payload?: unknown }> = [];
   const ctx = {
     provided,
+    consumed,
     subs,
     emitted,
     log: mock(() => {}),
@@ -19,7 +32,7 @@ function makeCtx(overrides: { config?: Record<string, unknown> } = {}) {
     emit: mock(async (event: string, payload?: unknown) => { emitted.push({ event, payload }); return []; }),
     defineService: mock(() => {}),
     provideService: mock((name: string, impl: unknown) => { provided[name] = impl; }),
-    consumeService: mock(() => {}),
+    consumeService: mock((name: string) => { consumed.push(name); }),
     useService: mock((name: string) => provided[name]),
     secrets: { get: mock(async () => undefined), refresh: mock(async () => undefined) },
   } as any;
