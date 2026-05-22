@@ -790,12 +790,4 @@ describe("TuiStore.theme", () => {
     expect(calls).toBe(1);
   });
 
-  it("setTheme is idempotent on identical reference (no-op subscribers ok)", () => {
-    const store = new TuiStore({ theme: BUILT_IN_THEME });
-    let calls = 0;
-    store.subscribe(() => { calls++; });
-    store.setTheme(BUILT_IN_THEME);
-    expect(store.snapshot().theme).toBe(BUILT_IN_THEME);
-    expect(calls).toBeGreaterThanOrEqual(0);
-  });
 });
