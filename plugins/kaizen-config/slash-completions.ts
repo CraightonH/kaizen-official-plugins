@@ -1,4 +1,10 @@
-import type { CompletionItem, ConfigStoreService, FieldSchema } from "llm-contracts/public";
+import type {
+  CompletionItem,
+  ConfigResolutionSource,
+  ConfigStoreService,
+  FieldSchema,
+} from "llm-contracts/public";
+import { renderFieldRow, renderValueRows } from "./field-rendering.ts";
 
 function resolutionDetail(homeExists: boolean, projectExists: boolean): string {
   const parts: string[] = [];
@@ -17,44 +23,48 @@ export async function pluginCompletions(store: ConfigStoreService): Promise<Comp
   }));
 }
 
-function fieldDetail(field: FieldSchema): string {
-  const base = field.type;
-  if (field.type === "string" && field.secret) return `${base} · secret`;
-  return base;
-}
-
 export async function keyEqualsValueCompletions(
   store: ConfigStoreService,
   prev: string[],
+  query: string = "",
 ): Promise<CompletionItem[]> {
   const plugin = prev[0];
   if (!plugin) return [];
   const spec = store.getSpec(plugin);
-  const schema = spec?.schema ?? {};
-  const items: CompletionItem[] = [];
-  for (const [key, field] of Object.entries(schema)) {
-    if (!field) continue;
-    const f = field as FieldSchema;
-    const detail = fieldDetail(f);
-    // Terminal value picks get a trailing space so the cursor lands past the
-    // token and the next match (flag slot) can fire. Free-form `key=` is left
-    // unterminated because the user types the value next.
-    if (f.type === "boolean") {
-      items.push({ label: `${key}=true`, insertText: `${key}=true `, detail });
-      items.push({ label: `${key}=false`, insertText: `${key}=false `, detail });
-    } else if (f.type === "enum") {
-      for (const v of f.values) {
-        items.push({ label: `${key}=${v}`, insertText: `${key}=${v} `, detail });
-      }
-    } else if (f.type === "string" && f.enum) {
-      for (const v of f.enum) {
-        items.push({ label: `${key}=${v}`, insertText: `${key}=${v} `, detail });
-      }
-    } else {
-      items.push({ label: key, insertText: `${key}=`, detail });
+  const schema = spec?.schema as Record<string, FieldSchema | undefined> | undefined;
+  if (!schema) return [];
+
+  let merged: Record<string, unknown> = {};
+  try { merged = store.get(plugin) as Record<string, unknown>; } catch { merged = {}; }
+  const status = store.list().find((r) => r.plugin === plugin);
+  const resolution = (status?.resolution ?? {}) as Record<string, ConfigResolutionSource>;
+
+  const eqIdx = query.indexOf("=");
+  if (eqIdx === -1) {
+    const rows: CompletionItem[] = [];
+    for (const [key, field] of Object.entries(schema)) {
+      if (!field) continue;
+      const source = resolution[key] ?? "default";
+      rows.push(renderFieldRow({
+        key,
+        field,
+        currentValue: merged[key],
+        source,
+        isSet: source !== "default",
+      }));
     }
+    return rows;
   }
-  return items;
+
+  const key = query.slice(0, eqIdx);
+  const valueQuery = query.slice(eqIdx + 1);
+  const field = schema[key];
+  if (!field) return [];
+  const source = resolution[key] ?? "default";
+  return renderValueRows(
+    { key, field, currentValue: merged[key], source, isSet: source !== "default" },
+    valueQuery,
+  );
 }
 
 export async function keyOnlyCompletions(
@@ -69,7 +79,9 @@ export async function keyOnlyCompletions(
   for (const [key, field] of Object.entries(schema)) {
     if (!field) continue;
     // Terminal pick for /config:get / /config:unset; user moves on to flags or submit.
-    items.push({ label: key, insertText: `${key} `, detail: fieldDetail(field as FieldSchema) });
+    const f = field as FieldSchema;
+    const detail = f.type === "string" && f.secret ? `${f.type} · secret` : f.type;
+    items.push({ label: key, insertText: `${key} `, detail });
   }
   return items;
 }

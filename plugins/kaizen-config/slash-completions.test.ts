@@ -46,39 +46,95 @@ describe("pluginCompletions", () => {
 });
 
 describe("keyEqualsValueCompletions", () => {
-  it("expands booleans into two items", async () => {
-    const items = await keyEqualsValueCompletions(makeStore(), ["kaizen-config"]);
-    const labels = items.map(i => i.label);
-    expect(labels).toContain("enabled=true");
-    expect(labels).toContain("enabled=false");
-  });
-
-  it("expands enums into one item per value", async () => {
-    const items = await keyEqualsValueCompletions(makeStore(), ["kaizen-config"]);
-    const labels = items.map(i => i.label);
-    expect(labels).toContain("backend=env");
-    expect(labels).toContain("backend=keychain");
-  });
-
-  it("appends '· secret' to detail for secret string fields", async () => {
-    const items = await keyEqualsValueCompletions(makeStore(), ["kaizen-config"]);
-    const apiKey = items.find(i => i.label === "apiKey");
-    expect(apiKey?.detail).toContain("secret");
-  });
+  function storeWith(
+    snapshot: Record<string, unknown>,
+    resolution: Record<string, "default" | "home" | "project" | "env">,
+  ): ConfigStoreService {
+    const base = makeStore();
+    return {
+      ...base,
+      get: () => snapshot as any,
+      list: () => [
+        {
+          plugin: "kaizen-config",
+          homePath: "/h",
+          projectPath: "/p",
+          homeExists: true,
+          projectExists: false,
+          resolution,
+        },
+      ],
+    };
+  }
 
   it("returns [] when plugin is unknown", async () => {
-    const items = await keyEqualsValueCompletions(makeStore(), ["nope"]);
+    const items = await keyEqualsValueCompletions(makeStore(), ["nope"], "");
     expect(items).toEqual([]);
   });
 
-  it("terminal value picks get a trailing space; free-form `key=` does not", async () => {
-    const items = await keyEqualsValueCompletions(makeStore(), ["kaizen-config"]);
-    const enabledTrue = items.find(i => i.label === "enabled=true")!;
-    const backendEnv = items.find(i => i.label === "backend=env")!;
-    const url = items.find(i => i.label === "url")!;
-    expect(enabledTrue.insertText.endsWith(" ")).toBe(true);
-    expect(backendEnv.insertText.endsWith(" ")).toBe(true);
-    expect(url.insertText).toBe("url=");
+  it("field tier (empty query): one row per field, each with ✓ value in detail", async () => {
+    const store = storeWith(
+      { enabled: true, backend: "keychain", apiKey: "swordfish", url: "https://x" },
+      { enabled: "home", backend: "home", apiKey: "home", url: "home" },
+    );
+    const items = await keyEqualsValueCompletions(store, ["kaizen-config"], "");
+    const labels = items.map((i) => i.label).sort();
+    expect(labels).toEqual(["apiKey", "backend", "enabled", "url"]);
+    expect(items.find((i) => i.label === "enabled")!.detail)
+      .toBe("✓ true · home  boolean");
+    expect(items.find((i) => i.label === "apiKey")!.detail)
+      .toBe("✓ *** · home  string · secret");
+    expect(items.find((i) => i.label === "url")!.insertText).toBe("url=https://x ");
+    expect(items.find((i) => i.label === "enabled")!.insertText).toBe("enabled=");
+  });
+
+  it("field tier: unset values render (unset) with no ✓ and key= insertText", async () => {
+    const store = storeWith({}, {});
+    const items = await keyEqualsValueCompletions(store, ["kaizen-config"], "");
+    expect(items.find((i) => i.label === "url")!.detail).toBe("(unset)  string");
+    expect(items.find((i) => i.label === "url")!.insertText).toBe("url=");
+  });
+
+  it("field tier: env-sourced value shows · env in detail and suppresses pre-fill", async () => {
+    const store = storeWith({ url: "https://env" }, { url: "env" });
+    const items = await keyEqualsValueCompletions(store, ["kaizen-config"], "");
+    expect(items.find((i) => i.label === "url")!.detail)
+      .toBe("✓ https://env · env  string");
+    expect(items.find((i) => i.label === "url")!.insertText).toBe("url=");
+  });
+
+  it("value tier (query has '='): rows for the matching field only", async () => {
+    const store = storeWith(
+      { enabled: true, backend: "keychain" },
+      { enabled: "home", backend: "home" },
+    );
+    const items = await keyEqualsValueCompletions(store, ["kaizen-config"], "enabled=");
+    expect(items.map((i) => i.label)).toEqual(["✓ true", "  false"]);
+    expect(items[0]!.insertText).toBe("enabled=true ");
+  });
+
+  it("value tier: enum values, ✓ on current", async () => {
+    const store = storeWith({ backend: "keychain" }, { backend: "home" });
+    const items = await keyEqualsValueCompletions(store, ["kaizen-config"], "backend=");
+    expect(items.map((i) => i.label)).toEqual(["  env", "✓ keychain"]);
+  });
+
+  it("value tier: filters by post-= text", async () => {
+    const store = storeWith({ backend: "env" }, { backend: "home" });
+    const items = await keyEqualsValueCompletions(store, ["kaizen-config"], "backend=k");
+    expect(items.map((i) => i.label)).toEqual(["  keychain"]);
+  });
+
+  it("value tier: free-form field returns []", async () => {
+    const store = storeWith({ url: "https://x" }, { url: "home" });
+    const items = await keyEqualsValueCompletions(store, ["kaizen-config"], "url=");
+    expect(items).toEqual([]);
+  });
+
+  it("value tier: unknown key returns []", async () => {
+    const store = storeWith({}, {});
+    const items = await keyEqualsValueCompletions(store, ["kaizen-config"], "nopeKey=");
+    expect(items).toEqual([]);
   });
 });
 
