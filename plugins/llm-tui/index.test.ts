@@ -1,7 +1,7 @@
 import { describe, it, expect, mock } from "bun:test";
 import plugin, { createTuiChannel } from "./index.tsx";
 import { TuiStore } from "./state/store.ts";
-import type { UiPromptService, ConfigStoreService } from "llm-contracts/public";
+import type { UiPromptService, ConfigStoreService, UiTheme } from "llm-contracts/public";
 import { BUILT_IN_THEME } from "./theme/schema.ts";
 
 const fakeConfigStore: ConfigStoreService = {
@@ -163,6 +163,36 @@ describe("llm-tui plugin", () => {
         cancelId: "cancel",
       }),
     ).resolves.toEqual({ id: "cancel" });
+  });
+
+  it("config:store.watch callback updates themeService.current()", async () => {
+    const initial: UiTheme = { ...BUILT_IN_THEME, promptColor: "red" };
+    let captured: ((next: UiTheme) => void) | null = null;
+
+    const cfg: ConfigStoreService = {
+      register: () => {},
+      get: <T>() => (initial as unknown as T),
+      set: async () => {},
+      unset: async () => {},
+      watch: (_plugin, cb) => {
+        captured = cb as (next: UiTheme) => void;
+        return () => {};
+      },
+      getSpec: () => undefined,
+    };
+
+    const ctx = makeCtx();
+    ctx.provided["config:store"] = cfg;
+    await plugin.setup(ctx);
+
+    const themeSvc = ctx.provided["ui:theme"] as { current: () => UiTheme };
+    expect(themeSvc.current().promptColor).toBe("red");
+
+    expect(captured).not.toBeNull();
+    const next: UiTheme = { ...initial, promptColor: "cyan" };
+    captured!(next);
+
+    expect(themeSvc.current().promptColor).toBe("cyan");
   });
 
   describe("createTuiChannel — WriteOptions forwarded to store", () => {
