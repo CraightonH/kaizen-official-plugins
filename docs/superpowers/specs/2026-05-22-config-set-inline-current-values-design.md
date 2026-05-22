@@ -90,6 +90,11 @@ export function formatValue(
 per-value rows for booleans/enums (and `[]` for free-form fields, since the
 field row's pre-filled `insertText` already covers them).
 
+"Enum-like" covers both `{ type: "enum", values: [...] }` and
+`{ type: "string", enum: [...] }` — `renderValueRows` treats them identically,
+matching the existing logic in `keyEqualsValueCompletions`. "Free-form" means
+any `string` without an `enum`, plus `number`.
+
 `formatValue` redacts secrets to `***`, JSON-stringifies non-scalars, and
 truncates the result to `opts.max` characters with a trailing `…`. The truncated
 form is used only for the `detail` string — the full value is preserved in
@@ -150,12 +155,18 @@ value tier is needed for those commands since they don't take a value.
 
 ### `slash.ts`
 
-One-line change in each of the three `register` calls that wire a `complete`
-callback: pass `query` through.
+One-line change in the `/config:set` `register` call to thread `query`
+through to `keyEqualsValueCompletions`:
 
 ```ts
 { name: "key=value", complete: (prev, query) => keyEqualsValueCompletions(deps.store, prev, query) }
 ```
+
+The `/config:get` and `/config:unset` registrations continue to use
+`keyOnlyCompletions`, whose existing single-tier behavior doesn't need the
+`query` argument. Both inherit the new `[<value> · <source>] <type>` detail
+treatment because `keyOnlyCompletions` is updated to call `renderFieldRow`
+internally.
 
 ## Data flow
 
