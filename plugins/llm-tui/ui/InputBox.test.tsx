@@ -10,7 +10,7 @@ import type { CompletionSource } from "llm-contracts/public";
 const tick = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 
 function setup() {
-  const store = new TuiStore();
+  const store = new TuiStore({ theme: DEFAULT_THEME });
   const reg = makeCompletionRegistry({ debounceMs: 0 });
   const sources = new Map<string, CompletionSource>();
   // Mirror the production wrapper from llm-tui/index.tsx so register()

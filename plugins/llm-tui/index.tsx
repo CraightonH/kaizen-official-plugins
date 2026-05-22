@@ -44,7 +44,7 @@ const plugin: KaizenPlugin = {
     ctx.provideService<UiStatusService>("ui:status", statusService);
 
     // Store + completion registry are shared between the channel + UI.
-    const store = new TuiStore();
+    const store = new TuiStore({ theme });
     const registry = makeCompletionRegistry();
     ctx.provideService<UiCompletionService>("ui:completion-source", registry.service);
     const toolRenderers = makeToolRendererRegistry();

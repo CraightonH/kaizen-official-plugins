@@ -2,6 +2,7 @@ import { describe, it, expect, mock } from "bun:test";
 import plugin, { createTuiChannel } from "./index.tsx";
 import { TuiStore } from "./state/store.ts";
 import type { UiPromptService } from "llm-contracts/public";
+import { BUILT_IN_THEME } from "./theme/schema.ts";
 
 function makeCtx(overrides: { config?: Record<string, unknown> } = {}) {
   const provided: Record<string, unknown> = {};
@@ -153,7 +154,7 @@ describe("llm-tui plugin", () => {
 
   describe("createTuiChannel — WriteOptions forwarded to store", () => {
     it("writeNotice with markdown:true sets entry.markdown === true", () => {
-      const store = new TuiStore();
+      const store = new TuiStore({ theme: BUILT_IN_THEME });
       const ch = createTuiChannel(store);
       ch.writeNotice("**bold**", { markdown: true });
       const entry = store.snapshot().transcript.at(-1) as any;
@@ -162,7 +163,7 @@ describe("llm-tui plugin", () => {
     });
 
     it("writeOutput with markdown:false sets entry.markdown === false", () => {
-      const store = new TuiStore();
+      const store = new TuiStore({ theme: BUILT_IN_THEME });
       const ch = createTuiChannel(store);
       ch.writeOutput("raw output", { markdown: false });
       const entry = store.snapshot().transcript.at(-1) as any;
@@ -171,7 +172,7 @@ describe("llm-tui plugin", () => {
     });
 
     it("writeOutput with no opts leaves entry.markdown === undefined", () => {
-      const store = new TuiStore();
+      const store = new TuiStore({ theme: BUILT_IN_THEME });
       const ch = createTuiChannel(store);
       ch.writeOutput("bare output");
       const entry = store.snapshot().transcript.at(-1) as any;
@@ -180,7 +181,7 @@ describe("llm-tui plugin", () => {
     });
 
     it("writeUser with markdown:true sets entry.markdown === true", () => {
-      const store = new TuiStore();
+      const store = new TuiStore({ theme: BUILT_IN_THEME });
       const ch = createTuiChannel(store);
       ch.writeUser!("user msg", { markdown: true });
       const entry = store.snapshot().transcript.at(-1) as any;

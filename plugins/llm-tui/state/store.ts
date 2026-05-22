@@ -2,6 +2,7 @@ import type {
   ToolCallStatus,
   UiPromptOptionsRequest,
   UiPromptTextRequest,
+  UiTheme,
 } from "llm-contracts/public";
 
 export type PromptSlice =
@@ -124,6 +125,8 @@ export interface TuiSnapshot {
    * sources Map itself is mutated in place and won't trip referential checks.
    */
   sourcesVersion: number;
+  /** Current theme. Pushed in via setTheme(); read by UI components. */
+  theme: UiTheme;
 }
 
 export class TuiStore {
@@ -139,6 +142,7 @@ export class TuiStore {
   private _historyView: HistoryViewState = { focusIdx: -1, expanded: new Set() };
   private _prompt: PromptSlice = null;
   private _sourcesVersion = 0;
+  private _theme: UiTheme;
   private _seq = 0;
 
   // Bracketed-paste registry: pasted content is stored here keyed by id; the
@@ -150,7 +154,12 @@ export class TuiStore {
   private _pending: ((line: string) => void) | null = null;
   private _queue: string[] = [];
   private _listeners = new Set<() => void>();
-  private _snapshot: TuiSnapshot = this._build();
+  private _snapshot: TuiSnapshot;
+
+  constructor(opts: { theme: UiTheme }) {
+    this._theme = opts.theme;
+    this._snapshot = this._build();
+  }
 
   subscribe(fn: () => void): () => void {
     this._listeners.add(fn);
@@ -607,6 +616,11 @@ export class TuiStore {
     }
   }
 
+  setTheme(next: UiTheme): void {
+    this._theme = next;
+    this._emit();
+  }
+
   private _build(): TuiSnapshot {
     return {
       transcript: this._transcript,
@@ -621,6 +635,7 @@ export class TuiStore {
       historyView: this._historyView,
       prompt: this._prompt,
       sourcesVersion: this._sourcesVersion,
+      theme: this._theme,
     };
   }
 

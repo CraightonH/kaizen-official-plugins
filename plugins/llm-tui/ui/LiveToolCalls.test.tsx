@@ -15,7 +15,7 @@ const theme = {
 } as const;
 
 test("renders nothing when no live tool calls exist", () => {
-  const store = new TuiStore();
+  const store = new TuiStore({ theme: theme as any });
   const reg = makeToolRendererRegistry();
   const { lastFrame } = render(
     <LiveToolCalls store={store} registry={reg} theme={theme as any} />
@@ -24,7 +24,7 @@ test("renders nothing when no live tool calls exist", () => {
 });
 
 test("renders one running entry per live tool call", () => {
-  const store = new TuiStore();
+  const store = new TuiStore({ theme: theme as any });
   const reg = makeToolRendererRegistry();
   store.appendLiveToolCall("c1", "read_file", { path: "/etc/hosts" });
   store.appendLiveToolCall("c2", "execute_typescript", { code: "1+1" });
@@ -37,7 +37,7 @@ test("renders one running entry per live tool call", () => {
 });
 
 test("repaints when stdoutDelta arrives (smoke check the subscribe wiring)", async () => {
-  const store = new TuiStore();
+  const store = new TuiStore({ theme: theme as any });
   const reg = makeToolRendererRegistry();
   store.appendLiveToolCall("c1", "execute_typescript", { code: "console.log(1)" });
   const { lastFrame, rerender } = render(

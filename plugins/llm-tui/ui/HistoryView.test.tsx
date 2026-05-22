@@ -8,7 +8,7 @@ import { DEFAULT_THEME } from "../theme/loader.ts";
 const tick = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 
 function seed() {
-  const s = new TuiStore();
+  const s = new TuiStore({ theme: DEFAULT_THEME });
   s.appendUser("first question");
   s.appendReasoning("alpha-thought-1\nalpha-thought-2"); s.finalizeReasoning();
   s.appendOutput("first answer");
@@ -93,7 +93,7 @@ describe("HistoryView", () => {
   });
 
   it("renders 'no thought blocks' notice when none exist", async () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: DEFAULT_THEME });
     s.appendUser("hi"); s.appendOutput("hello");
     s.enterHistoryMode();
     const { lastFrame } = render(<HistoryView store={s} theme={DEFAULT_THEME} />);
@@ -102,7 +102,7 @@ describe("HistoryView", () => {
   });
 
   it("renders a tool_call entry with wrench glyph in history", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: DEFAULT_THEME });
     s.appendToolCallToTranscript("c1", "read_file", { path: "/etc/hosts" }, "done", "ok");
     s.enterHistoryMode();
     const { lastFrame } = render(<HistoryView store={s} theme={DEFAULT_THEME} />);
@@ -111,7 +111,7 @@ describe("HistoryView", () => {
   });
 
   it("renders expanded thoughts through markdown when theme.thoughtsMarkdown is true (no dim on body)", async () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: DEFAULT_THEME });
     s.appendReasoning("**bold thought**");
     s.finalizeReasoning();
     s.enterHistoryMode();
@@ -124,7 +124,7 @@ describe("HistoryView", () => {
   });
 
   it("renders expanded thoughts as plain per-line dim text when theme.thoughtsMarkdown is false", async () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: DEFAULT_THEME });
     s.appendReasoning("**not rendered**");
     s.finalizeReasoning();
     s.enterHistoryMode();
@@ -135,7 +135,7 @@ describe("HistoryView", () => {
   });
 
   it("memoizes rendered markdown per entry id (renderMarkdown not re-run on collapse/expand)", async () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: DEFAULT_THEME });
     s.appendReasoning("**stable**");
     s.finalizeReasoning();
     s.enterHistoryMode();

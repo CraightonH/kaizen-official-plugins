@@ -11,7 +11,7 @@ import type { CompletionSource } from "llm-contracts/public";
 const tick = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 
 function setup() {
-  const store = new TuiStore();
+  const store = new TuiStore({ theme: DEFAULT_THEME });
   const reg = makeCompletionRegistry({ debounceMs: 0 });
   const sources = new Map<string, CompletionSource>();
   return { store, reg, sources };
@@ -103,7 +103,7 @@ describe("App", () => {
   });
 
   it("output entry without markdown flag renders through renderMarkdown (default true)", async () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: DEFAULT_THEME });
     s.appendOutput("**bold**");
     const { lastFrame } = render(
       <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} sources={new Map()} theme={DEFAULT_THEME} onSubmit={() => {}} />,
@@ -115,7 +115,7 @@ describe("App", () => {
   });
 
   it("output entry with markdown: false renders raw", async () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: DEFAULT_THEME });
     s.appendOutput("**bold**", { markdown: false });
     const { lastFrame } = render(
       <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} sources={new Map()} theme={DEFAULT_THEME} onSubmit={() => {}} />,
@@ -125,7 +125,7 @@ describe("App", () => {
   });
 
   it("notice entry without markdown flag renders raw with dim", async () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: DEFAULT_THEME });
     s.appendNotice("**plain**");
     const { lastFrame } = render(
       <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} sources={new Map()} theme={DEFAULT_THEME} onSubmit={() => {}} />,
@@ -135,7 +135,7 @@ describe("App", () => {
   });
 
   it("notice entry with markdown: true renders through renderMarkdown (no dim)", async () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: DEFAULT_THEME });
     s.appendNotice("**md**", { markdown: true });
     const { lastFrame } = render(
       <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} sources={new Map()} theme={DEFAULT_THEME} onSubmit={() => {}} />,
@@ -147,7 +147,7 @@ describe("App", () => {
   });
 
   it("user entry with markdown: true renders through renderMarkdown", async () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: DEFAULT_THEME });
     s.appendUser("**hi**", { markdown: true });
     const { lastFrame } = render(
       <App store={s} registry={makeCompletionRegistry({ debounceMs: 0 })} toolRenderers={makeToolRendererRegistry()} sources={new Map()} theme={DEFAULT_THEME} onSubmit={() => {}} />,

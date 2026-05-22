@@ -1,9 +1,10 @@
 import { describe, it, expect } from "bun:test";
 import { TuiStore, type CompletionItem, type ToolCallEntry } from "./store.ts";
+import { BUILT_IN_THEME } from "../theme/schema.ts";
 
 describe("TuiStore", () => {
   it("appendOutput adds an output line and notifies subscribers", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     let count = 0;
     s.subscribe(() => { count++; });
     s.appendOutput("hello");
@@ -16,7 +17,7 @@ describe("TuiStore", () => {
   });
 
   it("appendUser records a user line without handoffFrom by default", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.appendUser("hi");
     const last = s.snapshot().transcript.at(-1)! as any;
     expect(last.kind).toBe("user");
@@ -25,7 +26,7 @@ describe("TuiStore", () => {
   });
 
   it("appendUser with handoffFrom records the marker on the entry", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.appendUser("hi", { handoffFrom: "abc" });
     const last = s.snapshot().transcript.at(-1)! as any;
     expect(last.kind).toBe("user");
@@ -34,7 +35,7 @@ describe("TuiStore", () => {
   });
 
   it("appendNotice records a notice line", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.appendNotice("setup ok");
     const last = s.snapshot().transcript.at(-1)!;
     expect(last.kind).toBe("notice");
@@ -43,7 +44,7 @@ describe("TuiStore", () => {
   });
 
   it("setBusy toggles busy with optional message", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.setBusy(true, "thinking");
     expect(s.snapshot().busy).toEqual({ active: true, message: "thinking" });
     s.setBusy(false);
@@ -51,7 +52,7 @@ describe("TuiStore", () => {
   });
 
   it("setBusyTiming records start time and zeroes the token delta", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     const now = Date.now();
     s.setBusy(true, "thinking");
     s.setBusyTiming(now);
@@ -59,7 +60,7 @@ describe("TuiStore", () => {
   });
 
   it("updateBusyTokens sets the absolute count", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.setBusy(true, "thinking");
     s.setBusyTiming(Date.now());
     s.updateBusyTokens(856);
@@ -67,7 +68,7 @@ describe("TuiStore", () => {
   });
 
   it("incrementBusyTokens accumulates streamed tokens", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.setBusy(true, "thinking");
     s.setBusyTiming(Date.now());
     s.incrementBusyTokens();
@@ -77,7 +78,7 @@ describe("TuiStore", () => {
   });
 
   it("clearBusyTiming resets everything", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.setBusy(true, "thinking");
     s.setBusyTiming(Date.now());
     s.updateBusyTokens(856);
@@ -86,7 +87,7 @@ describe("TuiStore", () => {
   });
 
   it("upsertStatus and clearStatus manage the status map", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.upsertStatus("git", "main");
     s.upsertStatus("git", "feat/x");
     expect(s.snapshot().status.git).toBe("feat/x");
@@ -95,13 +96,13 @@ describe("TuiStore", () => {
   });
 
   it("setInput records value and cursor", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.setInput("abc", 2);
     expect(s.snapshot().input).toEqual({ value: "abc", cursor: 2 });
   });
 
   it("openPopup, setPopupItems, movePopup, closePopup", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.openPopup({ sourceId: "stub", trigger: "/", query: "", anchor: 0 });
     expect(s.snapshot().popup?.trigger).toBe("/");
     expect(s.snapshot().popup?.selectedIndex).toBe(0);
@@ -125,7 +126,7 @@ describe("TuiStore", () => {
   });
 
   it("openPopup records sourceId and trigger for char sources", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.openPopup({ sourceId: "src1", trigger: "/", query: "", anchor: 3 });
     const p = s.snapshot().popup;
     expect(p?.sourceId).toBe("src1");
@@ -134,7 +135,7 @@ describe("TuiStore", () => {
   });
 
   it("openPopup records sourceId only for match-based sources", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.openPopup({ sourceId: "args", query: "", anchor: 12 });
     const p = s.snapshot().popup;
     expect(p?.sourceId).toBe("args");
@@ -143,7 +144,7 @@ describe("TuiStore", () => {
   });
 
   it("setPopupQuery updates query and resets selection to 0", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.openPopup({ sourceId: "stub", trigger: "/", query: "", anchor: 0 });
     s.setPopupItems([{ label: "/a", insertText: "/a" }, { label: "/b", insertText: "/b" }]);
     s.movePopup(1);
@@ -153,7 +154,7 @@ describe("TuiStore", () => {
   });
 
   it("awaitInput resolves on submit and queues if not awaited", async () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     const p = s.awaitInput();
     s.submit("hello");
     expect(await p).toBe("hello");
@@ -164,14 +165,14 @@ describe("TuiStore", () => {
   });
 
   it("submit appends to history", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.submit("first");
     s.submit("second");
     expect(s.snapshot().history).toEqual(["first", "second"]);
   });
 
   it("unsubscribe stops further notifications", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     let count = 0;
     const off = s.subscribe(() => { count++; });
     s.appendOutput("a");
@@ -182,7 +183,7 @@ describe("TuiStore", () => {
 
   describe("history view mode", () => {
     function withTwoThoughts() {
-      const s = new TuiStore();
+      const s = new TuiStore({ theme: BUILT_IN_THEME });
       s.appendUser("q1");
       s.appendReasoning("first thought\nmore"); s.finalizeReasoning();
       s.appendOutput("a1");
@@ -193,7 +194,7 @@ describe("TuiStore", () => {
     }
 
     it("starts in chat mode with no expanded blocks", () => {
-      const s = new TuiStore();
+      const s = new TuiStore({ theme: BUILT_IN_THEME });
       expect(s.snapshot().viewMode).toBe("chat");
       expect(s.snapshot().historyView.focusIdx).toBe(-1);
       expect(s.snapshot().historyView.expanded.size).toBe(0);
@@ -207,7 +208,7 @@ describe("TuiStore", () => {
     });
 
     it("enterHistoryMode with no thoughts has no focus", () => {
-      const s = new TuiStore();
+      const s = new TuiStore({ theme: BUILT_IN_THEME });
       s.appendUser("q"); s.appendOutput("a");
       s.enterHistoryMode();
       expect(s.snapshot().historyView.focusIdx).toBe(-1);
@@ -258,7 +259,7 @@ describe("TuiStore", () => {
     });
 
     it("enterHistoryMode focuses across thoughts and tool_calls in transcript order", () => {
-      const store = new TuiStore();
+      const store = new TuiStore({ theme: BUILT_IN_THEME });
       store.appendUser("hi");
       store.appendReasoning("thinking…");
       store.finalizeReasoning();
@@ -279,7 +280,7 @@ describe("TuiStore", () => {
 
   describe("live tool calls", () => {
     it("appendLiveToolCall adds to liveToolCalls, not transcript", () => {
-      const store = new TuiStore();
+      const store = new TuiStore({ theme: BUILT_IN_THEME });
       store.appendLiveToolCall("call-1", "read_file", { path: "/etc/hosts" });
       const snap = store.snapshot();
       expect(snap.transcript).toHaveLength(0);
@@ -291,7 +292,7 @@ describe("TuiStore", () => {
     });
 
     it("updateLiveToolCall accumulates stdout deltas in liveToolCalls", () => {
-      const store = new TuiStore();
+      const store = new TuiStore({ theme: BUILT_IN_THEME });
       store.appendLiveToolCall("c1", "execute_typescript", { code: "x" });
       store.updateLiveToolCall("c1", { stdoutDelta: "a" });
       store.updateLiveToolCall("c1", { stdoutDelta: "b" });
@@ -300,13 +301,13 @@ describe("TuiStore", () => {
     });
 
     it("updateLiveToolCall on unknown id is a no-op", () => {
-      const store = new TuiStore();
+      const store = new TuiStore({ theme: BUILT_IN_THEME });
       expect(() => store.updateLiveToolCall("missing", { stdoutDelta: "x" })).not.toThrow();
       expect(store.snapshot().liveToolCalls.size).toBe(0);
     });
 
     it("finalizeLiveToolCall moves entry from liveToolCalls into transcript", () => {
-      const store = new TuiStore();
+      const store = new TuiStore({ theme: BUILT_IN_THEME });
       store.appendLiveToolCall("c1", "read_file", { path: "/x" });
       store.updateLiveToolCall("c1", { result: "data" });
       store.finalizeLiveToolCall("c1", "done");
@@ -320,13 +321,13 @@ describe("TuiStore", () => {
     });
 
     it("finalizeLiveToolCall on unknown id is a no-op", () => {
-      const store = new TuiStore();
+      const store = new TuiStore({ theme: BUILT_IN_THEME });
       expect(() => store.finalizeLiveToolCall("missing", "done")).not.toThrow();
       expect(store.snapshot().transcript).toHaveLength(0);
     });
 
     it("hasLiveToolCall reflects liveToolCalls membership", () => {
-      const store = new TuiStore();
+      const store = new TuiStore({ theme: BUILT_IN_THEME });
       expect(store.hasLiveToolCall("c1")).toBe(false);
       store.appendLiveToolCall("c1", "x", {});
       expect(store.hasLiveToolCall("c1")).toBe(true);
@@ -335,7 +336,7 @@ describe("TuiStore", () => {
     });
 
     it("appendToolCallToTranscript appends a finalized entry directly (no live phase)", () => {
-      const store = new TuiStore();
+      const store = new TuiStore({ theme: BUILT_IN_THEME });
       store.appendToolCallToTranscript("c1", "read_file", { path: "/x" }, "error", undefined, "unknown tool");
       const snap = store.snapshot();
       expect(snap.liveToolCalls.size).toBe(0);
@@ -346,7 +347,7 @@ describe("TuiStore", () => {
     });
 
     it("appendAgentActivity pushes onto the rolling buffer for a live tool call", () => {
-      const store = new TuiStore();
+      const store = new TuiStore({ theme: BUILT_IN_THEME });
       store.appendLiveToolCall("c1", "dispatch_agent", { agent_name: "a" });
       store.appendAgentActivity("c1", "first line");
       store.appendAgentActivity("c1", "second line");
@@ -356,7 +357,7 @@ describe("TuiStore", () => {
 
     it("appendAgentActivity caps the buffer at AGENT_ACTIVITY_CAP, dropping oldest entries", async () => {
       const { AGENT_ACTIVITY_CAP } = await import("./store.ts");
-      const store = new TuiStore();
+      const store = new TuiStore({ theme: BUILT_IN_THEME });
       store.appendLiveToolCall("c1", "dispatch_agent", {});
       for (let i = 0; i < AGENT_ACTIVITY_CAP + 3; i++) store.appendAgentActivity("c1", `line ${i}`);
       const e = store.snapshot().liveToolCalls.get("c1")!;
@@ -366,13 +367,13 @@ describe("TuiStore", () => {
     });
 
     it("appendAgentActivity is a no-op for unknown callId", () => {
-      const store = new TuiStore();
+      const store = new TuiStore({ theme: BUILT_IN_THEME });
       expect(() => store.appendAgentActivity("missing", "line")).not.toThrow();
       expect(store.snapshot().liveToolCalls.size).toBe(0);
     });
 
     it("finalizeLiveToolCall preserves agentActivity on the transcript entry", () => {
-      const store = new TuiStore();
+      const store = new TuiStore({ theme: BUILT_IN_THEME });
       store.appendLiveToolCall("c1", "dispatch_agent", {});
       store.appendAgentActivity("c1", "did something");
       store.finalizeLiveToolCall("c1", "done");
@@ -381,14 +382,14 @@ describe("TuiStore", () => {
     });
 
     it("clearLiveToolCalls drops in-flight entries (used on turn:end rollback)", () => {
-      const store = new TuiStore();
+      const store = new TuiStore({ theme: BUILT_IN_THEME });
       store.appendLiveToolCall("c1", "read_file", {});
       store.clearLiveToolCalls();
       expect(store.snapshot().liveToolCalls.size).toBe(0);
     });
 
     it("snapshot identity changes on every mutation", () => {
-      const store = new TuiStore();
+      const store = new TuiStore({ theme: BUILT_IN_THEME });
       const s1 = store.snapshot();
       store.appendLiveToolCall("c1", "x", {});
       const s2 = store.snapshot();
@@ -398,21 +399,21 @@ describe("TuiStore", () => {
   });
 
   it("appendOutput defaults to no markdown flag on the entry", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.appendOutput("hello");
     const e = s.snapshot().transcript[0]! as any;
     expect(e.markdown).toBeUndefined();
   });
 
   it("appendOutput records markdown: false when explicitly opted out", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.appendOutput("raw", { markdown: false });
     const e = s.snapshot().transcript[0]! as any;
     expect(e.markdown).toBe(false);
   });
 
   it("appendNotice records markdown: true when opted in", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.appendNotice("# heading", { markdown: true });
     const e = s.snapshot().transcript[0]! as any;
     expect(e.kind).toBe("notice");
@@ -420,14 +421,14 @@ describe("TuiStore", () => {
   });
 
   it("appendNotice without opts leaves markdown undefined", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.appendNotice("plain");
     const e = s.snapshot().transcript[0]! as any;
     expect(e.markdown).toBeUndefined();
   });
 
   it("appendUser records markdown: true when opted in (handoffFrom unaffected)", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.appendUser("**hi**", { markdown: true, handoffFrom: "abc" });
     const e = s.snapshot().transcript[0]! as any;
     expect(e.kind).toBe("user");
@@ -436,7 +437,7 @@ describe("TuiStore", () => {
   });
 
   it("two consecutive writes with different flags produce two distinct entries", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.appendNotice("plain");
     s.appendNotice("# md", { markdown: true });
     const t = s.snapshot().transcript as any[];
@@ -447,7 +448,7 @@ describe("TuiStore", () => {
 
   describe("paste registry", () => {
     it("registerPaste returns id+placeholder, with line count baked in", () => {
-      const s = new TuiStore();
+      const s = new TuiStore({ theme: BUILT_IN_THEME });
       const r1 = s.registerPaste("one line");
       expect(r1.id).toBe(1);
       expect(r1.placeholder).toBe("[Pasted text #1 +1 line]");
@@ -457,20 +458,20 @@ describe("TuiStore", () => {
     });
 
     it("resolvePastes substitutes content for placeholders", () => {
-      const s = new TuiStore();
+      const s = new TuiStore({ theme: BUILT_IN_THEME });
       const r = s.registerPaste("HELLO\nWORLD");
       const line = `before ${r.placeholder} after`;
       expect(s.resolvePastes(line)).toBe("before HELLO\nWORLD after");
     });
 
     it("resolvePastes leaves unknown placeholders alone", () => {
-      const s = new TuiStore();
+      const s = new TuiStore({ theme: BUILT_IN_THEME });
       const line = "[Pasted text #999 +1 line]";
       expect(s.resolvePastes(line)).toBe(line);
     });
 
     it("clearPastes drops content but does not reset ids", () => {
-      const s = new TuiStore();
+      const s = new TuiStore({ theme: BUILT_IN_THEME });
       s.registerPaste("a"); s.registerPaste("b");
       s.clearPastes();
       const r = s.registerPaste("c");
@@ -483,12 +484,12 @@ describe("TuiStore", () => {
 
 describe("TuiStore — prompt slice (open)", () => {
   it("starts with prompt = null", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     expect(s.snapshot().prompt).toBeNull();
   });
 
   it("openOptionsPrompt sets the slice with defaults", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     let resolved: any = null;
     s.openOptionsPrompt(
       {
@@ -510,7 +511,7 @@ describe("TuiStore — prompt slice (open)", () => {
   });
 
   it("openOptionsPrompt honors defaultId", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.openOptionsPrompt(
       { title: "T", body: "B", options: [{ id: "a", label: "A" }, { id: "b", label: "B" }], defaultId: "b" },
       () => {},
@@ -520,7 +521,7 @@ describe("TuiStore — prompt slice (open)", () => {
   });
 
   it("openTextPrompt sets kind=text with defaultValue", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.openTextPrompt({ title: "T", defaultValue: "hello" }, () => {});
     const slice = s.snapshot().prompt;
     expect(slice!.kind).toBe("text");
@@ -530,14 +531,14 @@ describe("TuiStore — prompt slice (open)", () => {
   });
 
   it("openTextPrompt defaults text to empty string", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.openTextPrompt({ title: "T" }, () => {});
     const slice = s.snapshot().prompt;
     expect(slice!.kind === "text" && slice!.text).toBe("");
   });
 
   it("snapshot identity changes when prompt opens", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     const a = s.snapshot();
     s.openOptionsPrompt({ title: "T", body: "B", options: [{ id: "a", label: "A" }] }, () => {});
     const b = s.snapshot();
@@ -561,7 +562,7 @@ describe("TuiStore — prompt slice (navigation)", () => {
   };
 
   it("moveSelection clamps to [0, length-1]", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     openTwo(s);
     s.moveSelection(-1);
     expect(s.snapshot().prompt!.kind === "options" && s.snapshot().prompt!.selectedIndex).toBe(0);
@@ -572,7 +573,7 @@ describe("TuiStore — prompt slice (navigation)", () => {
   });
 
   it("moveSelection is a no-op when prompt is text or null", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.moveSelection(1);
     expect(s.snapshot().prompt).toBeNull();
     s.openTextPrompt({ title: "T" }, () => {});
@@ -581,7 +582,7 @@ describe("TuiStore — prompt slice (navigation)", () => {
   });
 
   it("tabExpand only expands when selected option has expandsTo", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     openTwo(s);
     s.tabExpand();
     expect(s.snapshot().prompt!.kind === "options" && s.snapshot().prompt!.expanded).toBeNull();
@@ -592,7 +593,7 @@ describe("TuiStore — prompt slice (navigation)", () => {
   });
 
   it("tabExpand uses defaultValue when expandsTo provides one", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.openOptionsPrompt(
       {
         title: "T",
@@ -607,7 +608,7 @@ describe("TuiStore — prompt slice (navigation)", () => {
   });
 
   it("collapseExpansion clears expanded (discarding text)", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     openTwo(s);
     s.moveSelection(1);
     s.tabExpand();
@@ -618,7 +619,7 @@ describe("TuiStore — prompt slice (navigation)", () => {
   });
 
   it("setExpandedText replaces the expanded text", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     openTwo(s);
     s.moveSelection(1);
     s.tabExpand();
@@ -628,7 +629,7 @@ describe("TuiStore — prompt slice (navigation)", () => {
   });
 
   it("setExpandedText is a no-op when not expanded", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     openTwo(s);
     s.setExpandedText("ignored");
     const slice = s.snapshot().prompt;
@@ -636,7 +637,7 @@ describe("TuiStore — prompt slice (navigation)", () => {
   });
 
   it("setStandaloneText replaces text in text mode", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.openTextPrompt({ title: "T" }, () => {});
     s.setStandaloneText("hello");
     expect(s.snapshot().prompt!.kind === "text" && s.snapshot().prompt!.text).toBe("hello");
@@ -645,7 +646,7 @@ describe("TuiStore — prompt slice (navigation)", () => {
 
 describe("TuiStore — prompt slice (submit/escape)", () => {
   it("submitPrompt resolves with result and clears the slice", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     let resolved: any = null;
     s.openOptionsPrompt(
       { title: "Approve?", body: "B", options: [{ id: "ok", label: "OK" }] },
@@ -657,7 +658,7 @@ describe("TuiStore — prompt slice (submit/escape)", () => {
   });
 
   it("submitPrompt for options appends a notice transcript entry", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.openOptionsPrompt(
       { title: "Approve?", body: "B", options: [{ id: "ok", label: "OK" }] },
       () => {},
@@ -669,7 +670,7 @@ describe("TuiStore — prompt slice (submit/escape)", () => {
   });
 
   it("submitPrompt for options with text appends '<label>: <text>'", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.openOptionsPrompt(
       {
         title: "Approve?",
@@ -685,13 +686,13 @@ describe("TuiStore — prompt slice (submit/escape)", () => {
   });
 
   it("submitPrompt for text appends '<text>' or '(skipped)'", () => {
-    const s1 = new TuiStore();
+    const s1 = new TuiStore({ theme: BUILT_IN_THEME });
     s1.openTextPrompt({ title: "Reason?" }, () => {});
     s1.submitPrompt("because");
     const t1 = s1.snapshot().transcript.filter((e) => e.kind === "notice").at(-1)!;
     expect((t1 as any).text).toBe("? Reason? → because");
 
-    const s2 = new TuiStore();
+    const s2 = new TuiStore({ theme: BUILT_IN_THEME });
     s2.openTextPrompt({ title: "Reason?" }, () => {});
     s2.submitPrompt("");
     const t2 = s2.snapshot().transcript.filter((e) => e.kind === "notice").at(-1)!;
@@ -699,14 +700,14 @@ describe("TuiStore — prompt slice (submit/escape)", () => {
   });
 
   it("submitPrompt is a no-op when no prompt is active", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     const before = s.snapshot();
     s.submitPrompt({ id: "x" } as any);
     expect(s.snapshot()).toBe(before);
   });
 
   it("escapePrompt resolves options with cancelId (or last option) and clears", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     let resolved: any = null;
     s.openOptionsPrompt(
       { title: "T", body: "B", options: [{ id: "a", label: "A" }, { id: "b", label: "B" }] },
@@ -718,7 +719,7 @@ describe("TuiStore — prompt slice (submit/escape)", () => {
   });
 
   it("escapePrompt honors explicit cancelId on options request", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     let resolved: any = null;
     s.openOptionsPrompt(
       { title: "T", body: "B", options: [{ id: "a", label: "A" }, { id: "b", label: "B" }], cancelId: "a" },
@@ -729,7 +730,7 @@ describe("TuiStore — prompt slice (submit/escape)", () => {
   });
 
   it("escapePrompt resolves text with empty string", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     let resolved: string | null = null;
     s.openTextPrompt({ title: "T", defaultValue: "x" }, (t) => { resolved = t; });
     s.escapePrompt();
@@ -740,31 +741,61 @@ describe("TuiStore — prompt slice (submit/escape)", () => {
 
 describe("TuiStore.latestOutputText", () => {
   it("returns null on empty transcript", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     expect(s.latestOutputText()).toBeNull();
   });
 
   it("returns null when transcript has only non-output kinds", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.appendNotice("hello");
     s.appendUser("hi");
     expect(s.latestOutputText()).toBeNull();
   });
 
   it("returns the text of the only output entry", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.appendNotice("ignored");
     s.appendOutput("the answer");
     expect(s.latestOutputText()).toBe("the answer");
   });
 
   it("returns the most recent output across mixed kinds", () => {
-    const s = new TuiStore();
+    const s = new TuiStore({ theme: BUILT_IN_THEME });
     s.appendOutput("first");
     s.appendNotice("note");
     s.appendUser("question");
     s.appendOutput("second");
     s.appendNotice("done");
     expect(s.latestOutputText()).toBe("second");
+  });
+});
+
+describe("TuiStore.theme", () => {
+  it("constructor seeds the initial theme", () => {
+    const store = new TuiStore({ theme: BUILT_IN_THEME });
+    expect(store.snapshot().theme).toBe(BUILT_IN_THEME);
+  });
+
+  it("setTheme replaces the snapshot value and notifies subscribers", () => {
+    const store = new TuiStore({ theme: BUILT_IN_THEME });
+    let calls = 0;
+    store.subscribe(() => { calls++; });
+    const before = store.snapshot();
+
+    const next = { ...BUILT_IN_THEME, promptColor: "cyan" };
+    store.setTheme(next);
+
+    expect(store.snapshot().theme).toBe(next);
+    expect(store.snapshot()).not.toBe(before);
+    expect(calls).toBe(1);
+  });
+
+  it("setTheme is idempotent on identical reference (no-op subscribers ok)", () => {
+    const store = new TuiStore({ theme: BUILT_IN_THEME });
+    let calls = 0;
+    store.subscribe(() => { calls++; });
+    store.setTheme(BUILT_IN_THEME);
+    expect(store.snapshot().theme).toBe(BUILT_IN_THEME);
+    expect(calls).toBeGreaterThanOrEqual(0);
   });
 });

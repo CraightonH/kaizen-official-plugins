@@ -2,6 +2,7 @@ import { describe, it, expect, mock } from "bun:test";
 import plugin from "./index.tsx";
 import type { UiCompletionService } from "llm-contracts/public";
 import { TuiStore } from "./state/store.ts";
+import { BUILT_IN_THEME } from "./theme/schema.ts";
 
 function makeCtx() {
   const provided: Record<string, unknown> = {};
@@ -73,7 +74,7 @@ describe("llm-tui integration (non-TTY)", () => {
   });
 
   it("store lifecycle: appendLiveToolCall → updateLiveToolCall → finalizeLiveToolCall accumulates stdout into transcript", () => {
-    const store = new TuiStore();
+    const store = new TuiStore({ theme: BUILT_IN_THEME });
     store.appendLiveToolCall("c1", "read_file", { path: "/etc/hosts" });
     store.updateLiveToolCall("c1", { stdoutDelta: "127.0.0.1 localhost\n" });
     store.updateLiveToolCall("c1", { result: "127.0.0.1 localhost\n" });
@@ -95,7 +96,7 @@ describe("llm-tui integration (non-TTY)", () => {
 
 describe("integration: WriteOptions forwarded by store (verifies channel delegation target)", () => {
   it("appendNotice with markdown:true sets entry.markdown === true", () => {
-    const store = new TuiStore();
+    const store = new TuiStore({ theme: BUILT_IN_THEME });
     store.appendNotice("**md**", { markdown: true });
     const e = store.snapshot().transcript.at(-1)! as any;
     expect(e.kind).toBe("notice");
@@ -103,7 +104,7 @@ describe("integration: WriteOptions forwarded by store (verifies channel delegat
   });
 
   it("appendOutput with markdown:false sets entry.markdown === false", () => {
-    const store = new TuiStore();
+    const store = new TuiStore({ theme: BUILT_IN_THEME });
     store.appendOutput("raw", { markdown: false });
     const e = store.snapshot().transcript.at(-1)! as any;
     expect(e.kind).toBe("output");
@@ -111,7 +112,7 @@ describe("integration: WriteOptions forwarded by store (verifies channel delegat
   });
 
   it("appendNotice without opts leaves markdown undefined", () => {
-    const store = new TuiStore();
+    const store = new TuiStore({ theme: BUILT_IN_THEME });
     store.appendNotice("plain");
     const e = store.snapshot().transcript.at(-1)! as any;
     expect(e.kind).toBe("notice");
@@ -121,7 +122,7 @@ describe("integration: WriteOptions forwarded by store (verifies channel delegat
 
 describe("prompt keystroke gating", () => {
   it("Up/Down navigate options; Enter submits with id; transcript echo lands", async () => {
-    const store = new TuiStore();
+    const store = new TuiStore({ theme: BUILT_IN_THEME });
     let resolved: any = null;
     store.openOptionsPrompt(
       {
@@ -144,7 +145,7 @@ describe("prompt keystroke gating", () => {
   });
 
   it("Tab on expandsTo option opens text; typing + Enter resolves with text", async () => {
-    const store = new TuiStore();
+    const store = new TuiStore({ theme: BUILT_IN_THEME });
     let resolved: any = null;
     store.openOptionsPrompt(
       {
@@ -163,7 +164,7 @@ describe("prompt keystroke gating", () => {
 
 describe("integration: Ctrl+X copies latest output", () => {
   it("store accessor returns the most recent assistant message text", () => {
-    const store = new TuiStore();
+    const store = new TuiStore({ theme: BUILT_IN_THEME });
     store.appendOutput("first answer");
     store.appendUser("follow-up");
     store.appendOutput("second answer");
@@ -173,7 +174,7 @@ describe("integration: Ctrl+X copies latest output", () => {
   });
 
   it("notice is posted on copy success path (simulated)", async () => {
-    const store = new TuiStore();
+    const store = new TuiStore({ theme: BUILT_IN_THEME });
     store.appendOutput("# Hello\n\nworld");
 
     const text = store.latestOutputText()!;
