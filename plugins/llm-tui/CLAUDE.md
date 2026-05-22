@@ -21,9 +21,9 @@ state/store.ts         TuiStore class. Single source of truth: transcript, busy,
 completion/registry.ts makeCompletionRegistry({ debounceMs? }) → { service, query }. Stateful
                        closure: source map by id, debounce timer, monotonic token for async
                        cancellation. Pure logic; no React, no ctx.
-theme/loader.ts        loadTheme(deps) → UiTheme. DI-friendly (deps inject readFile/env/log).
-                       realThemeDeps(log, harnessDefaults) supplies the real ones at mount.
-                       DEFAULT_THEME is the baked-in floor.
+theme/schema.ts        BUILT_IN_THEME (baked-in floor) and THEME_SCHEMA (validation for
+                       /config:set llm-tui <field>=<value>). Pure data. The theme value
+                       itself is owned by kaizen-config and lives on TuiSnapshot.theme.
 ui/App.tsx             Root component. Subscribes to TuiStore via useSyncExternalStore.
                        Composes TranscriptView, ThinkingBox, SpinnerLine, InputBox,
                        CompletionPopup, StatusBar.
@@ -40,7 +40,7 @@ ui/ThoughtsBlock.tsx   Collapsed Thoughts transcript entry; Ctrl+R toggles the m
 ```
 
 Boundaries:
-- `state/store.ts`, `completion/registry.ts`, and `theme/loader.ts` are the only stateful non-UI modules. All three are framework-free (no React, no `ctx`).
+- `state/store.ts` and `completion/registry.ts` are the only stateful non-UI modules. Both are framework-free (no React, no `ctx`). `theme/schema.ts` is pure data.
 - Only `index.tsx` imports `kaizen/types` or touches `ctx`.
 - UI components read from the store via `useSyncExternalStore` (subscribe + snapshot). Never reach into `ctx` from a component.
 - Tests for each module live alongside it (`*.test.ts(x)`) and run independently under `bun test`.
@@ -53,7 +53,7 @@ Boundaries:
 - **Popup never submits.** Enter/Tab on a selection only inserts text and closes; submission requires a separate Enter with the popup closed (or open-with-zero-matches fall-through).
 - **Trigger detection is naive.** Inside-word / inside-quotes / inside-backticks suppression is a linear scan from line start. Edge cases bias toward "open" rather than "skip" — keep it that way; full lexing is out of scope.
 - **Source `list()` errors are swallowed per-source.** Other sources for the same trigger still contribute. Don't surface these as notices.
-- **Theme is read-once.** No hot reload. If you add a watcher, keep `current()` returning a stable reference between mutations so consumers can cache.
+- **Theme lives on the store snapshot.** `config:store.watch("llm-tui")` pushes updates into `TuiStore.setTheme()`. `UiThemeService.current()` returns the latest value. Components must read `state.theme` from the snapshot rather than calling `themeService.current()` ad hoc, or they'll miss live updates. Tool renderers take a `getTheme: () => UiTheme` callback for the same reason.
 - **Fallback channel matches TTY channel shape.** Adding a method to `UiChannelService` requires adding a (possibly no-op) implementation to `fallback.ts` in the same change.
 - **Status bar has no public mutator.** All updates go through `status:item-update` / `status:item-clear`. Adding a method bypassing the event bus breaks the decoupling guarantee.
 - **Reasoning lifecycle is tri-state.** `llm:reasoning` deltas accumulate; `llm:done` finalizes into a Thoughts block; `turn:end` clears unfinalized buffers. All three handlers must remain symmetric or the thinking box leaks across turns.
@@ -110,7 +110,7 @@ cd plugins/llm-tui && bun test
 
 - `state/store.test.ts` covers every reducer-style mutation and the `readInput` queue/await pair.
 - `completion/registry.test.ts` covers register/unregister, debouncing, async cancellation by token, and per-source error swallowing.
-- `theme/loader.test.ts` uses injected `ThemeDeps` — never the real filesystem.
+- `theme/schema.test.ts` exercises the color regex and `THEME_SCHEMA` against the kaizen-config validator. No filesystem.
 - UI tests use `ink-testing-library` (`render`, `lastFrame`); avoid driving the real terminal.
 - `index.test.ts` is the lifecycle smoke test (mount, register a fake source, simulate keypresses, assert store transitions). Use the fake-`ctx` helper there rather than spinning up a real Kaizen runtime.
 - `integration.test.ts` runs the cross-component flow without Ink — store + registry + simulated input only.
