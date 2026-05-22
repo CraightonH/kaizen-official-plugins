@@ -54,7 +54,7 @@ const plugin: KaizenPlugin = {
     // bash). Each provides a verbose result view rendered inline below the
     // one-line summary. External tools can override by registering their own
     // renderer with the same toolName.
-    for (const r of defaultRenderers(theme)) toolRenderers.service.register(r);
+    for (const r of defaultRenderers(() => themeService.current())) toolRenderers.service.register(r);
 
     // Track registered sources by id. The InputBox derives both char-trigger
     // activation and match-based activation from this map. The Map is mutated

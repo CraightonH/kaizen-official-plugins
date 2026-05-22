@@ -1,7 +1,6 @@
 import React from "react";
 import { Text } from "ink";
-import type { UiToolRenderer } from "llm-contracts/public";
-import type { TuiTheme } from "../theme/loader.ts";
+import type { UiTheme, UiToolRenderer } from "llm-contracts/public";
 import { extractPrimaryString, PRIMARY_RESULT_KEYS } from "./util.ts";
 
 const PREVIEW_LINES = 10;
@@ -23,13 +22,13 @@ function basename(p: string): string {
   return idx >= 0 ? p.slice(idx + 1) : p;
 }
 
-function renderError(msg: string, theme: TuiTheme): React.ReactNode {
+function renderError(msg: string, theme: UiTheme): React.ReactNode {
   return <Text color={theme.noticeColor}>{truncLine(msg)}</Text>;
 }
 
 function renderLines(
   lines: string[],
-  theme: TuiTheme,
+  theme: UiTheme,
   hidden: number,
   prefix: (i: number, line: string) => { glyph: string; color?: string; dim?: boolean } | null = () => null,
 ): React.ReactNode {
@@ -55,7 +54,7 @@ function renderLines(
   );
 }
 
-export function defaultRenderers(theme: TuiTheme): UiToolRenderer[] {
+export function defaultRenderers(getTheme: () => UiTheme): UiToolRenderer[] {
   return [
     // edit: show a unified-ish diff. str_replace command only; insert handled below.
     {
@@ -68,6 +67,7 @@ export function defaultRenderers(theme: TuiTheme): UiToolRenderer[] {
         return cmd && base ? `${cmd} ${base}` : (base || cmd);
       },
       expandedView: (args, _result, status) => {
+        const theme = getTheme();
         if (status === "error") return null;
         const a = (args ?? {}) as Record<string, unknown>;
 
@@ -123,6 +123,7 @@ export function defaultRenderers(theme: TuiTheme): UiToolRenderer[] {
         return path ? basename(path) : "";
       },
       expandedView: (args, _result, status) => {
+        const theme = getTheme();
         if (status === "error") return null;
         const a = (args ?? {}) as Record<string, unknown>;
         const content = typeof a.content === "string" ? a.content : "";
@@ -146,6 +147,7 @@ export function defaultRenderers(theme: TuiTheme): UiToolRenderer[] {
         return path ? basename(path) : "";
       },
       expandedView: (args, _result, status) => {
+        const theme = getTheme();
         if (status === "error") return null;
         const a = (args ?? {}) as Record<string, unknown>;
         const content = typeof a.content === "string" ? a.content : "";
@@ -172,6 +174,7 @@ export function defaultRenderers(theme: TuiTheme): UiToolRenderer[] {
         return `exec ${n} line${n === 1 ? "" : "s"}`;
       },
       expandedView: (args, result, _status, stdout) => {
+        const theme = getTheme();
         const code = typeof (args as any)?.code === "string" ? (args as any).code : "";
         const codePrev = code ? previewLines(code, PREVIEW_LINES) : { lines: [], hidden: 0 };
         const stdoutPrev = stdout ? previewLines(stdout, PREVIEW_LINES) : { lines: [], hidden: 0 };
@@ -220,6 +223,7 @@ export function defaultRenderers(theme: TuiTheme): UiToolRenderer[] {
         return cmd.replace(/\s+/g, " ").trim();
       },
       expandedView: (_args, result, status, stdout) => {
+        const theme = getTheme();
         if (status === "error") {
           return result ? renderError(result, theme) : null;
         }

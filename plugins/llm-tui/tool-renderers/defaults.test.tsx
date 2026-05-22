@@ -17,7 +17,7 @@ const theme = {
 
 function withDefaults() {
   const reg = makeToolRendererRegistry();
-  for (const r of defaultRenderers(theme as any)) reg.service.register(r);
+  for (const r of defaultRenderers(() => theme as any)) reg.service.register(r);
   return reg;
 }
 
