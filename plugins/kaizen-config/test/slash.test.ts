@@ -230,6 +230,53 @@ describe("/config:unset", () => {
   });
 });
 
+describe("/config:set — completion callback threads query through", () => {
+  function makeStoreWithSchema(): ConfigStoreService {
+    return makeStore({
+      list: () => [
+        {
+          plugin: "kaizen-config",
+          homePath: "/h",
+          projectPath: "/p",
+          homeExists: true,
+          projectExists: false,
+          resolution: {},
+        },
+      ],
+      getSpec: (_p: string) => ({
+        plugin: "kaizen-config",
+        defaults: {},
+        schema: {
+          enabled: { type: "boolean" },
+          backend: { type: "enum", values: ["env", "keychain"] },
+          apiKey: { type: "string", secret: true },
+          url: { type: "string" },
+        },
+      }),
+    });
+  }
+
+  it("threads query into keyEqualsValueCompletions — field tier vs value tier", async () => {
+    const captured: { arg?: { complete?: (prev: string[], query: string) => Promise<any> } } = {};
+    const reg: SlashRegistryLike = {
+      register(manifest: any, _handler: any) {
+        if (manifest.name === "config:set") {
+          captured.arg = manifest.arguments?.[1];
+        }
+        return () => {};
+      },
+    };
+    registerSlashCommands(reg, makeDeps({ store: makeStoreWithSchema() }));
+
+    expect(captured.arg?.complete).toBeDefined();
+    const rowsField = await captured.arg!.complete!(["kaizen-config"], "");
+    const rowsValue = await captured.arg!.complete!(["kaizen-config"], "enabled=");
+    // Field tier returns all schema keys; value tier returns 2 booleans
+    expect(rowsField.length).toBeGreaterThan(rowsValue.length);
+    expect(rowsValue.every((r: any) => r.label.includes("true") || r.label.includes("false"))).toBe(true);
+  });
+});
+
 describe("/config:list — resolution + backends footer", () => {
   it("prints resolution column and registered backends in footer", async () => {
     const { reg, registered } = makeRegistry();
