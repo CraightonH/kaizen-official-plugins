@@ -150,8 +150,8 @@ export async function keyEqualsValueCompletions(
 ```
 
 `keyOnlyCompletions` (consumed by `/config:get` and `/config:unset`) gets the
-same `[<value> · <source>] <type>` detail treatment via `renderFieldRow`. No
-value tier is needed for those commands since they don't take a value.
+same `✓ <value> · <source>  <type>` detail treatment via `renderFieldRow`.
+No value tier is needed for those commands since they don't take a value.
 
 ### `slash.ts`
 
@@ -180,48 +180,70 @@ internally.
    the schema (`store.getSpec`), the merged value snapshot (`store.get`), and
    the per-field resolution map (`store.list().find(...).resolution`). For
    each field it calls `renderFieldRow`.
-5. User picks `thoughtsMarkdown [true · home] boolean`. The accepted row's
-   `insertText` is `thoughtsMarkdown=`. The cursor now sits right after `=`.
+5. User picks `thoughtsMarkdown` (detail: `✓ true · home  boolean`). The
+   accepted row's `insertText` is `thoughtsMarkdown=`. The cursor now sits
+   right after `=`.
 6. Steps 2–3 fire again. `query` is now `"thoughtsMarkdown="`.
 7. `keyEqualsValueCompletions` sees `=` → value tier. It slices the query at
    `=`, looks up the field schema for `thoughtsMarkdown`, and calls
    `renderValueRows`. The result is two rows:
-   `thoughtsMarkdown=true [current] boolean` and
-   `thoughtsMarkdown=false [true] boolean`.
+   `✓ true` / `boolean` (insertText `thoughtsMarkdown=true `) and
+   `  false` / `boolean` (insertText `thoughtsMarkdown=false `).
 8. User picks one. `insertText` includes a trailing space, which advances the
    slot index past `1` and triggers the flag-tier menu (`--project`).
 
 ## Rendering rules
 
+### Common convention: the `✓` glyph
+
+Wherever the menu surfaces "this is the value currently in force," the
+rendered text is prefixed with `✓ ` (U+2713 followed by a single space).
+Non-current rows in the same menu get a `  ` (two-space) prefix so the
+value column stays vertically aligned.
+
+This applies to:
+
+- Field-tier `detail` (the field's effective value).
+- Value-tier `label` (each value choice, with `✓` only on the one matching
+  the current value).
+
+The "unset" state shows `(unset)` with no `✓` — nothing is in force.
+
 ### Field tier (query has no `=`)
+
+`label` is always the bare field key (e.g. `defaultSecretBackend`). The
+table below shows the `detail` and `insertText`.
 
 | Scenario | `detail` | `insertText` |
 |---|---|---|
-| Free-form string/number, set in `home` | `[bitwarden · home] string` | `defaultSecretBackend=bitwarden ` |
-| Free-form, only default | `[bitwarden · default] string` | `defaultSecretBackend=bitwarden ` |
-| Free-form, env override active | `[bitwarden · env] string` | `defaultSecretBackend=` |
-| Secret string, set | `[*** · home] string · secret` | `apiKey=` |
-| Secret string, unset | `[(unset)] string · secret` | `apiKey=` |
-| Boolean, set | `[true · home] boolean` | `thoughtsMarkdown=` |
-| Enum, set | `[keychain · project] enum` | `defaultSecretBackend=` |
-| Unset (no default) | `[(unset)] string` | `key=` |
-| Value length > 30 | `[abcdefghij…vwxyz · home] string` | full value in insertText |
+| Free-form string/number, set in `home` | `✓ bitwarden · home  string` | `defaultSecretBackend=bitwarden ` |
+| Free-form, only default | `✓ bitwarden · default  string` | `defaultSecretBackend=bitwarden ` |
+| Free-form, env override active | `✓ bitwarden · env  string` | `defaultSecretBackend=` |
+| Secret string, set | `✓ *** · home  string · secret` | `apiKey=` |
+| Secret string, unset | `(unset)  string · secret` | `apiKey=` |
+| Boolean, set | `✓ true · home  boolean` | `thoughtsMarkdown=` |
+| Enum, set | `✓ keychain · project  enum` | `defaultSecretBackend=` |
+| Unset (no default) | `(unset)  string` | `key=` |
+| Value length > 30 | `✓ abcdefghij…vwxyz · home  string` | full value in insertText |
 
 `default` is shown explicitly in the detail (the user opted in to surfacing
 defaults so it's clear *why* the field has its current effective value).
 
 ### Value tier (query like `key=` or `key=part`)
 
-| Scenario | Rows |
+`label` carries the value with the `✓`/`  ` prefix; `detail` is the type
+only. `insertText` is always the full `key=value ` token so the slash arg
+parses correctly.
+
+| Scenario | Rows (`label` / `detail` / `insertText`) |
 |---|---|
-| Boolean, current `true` | `key=true [current] boolean`, `key=false [true] boolean` |
-| Enum `keychain\|bitwarden\|env`, current `bitwarden` | `key=keychain [bitwarden] enum`, `key=bitwarden [current] enum`, `key=env [bitwarden] enum` |
+| Boolean, current `true` | `✓ true` / `boolean` / `thoughtsMarkdown=true `<br>`  false` / `boolean` / `thoughtsMarkdown=false ` |
+| Enum `keychain\|bitwarden\|env`, current `bitwarden` | `  keychain` / `enum` / `defaultSecretBackend=keychain `<br>`✓ bitwarden` / `enum` / `defaultSecretBackend=bitwarden `<br>`  env` / `enum` / `defaultSecretBackend=env ` |
 | `valueQuery = "k"` | only rows whose value starts with `k` |
 | Free-form string/number | `[]` |
 
-The `[current]` marker on the matching row directly answers "what's set now?";
-the `[<current value>]` marker on non-matching rows directly answers "what
-would change if I pick this?".
+The `✓` directly answers "what's set now?" while the un-checked rows show
+the values you'd be selecting in place of it.
 
 ## `insertText` pre-fill rules
 
@@ -245,9 +267,9 @@ In any other case, `insertText` is `\`${key}=\``.
   doesn't exist; there are no valid value suggestions to offer.
 - `store.get()` returning malformed data (shouldn't happen given schema
   validation invariants, but defensively): `formatValue` catches and renders
-  `[(error)]` so the menu degrades gracefully.
+  `(error)` so the menu degrades gracefully.
 - `redactValue` throwing on a non-conformant secret value: same fall-through
-  to `[(error)]`.
+  to `(error)`.
 
 ## Testing
 
@@ -286,5 +308,6 @@ In any other case, `insertText` is `\`${key}=\``.
 
 ## Open questions
 
-None at time of writing. Truncation length (30) and the default marker
-(shown explicitly rather than elided) were locked during brainstorming.
+None at time of writing. Truncation length (30), the default marker
+(shown explicitly rather than elided), and the `✓` convention (unified
+across field and value tiers) were locked during brainstorming.
