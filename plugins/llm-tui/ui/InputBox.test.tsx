@@ -4,13 +4,13 @@ import { render } from "ink-testing-library";
 import { InputBox } from "./InputBox.tsx";
 import { TuiStore } from "../state/store.ts";
 import { makeCompletionRegistry } from "../completion/registry.ts";
-import { DEFAULT_THEME } from "../theme/loader.ts";
+import { BUILT_IN_THEME } from "../theme/schema.ts";
 import type { CompletionSource } from "llm-contracts/public";
 
 const tick = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 
 function setup() {
-  const store = new TuiStore({ theme: DEFAULT_THEME });
+  const store = new TuiStore({ theme: BUILT_IN_THEME });
   const reg = makeCompletionRegistry({ debounceMs: 0 });
   const sources = new Map<string, CompletionSource>();
   // Mirror the production wrapper from llm-tui/index.tsx so register()
@@ -36,7 +36,7 @@ describe("InputBox", () => {
   it("renders prompt label and typed characters", async () => {
     const ctx = setup();
     const { stdin, lastFrame } = render(
-      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
     );
     await tick();
     stdin.write("hello");
@@ -49,7 +49,7 @@ describe("InputBox", () => {
     const ctx = setup();
     let submitted = "";
     const { stdin } = render(
-      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={(t) => { submitted = t; }} />,
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={(t) => { submitted = t; }} />,
     );
     await tick();
     stdin.write("ping");
@@ -65,7 +65,7 @@ describe("InputBox", () => {
     ctx.sources.set(src.id, src);
     ctx.reg.service.register(src);
     const { stdin } = render(
-      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
     );
     await tick();
     stdin.write("/");
@@ -80,7 +80,7 @@ describe("InputBox", () => {
     ctx.sources.set(src.id, src);
     ctx.reg.service.register(src);
     const { stdin } = render(
-      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
     );
     await tick();
     stdin.write("foo");
@@ -96,7 +96,7 @@ describe("InputBox", () => {
     ctx.sources.set(src.id, src);
     ctx.reg.service.register(src);
     const { stdin } = render(
-      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
     );
     await tick();
     stdin.write('say "');
@@ -110,7 +110,7 @@ describe("InputBox", () => {
     const ctx = setup();
     // triggers stays empty
     const { stdin } = render(
-      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
     );
     await tick();
     stdin.write("/");
@@ -131,7 +131,7 @@ describe("InputBox", () => {
     ctx.reg.service.register(src);
     let submitted: string | null = null;
     const { stdin } = render(
-      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={(t) => { submitted = t; }} />,
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={(t) => { submitted = t; }} />,
     );
     await tick();
     stdin.write("/");
@@ -152,7 +152,7 @@ describe("InputBox", () => {
     ctx.sources.set(src.id, src);
     ctx.reg.service.register(src);
     const { stdin } = render(
-      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
     );
     await tick();
     stdin.write("/");
@@ -170,7 +170,7 @@ describe("InputBox", () => {
     ctx.reg.service.register(src);
     let submitted = "";
     const { stdin } = render(
-      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={(t) => { submitted = t; }} />,
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={(t) => { submitted = t; }} />,
     );
     await tick();
     stdin.write("/notarealcommand");
@@ -188,7 +188,7 @@ describe("InputBox", () => {
     ctx.sources.set(src.id, src);
     ctx.reg.service.register(src);
     const { stdin } = render(
-      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
     );
     await tick();
     stdin.write("/he");
@@ -206,7 +206,7 @@ describe("InputBox", () => {
     ctx.sources.set(src.id, src);
     ctx.reg.service.register(src);
     const { stdin } = render(
-      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
     );
     await tick();
     stdin.write("/");
@@ -230,7 +230,7 @@ describe("InputBox", () => {
     async function typed(text: string) {
       const ctx = setup();
       const { stdin } = render(
-        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
       );
       await tick();
       stdin.write(text);
@@ -299,7 +299,7 @@ describe("InputBox", () => {
     it("line jumps respect newlines (multi-line buffer)", async () => {
       const ctx = setup();
       const { stdin } = render(
-        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
       );
       await tick();
       // "abc\ndefgh" — place cursor in middle of second line (offset 6 = "de|fgh").
@@ -318,7 +318,7 @@ describe("InputBox", () => {
     it("breaks long lines into rows that each begin with the gutter prefix", async () => {
       const ctx = setup();
       const { stdin, lastFrame } = render(
-        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
       );
       await tick();
       stdin.write("a".repeat(120)); // forces at least 2 visual rows
@@ -335,7 +335,7 @@ describe("InputBox", () => {
     it("cursor stays aligned across wrap boundary", async () => {
       const ctx = setup();
       const { stdin } = render(
-        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
       );
       await tick();
       stdin.write("a".repeat(120));
@@ -352,7 +352,7 @@ describe("InputBox", () => {
     it("paste in a single chunk inserts a placeholder, not the raw text", async () => {
       const ctx = setup();
       const { stdin } = render(
-        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
       );
       await tick();
       stdin.write("\x1b[200~hello\nworld\x1b[201~");
@@ -366,7 +366,7 @@ describe("InputBox", () => {
     it("paste split across two chunks accumulates correctly", async () => {
       const ctx = setup();
       const { stdin } = render(
-        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
       );
       await tick();
       stdin.write("\x1b[200~partial");
@@ -382,7 +382,7 @@ describe("InputBox", () => {
       const ctx = setup();
       let submitted = "";
       const { stdin } = render(
-        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={(t) => { submitted = t; }} />,
+        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={(t) => { submitted = t; }} />,
       );
       await tick();
       stdin.write("\x1b[200~line one\nline two\x1b[201~");
@@ -395,7 +395,7 @@ describe("InputBox", () => {
     it("backspace at end of placeholder deletes the whole token atomically", async () => {
       const ctx = setup();
       const { stdin } = render(
-        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
       );
       await tick();
       stdin.write("\x1b[200~hello\nworld\x1b[201~");
@@ -410,7 +410,7 @@ describe("InputBox", () => {
     it("backspace works atomically on a manually typed placeholder", async () => {
       const ctx = setup();
       const { stdin } = render(
-        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
       );
       await tick();
       stdin.write("a[Pasted text #99 +3 lines]b");
@@ -430,7 +430,7 @@ describe("InputBox", () => {
     it("Left arrow at end of placeholder jumps to its start atomically", async () => {
       const ctx = setup();
       const { stdin } = render(
-        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
       );
       await tick();
       stdin.write("ab");
@@ -454,7 +454,7 @@ describe("InputBox", () => {
     it("Right arrow at start of placeholder jumps to its end atomically", async () => {
       const ctx = setup();
       const { stdin } = render(
-        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
       );
       await tick();
       stdin.write("ab");
@@ -474,7 +474,7 @@ describe("InputBox", () => {
     it("Option+Left across a placeholder lands on its start", async () => {
       const ctx = setup();
       const { stdin } = render(
-        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
       );
       await tick();
       stdin.write("hello ");
@@ -499,7 +499,7 @@ describe("InputBox", () => {
       const ctx = setup();
       let submitted = "";
       const { stdin } = render(
-        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={(t) => { submitted = t; }} />,
+        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={(t) => { submitted = t; }} />,
       );
       await tick();
       stdin.write("before ");
@@ -519,7 +519,7 @@ describe("InputBox", () => {
       const ctx = setup();
       let exited = false;
       const { stdin, lastFrame } = render(
-        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} onExit={() => { exited = true; }} />,
+        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} onExit={() => { exited = true; }} />,
       );
       await tick();
       stdin.write("draft");
@@ -534,7 +534,7 @@ describe("InputBox", () => {
     it("hint clears after the exit window expires", async () => {
       const ctx = setup();
       const { stdin, lastFrame } = render(
-        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} onExit={() => {}} />,
+        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} onExit={() => {}} />,
       );
       await tick();
       stdin.write("\x03");
@@ -549,7 +549,7 @@ describe("InputBox", () => {
       const ctx = setup();
       let exitCount = 0;
       const { stdin } = render(
-        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} onExit={() => { exitCount++; }} />,
+        <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} onExit={() => { exitCount++; }} />,
       );
       await tick();
       stdin.write("\x03");
@@ -573,7 +573,7 @@ describe("InputBox", () => {
     ctx.sources.set(src.id, src);
     ctx.reg.service.register(src);
     const { stdin } = render(
-      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
     );
     await tick();
     stdin.write("/foo bar");
@@ -591,7 +591,7 @@ describe("InputBox", () => {
     // registrations and treat their trigger chars as live.
     const ctx = setup();
     const { stdin } = render(
-      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
     );
     await tick();
     // Register the "/" source AFTER mount.
@@ -618,7 +618,7 @@ describe("InputBox", () => {
     ctx.sources.set(src.id, src);
     ctx.reg.service.register(src);
     const { stdin } = render(
-      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
     );
     await tick();
     stdin.write("/cmd ");
@@ -645,7 +645,7 @@ describe("InputBox", () => {
     ctx.sources.set(src.id, src);
     ctx.reg.service.register(src);
     const { stdin } = render(
-      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
     );
     await tick();
     stdin.write("/foo ");
@@ -661,7 +661,7 @@ describe("InputBox", () => {
     const ctx = setup();
     ctx.store.submit("first");
     const { stdin, lastFrame } = render(
-      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={DEFAULT_THEME} onSubmit={ctx.onSubmit} />,
+      <InputBox store={ctx.store} registry={ctx.reg} sources={ctx.sources} theme={BUILT_IN_THEME} onSubmit={ctx.onSubmit} />,
     );
     await tick();
     stdin.write("\x1b[A");
@@ -680,7 +680,7 @@ describe("InputBox Ctrl+X copy", () => {
         store={ctx.store}
         registry={ctx.reg}
         sources={ctx.sources}
-        theme={DEFAULT_THEME}
+        theme={BUILT_IN_THEME}
         onSubmit={ctx.onSubmit}
         copyToClipboard={opts?.copyToClipboard}
       />,

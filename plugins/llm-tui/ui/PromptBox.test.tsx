@@ -3,19 +3,19 @@ import React from "react";
 import { render } from "ink-testing-library";
 import { PromptBox } from "./PromptBox.tsx";
 import { TuiStore } from "../state/store.ts";
-import { DEFAULT_THEME } from "../theme/loader.ts";
+import { BUILT_IN_THEME } from "../theme/schema.ts";
 
-const theme = DEFAULT_THEME;
+const theme = BUILT_IN_THEME;
 
 describe("<PromptBox>", () => {
   it("renders nothing when prompt is null", () => {
-    const store = new TuiStore({ theme: DEFAULT_THEME });
+    const store = new TuiStore({ theme: BUILT_IN_THEME });
     const { lastFrame } = render(<PromptBox store={store} theme={theme} />);
     expect(lastFrame()?.trim() ?? "").toBe("");
   });
 
   it("renders options mode with selected indicator", () => {
-    const store = new TuiStore({ theme: DEFAULT_THEME });
+    const store = new TuiStore({ theme: BUILT_IN_THEME });
     store.openOptionsPrompt(
       {
         title: "Approve tool call?",
@@ -38,7 +38,7 @@ describe("<PromptBox>", () => {
   });
 
   it("renders Tab-hint on options with expandsTo", () => {
-    const store = new TuiStore({ theme: DEFAULT_THEME });
+    const store = new TuiStore({ theme: BUILT_IN_THEME });
     store.openOptionsPrompt(
       {
         title: "T",
@@ -52,7 +52,7 @@ describe("<PromptBox>", () => {
   });
 
   it("renders expanded mode with text input row", () => {
-    const store = new TuiStore({ theme: DEFAULT_THEME });
+    const store = new TuiStore({ theme: BUILT_IN_THEME });
     store.openOptionsPrompt(
       {
         title: "T",
@@ -70,7 +70,7 @@ describe("<PromptBox>", () => {
   });
 
   it("renders standalone text mode", () => {
-    const store = new TuiStore({ theme: DEFAULT_THEME });
+    const store = new TuiStore({ theme: BUILT_IN_THEME });
     store.openTextPrompt({ title: "Reason?", body: "Why deny?", placeholder: "type here" }, () => {});
     const { lastFrame } = render(<PromptBox store={store} theme={theme} />);
     const frame = lastFrame() ?? "";
@@ -79,7 +79,7 @@ describe("<PromptBox>", () => {
   });
 
   it("handles CJK width in body without breaking layout", () => {
-    const store = new TuiStore({ theme: DEFAULT_THEME });
+    const store = new TuiStore({ theme: BUILT_IN_THEME });
     store.openOptionsPrompt(
       {
         title: "ツール呼び出しを承認しますか?",
