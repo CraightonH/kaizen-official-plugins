@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
 import type { ToolCallEntry } from "../state/store.ts";
 import type { ToolRendererRegistry } from "../tool-renderers/registry.ts";
-import type { TuiTheme } from "../theme/loader.ts";
+import type { UiTheme } from "llm-contracts/public";
 import { defaultCollapsedSummary, defaultResultPreview } from "../tool-renderers/util.ts";
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -10,7 +10,7 @@ const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", 
 export interface ToolCallBlockProps {
   entry: ToolCallEntry;
   registry: ToolRendererRegistry;
-  theme: TuiTheme;
+  theme: UiTheme;
 }
 
 export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ entry, registry, theme }) => {

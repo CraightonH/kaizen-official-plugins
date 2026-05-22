@@ -2,13 +2,13 @@ import React, { useSyncExternalStore } from "react";
 import { Box, Text } from "ink";
 import type { TuiStore } from "../state/store.ts";
 import type { ToolRendererRegistry } from "../tool-renderers/registry.ts";
-import type { TuiTheme } from "../theme/loader.ts";
+import type { UiTheme } from "llm-contracts/public";
 import { ToolCallBlock } from "./ToolCallBlock.tsx";
 
 export interface LiveToolCallsProps {
   store: TuiStore;
   registry: ToolRendererRegistry;
-  theme: TuiTheme;
+  theme: UiTheme;
 }
 
 /**

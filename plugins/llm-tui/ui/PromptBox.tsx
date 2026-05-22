@@ -1,11 +1,11 @@
 import React, { useSyncExternalStore } from "react";
 import { Box, Text } from "ink";
 import type { TuiStore } from "../state/store.ts";
-import type { TuiTheme } from "../theme/loader.ts";
+import type { UiTheme } from "llm-contracts/public";
 
 export interface PromptBoxProps {
   store: TuiStore;
-  theme: TuiTheme;
+  theme: UiTheme;
 }
 
 export const PromptBox: React.FC<PromptBoxProps> = ({ store, theme }) => {

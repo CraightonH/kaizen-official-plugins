@@ -1,12 +1,12 @@
 import React, { useSyncExternalStore } from "react";
 import { Box, Text, useInput } from "ink";
 import type { PlainTranscriptLine, ToolCallEntry, TuiStore, TranscriptLine } from "../state/store.ts";
-import type { TuiTheme } from "../theme/loader.ts";
+import type { UiTheme } from "llm-contracts/public";
 import { renderMarkdown } from "./markdown.ts";
 
 export interface HistoryViewProps {
   store: TuiStore;
-  theme: TuiTheme;
+  theme: UiTheme;
 }
 
 type ThoughtsEntry = PlainTranscriptLine & { kind: "thoughts" };

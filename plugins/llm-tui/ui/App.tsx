@@ -3,7 +3,6 @@ import { Box, Static, Text, useInput } from "ink";
 import type { CopyResult } from "../clipboard.ts";
 import type { TuiStore, TranscriptLine } from "../state/store.ts";
 import type { CompletionRegistry } from "../completion/registry.ts";
-import type { TuiTheme } from "../theme/loader.ts";
 import { SpinnerLine } from "./SpinnerLine.tsx";
 import { StatusBar } from "./StatusBar.tsx";
 import { InputBox } from "./InputBox.tsx";
@@ -15,14 +14,14 @@ import { LiveToolCalls } from "./LiveToolCalls.tsx";
 import { PromptBox } from "./PromptBox.tsx";
 import { renderMarkdown } from "./markdown.ts";
 import type { ToolRendererRegistry } from "../tool-renderers/registry.ts";
-import type { CompletionSource } from "llm-contracts/public";
+import type { CompletionSource, UiTheme } from "llm-contracts/public";
 
 export interface AppProps {
   store: TuiStore;
   registry: CompletionRegistry;
   toolRenderers: ToolRendererRegistry;
   sources: Map<string, CompletionSource>;
-  theme: TuiTheme;
+  theme: UiTheme;
   onSubmit: (text: string) => void;
   onCancel?: () => void;
   onExit?: () => void;

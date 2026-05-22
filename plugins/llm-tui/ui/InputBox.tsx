@@ -3,16 +3,15 @@ import { Box, Text, useInput, usePaste, useStdout } from "ink";
 import { useSyncExternalStore } from "react";
 import type { TuiStore } from "../state/store.ts";
 import type { CompletionRegistry } from "../completion/registry.ts";
-import type { TuiTheme } from "../theme/loader.ts";
 import type { CopyResult } from "../clipboard.ts";
-import type { CompletionSource } from "llm-contracts/public";
+import type { CompletionSource, UiTheme } from "llm-contracts/public";
 import { CompletionPopup } from "./CompletionPopup.tsx";
 
 export interface InputBoxProps {
   store: TuiStore;
   registry: CompletionRegistry;
   sources: Map<string, CompletionSource>;
-  theme: TuiTheme;
+  theme: UiTheme;
   onSubmit: (text: string) => void;
   onCancel?: () => void;
   onExit?: () => void;
