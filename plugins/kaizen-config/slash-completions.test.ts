@@ -139,15 +139,44 @@ describe("keyEqualsValueCompletions", () => {
 });
 
 describe("keyOnlyCompletions", () => {
-  it("returns one item per top-level key with no '=' suffix", async () => {
-    const items = await keyOnlyCompletions(makeStore(), ["kaizen-config"]);
-    const labels = items.map(i => i.label);
-    expect(labels.sort()).toEqual(["apiKey", "backend", "enabled", "url"].sort());
-    for (const it of items) expect(it.insertText.includes("=")).toBe(false);
+  function storeWith(
+    snapshot: Record<string, unknown>,
+    resolution: Record<string, "default" | "home" | "project" | "env">,
+  ): ConfigStoreService {
+    const base = makeStore();
+    return {
+      ...base,
+      get: () => snapshot as any,
+      list: () => [
+        {
+          plugin: "kaizen-config",
+          homePath: "/h",
+          projectPath: "/p",
+          homeExists: true,
+          projectExists: false,
+          resolution,
+        },
+      ],
+    };
+  }
+
+  it("returns one row per field with insertText `key ` (trailing space, no `=`)", async () => {
+    const store = storeWith({ url: "https://x" }, { url: "home" });
+    const items = await keyOnlyCompletions(store, ["kaizen-config"]);
+    expect(items.map((i) => i.label).sort()).toEqual(["apiKey", "backend", "enabled", "url"]);
+    const url = items.find((i) => i.label === "url")!;
+    expect(url.insertText).toBe("url ");
+    expect(url.insertText.includes("=")).toBe(false);
   });
 
-  it("appends a trailing space to insertText so the next slot fires", async () => {
-    const items = await keyOnlyCompletions(makeStore(), ["kaizen-config"]);
-    for (const it of items) expect(it.insertText.endsWith(" ")).toBe(true);
+  it("detail uses the same ✓ value · source  type convention as the field tier", async () => {
+    const store = storeWith({ url: "https://x" }, { url: "home" });
+    const items = await keyOnlyCompletions(store, ["kaizen-config"]);
+    expect(items.find((i) => i.label === "url")!.detail).toBe("✓ https://x · home  string");
+  });
+
+  it("returns [] when plugin is unknown", async () => {
+    const items = await keyOnlyCompletions(makeStore(), ["nope"]);
+    expect(items).toEqual([]);
   });
 });

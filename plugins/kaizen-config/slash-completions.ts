@@ -74,14 +74,28 @@ export async function keyOnlyCompletions(
   const plugin = prev[0];
   if (!plugin) return [];
   const spec = store.getSpec(plugin);
-  const schema = spec?.schema ?? {};
-  const items: CompletionItem[] = [];
+  const schema = spec?.schema as Record<string, FieldSchema | undefined> | undefined;
+  if (!schema) return [];
+
+  let merged: Record<string, unknown> = {};
+  try {
+    merged = store.get(plugin) as Record<string, unknown>;
+  } catch {
+    merged = {};
+  }
+  const status = store.list().find((r) => r.plugin === plugin);
+  const resolution = (status?.resolution ?? {}) as Record<string, ConfigResolutionSource>;
+
+  const rows: CompletionItem[] = [];
   for (const [key, field] of Object.entries(schema)) {
     if (!field) continue;
-    // Terminal pick for /config:get / /config:unset; user moves on to flags or submit.
-    const f = field as FieldSchema;
-    const detail = f.type === "string" && f.secret ? `${f.type} · secret` : f.type;
-    items.push({ label: key, insertText: `${key} `, detail });
+    const source = resolution[key] ?? "default";
+    const row = renderFieldRow({
+      key, field, currentValue: merged[key], source, isSet: source !== "default",
+    });
+    // /config:get and /config:unset don't take a value — the field row should
+    // insert `key ` (trailing space, no `=`), not the field-tier pre-fill.
+    rows.push({ label: row.label, insertText: `${key} `, detail: row.detail });
   }
-  return items;
+  return rows;
 }
