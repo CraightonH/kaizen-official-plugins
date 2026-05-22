@@ -1,8 +1,8 @@
 import type { ConfigSchema, UiTheme } from "llm-contracts/public";
 
 /**
- * Accepts a `#RRGGBB` hex color or any of Ink's named colors (matching the
- * legacy `theme/loader.ts` allowlist exactly).
+ * Accepts a `#RRGGBB` hex color or any of Ink's named colors (matching Ink's
+ * named-color set).
  */
 export const COLOR_PATTERN =
   "^(#[0-9a-fA-F]{6}|black|red|green|yellow|blue|magenta|cyan|white|gray|grey|" +
