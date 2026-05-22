@@ -4,6 +4,7 @@
       "allow": [
         "bash(ls *)"
       ]
-    }
+    },
+    "llm-tui": {}
   }
 }
