@@ -1,4 +1,4 @@
-import type { FieldSchema } from "llm-contracts/public";
+import type { FieldSchema, ConfigResolutionSource, CompletionItem } from "llm-contracts/public";
 
 const SECRET_MASK = "***";
 const UNSET_MARKER = "(unset)";
@@ -26,4 +26,63 @@ export function formatValue(
     return rendered.slice(0, opts.max - 1) + ELLIPSIS;
   }
   return rendered;
+}
+
+const TRUNCATE_MAX = 30;
+const CHECK_GLYPH = "✓ ";
+
+export type RenderInputs = {
+  key: string;
+  field: FieldSchema;
+  currentValue: unknown;
+  source: ConfigResolutionSource;
+  isSet: boolean;
+};
+
+function typeTag(field: FieldSchema): string {
+  if (field.type === "string" && field.secret) return "string · secret";
+  return field.type;
+}
+
+function isFreeForm(field: FieldSchema): boolean {
+  if (field.type === "number") return true;
+  if (field.type === "string" && !field.enum && !field.secret) return true;
+  return false;
+}
+
+function canPrefill(input: RenderInputs, rendered: string): boolean {
+  if (input.source === "env") return false;
+  if (input.field.type === "string" && input.field.secret) return false;
+  if (!isFreeForm(input.field)) return false;
+  if (/\s/.test(rendered)) return false;
+  if (rendered.startsWith("--")) return false;
+  return true;
+}
+
+export function renderFieldRow(input: RenderInputs): CompletionItem {
+  const tag = typeTag(input.field);
+  const isUnset = input.currentValue === null || input.currentValue === undefined;
+
+  let detail: string;
+  if (isUnset) {
+    detail = `(unset)  ${tag}`;
+  } else {
+    const display = formatValue(input.currentValue, input.field, { max: TRUNCATE_MAX });
+    detail = `${CHECK_GLYPH}${display} · ${input.source}  ${tag}`;
+  }
+
+  let insertText = `${input.key}=`;
+  if (!isUnset) {
+    const fullRendered =
+      typeof input.currentValue === "string"
+        ? input.currentValue
+        : typeof input.currentValue === "number" || typeof input.currentValue === "boolean"
+          ? String(input.currentValue)
+          : "";
+    if (canPrefill(input, fullRendered)) {
+      insertText = `${input.key}=${fullRendered} `;
+    }
+  }
+
+  return { label: input.key, insertText, detail };
 }

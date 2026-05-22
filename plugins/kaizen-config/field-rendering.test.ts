@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import type { FieldSchema } from "llm-contracts/public";
-import { formatValue } from "./field-rendering.ts";
+import { formatValue, renderFieldRow, type RenderInputs } from "./field-rendering.ts";
 
 describe("formatValue", () => {
   const stringField: FieldSchema = { type: "string" };
@@ -52,5 +52,143 @@ describe("formatValue", () => {
     circular.self = circular;
     expect(formatValue(circular, { type: "object", properties: {} } as FieldSchema, { max: 30 }))
       .toBe("(error)");
+  });
+});
+
+function inputs(over: Partial<RenderInputs>): RenderInputs {
+  return {
+    key: "url",
+    field: { type: "string" },
+    currentValue: "https://example.com",
+    source: "home",
+    isSet: true,
+    ...over,
+  };
+}
+
+describe("renderFieldRow", () => {
+  it("label is always the bare key", () => {
+    expect(renderFieldRow(inputs({})).label).toBe("url");
+  });
+
+  it("free-form string set in home renders ✓ value · home and pre-fills insertText", () => {
+    const row = renderFieldRow(inputs({ key: "url", currentValue: "https://x", source: "home" }));
+    expect(row.detail).toBe("✓ https://x · home  string");
+    expect(row.insertText).toBe("url=https://x ");
+  });
+
+  it("free-form string from default still shows ✓ and source=default; pre-fills", () => {
+    const row = renderFieldRow(inputs({
+      key: "url", currentValue: "https://default", source: "default", isSet: false,
+    }));
+    expect(row.detail).toBe("✓ https://default · default  string");
+    expect(row.insertText).toBe("url=https://default ");
+  });
+
+  it("env-sourced value shows ✓ and · env, but suppresses pre-fill", () => {
+    const row = renderFieldRow(inputs({
+      key: "url", currentValue: "https://env", source: "env", isSet: true,
+    }));
+    expect(row.detail).toBe("✓ https://env · env  string");
+    expect(row.insertText).toBe("url=");
+  });
+
+  it("secret field set in home renders *** with · secret type tag", () => {
+    const row = renderFieldRow(inputs({
+      key: "apiKey",
+      field: { type: "string", secret: true },
+      currentValue: "swordfish",
+      source: "home",
+      isSet: true,
+    }));
+    expect(row.detail).toBe("✓ *** · home  string · secret");
+    expect(row.insertText).toBe("apiKey=");
+  });
+
+  it("secret unset renders (unset) with no ✓", () => {
+    const row = renderFieldRow(inputs({
+      key: "apiKey",
+      field: { type: "string", secret: true },
+      currentValue: undefined,
+      source: "default",
+      isSet: false,
+    }));
+    expect(row.detail).toBe("(unset)  string · secret");
+    expect(row.insertText).toBe("apiKey=");
+  });
+
+  it("boolean set in home renders ✓ true · home, no pre-fill", () => {
+    const row = renderFieldRow(inputs({
+      key: "thoughtsMarkdown",
+      field: { type: "boolean" },
+      currentValue: true,
+      source: "home",
+      isSet: true,
+    }));
+    expect(row.detail).toBe("✓ true · home  boolean");
+    expect(row.insertText).toBe("thoughtsMarkdown=");
+  });
+
+  it("enum field renders enum type tag, no pre-fill", () => {
+    const row = renderFieldRow(inputs({
+      key: "backend",
+      field: { type: "enum", values: ["env", "keychain"] },
+      currentValue: "keychain",
+      source: "project",
+      isSet: true,
+    }));
+    expect(row.detail).toBe("✓ keychain · project  enum");
+    expect(row.insertText).toBe("backend=");
+  });
+
+  it("string-with-enum is treated like an enum (no pre-fill)", () => {
+    const row = renderFieldRow(inputs({
+      key: "backend",
+      field: { type: "string", enum: ["env", "keychain"] },
+      currentValue: "keychain",
+      source: "home",
+      isSet: true,
+    }));
+    expect(row.detail).toBe("✓ keychain · home  string");
+    expect(row.insertText).toBe("backend=");
+  });
+
+  it("unset (no default in force either) renders (unset) with no ✓", () => {
+    const row = renderFieldRow(inputs({
+      key: "url",
+      currentValue: undefined,
+      source: "default",
+      isSet: false,
+    }));
+    expect(row.detail).toBe("(unset)  string");
+    expect(row.insertText).toBe("url=");
+  });
+
+  it("long string value truncates in detail but pre-fills full value", () => {
+    const long = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG";
+    const row = renderFieldRow(inputs({ key: "url", currentValue: long, source: "home" }));
+    expect(row.detail).toBe(`✓ ${long.slice(0, 29)}… · home  string`);
+    expect(row.insertText).toBe(`url=${long} `);
+  });
+
+  it("suppresses pre-fill when value contains whitespace", () => {
+    const row = renderFieldRow(inputs({ key: "url", currentValue: "has space", source: "home" }));
+    expect(row.insertText).toBe("url=");
+  });
+
+  it("suppresses pre-fill when value starts with --", () => {
+    const row = renderFieldRow(inputs({ key: "url", currentValue: "--flag", source: "home" }));
+    expect(row.insertText).toBe("url=");
+  });
+
+  it("suppresses pre-fill for number field too (free-form numeric)", () => {
+    const row = renderFieldRow(inputs({
+      key: "port",
+      field: { type: "number" },
+      currentValue: 5432,
+      source: "home",
+    }));
+    expect(row.insertText).toBe("port=5432 ");
+    expect(row.detail).toBe("✓ 5432 · home  number");
   });
 });
