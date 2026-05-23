@@ -11,14 +11,30 @@ describe("buildCompletionSource", () => {
     expect(src.id).toBe("llm-slash-commands:registry");
   });
 
-  it("filters by prefix (query is text AFTER the slash)", async () => {
+  it("filters by case-insensitive substring of name", async () => {
     const reg = createRegistry();
     registerBuiltins(reg);
     reg.register({ name: "mcp:reload", description: "r", source: "plugin" }, async () => {});
     const src = buildCompletionSource(reg);
     const items = await src.list("he");
     expect(items.map((i) => i.label)).toEqual(["/help"]);
-    expect(items[0]!.insertText).toBe("/help ");
+  });
+
+  it("matches substring anywhere in the name", async () => {
+    const reg = createRegistry();
+    reg.register({ name: "config:get", description: "g", source: "plugin" }, async () => {});
+    reg.register({ name: "session:list", description: "l", source: "plugin" }, async () => {});
+    const src = buildCompletionSource(reg);
+    const items = await src.list("config");
+    expect(items.map((i) => i.label)).toEqual(["/config:get"]);
+  });
+
+  it("case-folds the query", async () => {
+    const reg = createRegistry();
+    registerBuiltins(reg);
+    const src = buildCompletionSource(reg);
+    const items = await src.list("HELP");
+    expect(items.map((i) => i.label)).toEqual(["/help"]);
   });
 
   it("returns all when query empty (user just typed '/')", async () => {

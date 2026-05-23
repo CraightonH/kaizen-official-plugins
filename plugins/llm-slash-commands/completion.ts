@@ -1,5 +1,6 @@
 import type { SlashRegistryService, SlashCommandManifest } from "./registry.ts";
 import type { CompletionItem, CompletionSource } from "llm-contracts/public";
+import { matchesQuery } from "./query-match.ts";
 
 function rank(m: SlashCommandManifest): number {
   if (m.source === "builtin" && !m.name.includes(":")) return 0;
@@ -14,7 +15,7 @@ export function buildCompletionSource(registry: SlashRegistryService): Completio
     async list(query: string): Promise<CompletionItem[]> {
       const all = registry.list();
       return all
-        .filter((m) => m.name.startsWith(query))
+        .filter((m) => matchesQuery(m.name, query))
         .sort((a, b) => {
           const ra = rank(a), rb = rank(b);
           if (ra !== rb) return ra - rb;
