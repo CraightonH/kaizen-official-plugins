@@ -17,19 +17,27 @@ function deps(overrides: { projectRoot?: string; userRoot?: string } = {}) {
 }
 
 describe("registry — discovery basics", () => {
-  it("populates from a flat directory", async () => {
+  it("populates from a flat CC-shape directory", async () => {
     const d = deps({ userRoot: join(FIXTURES, "ok-flat") });
     const reg = makeRegistry(d);
     await reg.rescan();
     const names = reg.list().map(m => m.name);
-    expect(names).toEqual(["git-rebase", "python"]);
+    expect(names).toEqual(["git-rebase", "python", "with-siblings"]);
   });
 
-  it("walks subdirectories", async () => {
+  it("sets baseDir on each manifest to the skill's directory", async () => {
+    const d = deps({ userRoot: join(FIXTURES, "ok-flat") });
+    const reg = makeRegistry(d);
+    await reg.rescan();
+    const git = reg.list().find(m => m.name === "git-rebase")!;
+    expect(git.baseDir).toBe(join(FIXTURES, "ok-flat", "git-rebase"));
+  });
+
+  it("returns [] for a nested directory tree (no <name>/SKILL.md at depth 1)", async () => {
     const d = deps({ userRoot: join(FIXTURES, "ok-nested") });
     const reg = makeRegistry(d);
     await reg.rescan();
-    expect(reg.list().map(m => m.name)).toEqual(["ops/k8s/kubectl-debug", "python/poetry-deps"]);
+    expect(reg.list()).toEqual([]);
   });
 
   it("uses tokens override when present", async () => {
@@ -45,14 +53,10 @@ describe("registry — discovery basics", () => {
     const d = deps({ userRoot: join(FIXTURES, "ok-flat") });
     const reg = makeRegistry(d);
     await reg.rescan();
-    const git = reg.list().find(x => x.name === "git-rebase");
-    expect(git).toBeDefined();
-    // body 'Step 1: stash unrelated work.\n' is ~31 chars → ceil(31/4) = 8.
-    // tokens override in fixture is 420 — that is what is asserted.
-    expect(git!.tokens).toBe(420);
-    const py = reg.list().find(x => x.name === "python");
-    expect(py).toBeDefined();
-    expect(py!.tokens).toBeGreaterThan(0);
+    const git = reg.list().find(x => x.name === "git-rebase")!;
+    expect(git.tokens).toBe(420);   // frontmatter override in fixture
+    const py = reg.list().find(x => x.name === "python")!;
+    expect(py.tokens).toBeGreaterThan(0);
   });
 });
 

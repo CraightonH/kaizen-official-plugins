@@ -49,6 +49,7 @@ function loadFromScanned(
       name: f.relativeName,
       description: parsed.manifest.description,
       tokens,
+      baseDir: f.baseDir,
     };
     const body = parsed.body;
     out.set(f.relativeName, {
