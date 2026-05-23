@@ -126,4 +126,25 @@ describe("registerSlashCommands", () => {
     );
     expect(prints[0]!.markdown).toBe(true);
   });
+
+  test("/skills:get with no args prints usage hint", async () => {
+    const slash = makeFakeSlash();
+    const registry = makeFakeRegistry({
+      list: [{ name: "alpha", description: "Anything" }],
+      bodies: { alpha: "body" },
+    });
+    registerSlashCommands({
+      registry,
+      slash: slash.service,
+      projectRoot: "/proj/.kaizen/skills",
+      userRoot: "/home/u/.kaizen/skills",
+    });
+    const getEntry = slash.registered.find((r) => r.manifest.name === "skills:get")!;
+    const { ctx, prints } = makeCtx("   "); // whitespace-only counts as no arg
+    await getEntry.handler(ctx);
+    expect(prints).toHaveLength(1);
+    expect(prints[0]!.text).toBe(
+      "Usage: /skills:get <name>\nRun /skills:list to see what's available."
+    );
+  });
 });

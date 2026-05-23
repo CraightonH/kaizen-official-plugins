@@ -34,7 +34,7 @@ export function registerSlashCommands(deps: RegisterSlashCommandsDeps): () => vo
     usage: "<name>",
   };
   const getHandler: SlashCommandHandler = async (ctx) => {
-    await ctx.print("(not implemented)");
+    await handleGet(ctx, deps);
   };
   offs.push(slash.register(getManifest, getHandler));
 
@@ -43,6 +43,19 @@ export function registerSlashCommands(deps: RegisterSlashCommandsDeps): () => vo
       try { off(); } catch { /* idempotent */ }
     }
   };
+}
+
+async function handleGet(
+  ctx: import("llm-contracts/public").SlashCommandContext,
+  deps: RegisterSlashCommandsDeps,
+): Promise<void> {
+  const name = ctx.args.trim();
+  if (!name) {
+    await ctx.print("Usage: /skills:get <name>\nRun /skills:list to see what's available.");
+    return;
+  }
+  // Remaining branches added in subsequent tasks.
+  await ctx.print(`(stub: would look up ${name})`);
 }
 
 function formatList(entries: SkillManifest[]): string {
