@@ -7,6 +7,8 @@ import { join } from "node:path";
 import { makeRegistry, type SkillsRegistryServiceImpl } from "./registry.ts";
 import { buildSkillsBlock } from "./injection.ts";
 import { LOAD_SKILL_SCHEMA, makeLoadSkillHandler } from "./tool.ts";
+import { registerSlashCommands } from "./slash-commands.ts";
+import type { SlashRegistryService } from "llm-contracts/public";
 
 const DEFAULT_RESCAN_MS = 30000;
 
@@ -42,6 +44,7 @@ function rescanIntervalMs(ctx: any): number {
 // Module-scope cleanup handles. setup() populates these; stop() drains them.
 let unregisterTool: (() => void) | undefined;
 let sectionHandle: { bumpGeneration(): void; unregister(): void } | undefined;
+let unregisterSlashCommands: (() => void) | undefined;
 
 const plugin: KaizenPlugin = {
   name: "llm-skills",
@@ -124,13 +127,30 @@ const plugin: KaizenPlugin = {
     } else {
       ctx.log("[llm-skills] tools:registry not available; load_skill not registered");
     }
+
+    // /skills:list and /skills:get — registered when llm-slash-commands is present.
+    // slash:registry is declared in services.consumes as a topo-hint only;
+    // useService returns undefined when the harness doesn't include the plugin.
+    const slash = ctx.useService<SlashRegistryService>("slash:registry");
+    if (slash) {
+      unregisterSlashCommands = registerSlashCommands({
+        registry,
+        slash,
+        projectRoot,
+        userRoot,
+      });
+    } else {
+      ctx.log("[llm-skills] slash:registry not available; /skills:* commands not registered");
+    }
   },
 
   async stop() {
     try { unregisterTool?.(); } catch { /* idempotent */ }
     try { sectionHandle?.unregister(); } catch { /* idempotent */ }
+    try { unregisterSlashCommands?.(); } catch { /* idempotent */ }
     unregisterTool = undefined;
     sectionHandle = undefined;
+    unregisterSlashCommands = undefined;
   },
 };
 
