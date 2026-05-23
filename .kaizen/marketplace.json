@@ -27,6 +27,7 @@
       "description": "Service contract definitions for the local harness. Pure types + defineService; no runtime behavior.",
       "categories": ["foundation", "contracts"],
       "versions": [
+        { "version": "0.5.0", "source": { "type": "file", "path": "plugins/llm-contracts" } },
         { "version": "0.4.0", "source": { "type": "file", "path": "plugins/llm-contracts" } },
         { "version": "0.3.0", "source": { "type": "file", "path": "plugins/llm-contracts" } },
         { "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-contracts" } },
@@ -88,6 +89,16 @@
         { "version": "0.1.2", "source": { "type": "file", "path": "plugins/llm-skills" } },
         { "version": "0.1.1", "source": { "type": "file", "path": "plugins/llm-skills" } },
         { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-skills" } }
+      ]
+    },
+    {
+      "kind": "plugin",
+      "name": "claude-skills",
+      "description": "Shim Claude Code skills (user, project, plugin-cache layouts) into skills:registry for the local harness.",
+      "categories": ["skills", "claude-code"],
+      "versions": [
+        { "version": "0.1.1", "source": { "type": "file", "path": "plugins/claude-skills" } },
+        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/claude-skills" } }
       ]
     },
     {
