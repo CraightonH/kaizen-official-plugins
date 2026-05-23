@@ -1,1 +1,0 @@
-1. Make it so `/config:set [plugin]` filters the plugin list as you type, apply that to all autocomplete menus, not just plugin menu.
