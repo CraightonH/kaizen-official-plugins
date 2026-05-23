@@ -141,3 +141,40 @@ describe("registry — rescan change detection", () => {
     expect(second.changed).toBe(false);  // identical visible set
   });
 });
+
+describe("registry — onChange invocations", () => {
+  it("fires onChange with { count } when rescan detects a snapshot change", async () => {
+    const d = deps({ userRoot: join(FIXTURES, "ok-flat") });
+    const onChange = mock((_info?: { count: number }) => {});
+    const reg = makeRegistry({ ...d, onChange });
+    const r = await reg.rescan();
+    expect(r.changed).toBe(true);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const lastCall = onChange.mock.calls.at(-1)!;
+    expect(lastCall[0]).toEqual({ count: r.count });
+  });
+
+  it("does not fire onChange when rescan reports no change", async () => {
+    const d = deps({ userRoot: join(FIXTURES, "ok-flat") });
+    const onChange = mock((_info?: { count: number }) => {});
+    const reg = makeRegistry({ ...d, onChange });
+    await reg.rescan();
+    onChange.mockClear();
+    const r2 = await reg.rescan();
+    expect(r2.changed).toBe(false);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("fires onChange with no info on programmatic register/unregister", async () => {
+    const onChange = mock((_info?: { count: number }) => {});
+    const reg = makeRegistry({ ...deps(), onChange });
+    await reg.rescan();
+    onChange.mockClear();
+    const off = reg.register({ name: "p", description: "d", tokens: 1 }, async () => "x");
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][0]).toBeUndefined();
+    off();
+    expect(onChange).toHaveBeenCalledTimes(2);
+    expect(onChange.mock.calls[1][0]).toBeUndefined();
+  });
+});

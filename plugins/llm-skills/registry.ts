@@ -8,8 +8,13 @@ export interface RegistryDeps {
   userRoot?: string;        // ~/.kaizen/skills
   warn: (msg: string) => void;
   error: (msg: string) => void;
-  /** Called whenever a programmatic register/unregister changes the registry. */
-  onChange?: () => void;
+  /**
+   * Called whenever the registry's visible set may have changed.
+   * - Programmatic register/unregister: invoked with no argument.
+   * - Rescan that detected a snapshot change: invoked with `{ count }`.
+   * The `count` lets the harness emit `skill:available-changed` from a single site.
+   */
+  onChange?: (info?: { count: number }) => void;
 }
 
 interface Entry {
@@ -121,7 +126,9 @@ export function makeRegistry(deps: RegistryDeps): SkillsRegistryServiceImpl {
       const snap = snapshotKeys(m);
       const changed = snap !== lastSnapshot;
       lastSnapshot = snap;
-      return { changed, count: m.size };
+      const count = m.size;
+      if (changed) deps.onChange?.({ count });
+      return { changed, count };
     },
   };
 }
