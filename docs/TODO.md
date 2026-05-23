@@ -1,1 +1,9 @@
 1. Add a `/skills` command suite. Claude code puts skills into the `/` root, but that makes it a bit messy because it mixes with built-in commands, tools, etc. So far our plugins have defined `/[domain]:[command] [args] [args]` and I think we can leverage that for additional organization. I'm not sure the precise shape, but I'll want a way to `list` all registered skills, `get` a skill's details (dump it to the TUI), and then a way to reference a skill to an LLM, ie. "use /superpowers:brainstorming for todo #1" in Claude Code, not sure what it should look like in kaizen.
+
+2. Add a `new_skill` tool to `llm-skills` (kaizen-only — does not mutate `claude-skills` sources). Goal: LLM doesn't have to reverse-engineer skill location or file shape. Structured tool input — frontmatter fields broken out as discrete params (name, description, tokens?), body as its own param, plus a `scope: "project" | "user"` selector. Plugin code derives the on-disk path from name + scope and writes the file. Considerations to settle in its own spec:
+   - Path derivation rules (flat vs nested names, dir layout under project/user roots).
+   - Name-conflict behavior (refuse vs overwrite-with-confirmation; cross-layer collisions).
+   - Validation (name shape matches `skills:registry` invariants, body non-empty, frontmatter sanity).
+   - Post-write reconciliation — force an immediate rescan, or let the next `turn:start` pick it up.
+   - Approval surface — this is a disk-mutating tool, so it should route through `llm-tool-approval` as sensitive.
+   - Return shape — written path + final registered name so the LLM can confirm/reference.
