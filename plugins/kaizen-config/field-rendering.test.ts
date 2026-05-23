@@ -245,22 +245,31 @@ describe("renderValueRows", () => {
     expect(rows[0]!.detail).toBe("string");
   });
 
-  it("filters rows by valueQuery prefix", () => {
+  it("filters enum rows by case-insensitive substring of valueQuery", () => {
     const rows = renderValueRows(inputs({
       key: "backend",
       field: { type: "enum", values: ["env", "keychain", "bitwarden"] },
       currentValue: "keychain",
-    }), "k");
-    expect(rows.map(r => r.label)).toEqual(["✓ keychain"]);
+    }), "ch");
+    expect(rows.map((r) => r.label)).toEqual(["✓ keychain"]);
   });
 
-  it("filters booleans by valueQuery prefix", () => {
+  it("filters enum rows case-insensitively", () => {
+    const rows = renderValueRows(inputs({
+      key: "backend",
+      field: { type: "enum", values: ["env", "keychain", "bitwarden"] },
+      currentValue: "keychain",
+    }), "KEY");
+    expect(rows.map((r) => r.label)).toEqual(["✓ keychain"]);
+  });
+
+  it("filters booleans by substring of valueQuery", () => {
     const rows = renderValueRows(inputs({
       key: "x",
       field: { type: "boolean" },
       currentValue: true,
-    }), "t");
-    expect(rows.map(r => r.label)).toEqual(["✓ true"]);
+    }), "ru");
+    expect(rows.map((r) => r.label)).toEqual(["✓ true"]);
   });
 
   it("returns [] for free-form string fields (pre-fill on field row already handled it)", () => {

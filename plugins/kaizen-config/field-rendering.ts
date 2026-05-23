@@ -1,4 +1,5 @@
 import type { FieldSchema, ConfigResolutionSource, CompletionItem } from "llm-contracts/public";
+import { matchesQuery } from "./query-match.ts";
 
 const SECRET_MASK = "***";
 const UNSET_MARKER = "(unset)";
@@ -116,14 +117,14 @@ export function renderValueRows(input: RenderInputs, valueQuery: string): Comple
   if (input.field.type === "boolean") {
     const all = ["true", "false"];
     return all
-      .filter((v) => v.startsWith(valueQuery))
+      .filter((v) => matchesQuery(v, valueQuery))
       .map((v) => valueRow(input.key, v, current === (v === "true"), tag));
   }
 
   const enumVals = enumValues(input.field);
   if (enumVals) {
     return enumVals
-      .filter((v) => v.startsWith(valueQuery))
+      .filter((v) => matchesQuery(v, valueQuery))
       .map((v) => valueRow(input.key, v, current === v, tag));
   }
 

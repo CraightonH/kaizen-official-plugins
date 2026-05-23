@@ -119,9 +119,9 @@ describe("keyEqualsValueCompletions", () => {
     expect(items.map((i) => i.label)).toEqual(["  env", "✓ keychain"]);
   });
 
-  it("value tier: filters by post-= text", async () => {
+  it("value tier: filters by case-insensitive substring of post-= text", async () => {
     const store = storeWith({ backend: "env" }, { backend: "home" });
-    const items = await keyEqualsValueCompletions(store, ["kaizen-config"], "backend=k");
+    const items = await keyEqualsValueCompletions(store, ["kaizen-config"], "backend=ch");
     expect(items.map((i) => i.label)).toEqual(["  keychain"]);
   });
 
