@@ -1,3 +1,5 @@
+import { lstat } from "node:fs/promises";
+import { join } from "node:path";
 import type { ToolSchema } from "llm-contracts/public";
 
 export const NEW_SKILL_SCHEMA: ToolSchema = {
@@ -94,4 +96,43 @@ export function validateNewSkillInput(raw: unknown): asserts raw is NewSkillInpu
   if (scope !== "project" && scope !== "user") {
     throw new Error("new_skill: 'scope' must be \"project\" or \"user\"");
   }
+}
+
+export interface ResolveTargetPathArgs {
+  name: string;
+  scope: "project" | "user";
+  projectRoot: string;
+  userRoot: string;
+}
+
+export interface ResolvedTargetPath {
+  /** Absolute path to the skill's directory (will be created). */
+  baseDir: string;
+  /** Absolute path to the SKILL.md file (will be written). */
+  file: string;
+}
+
+/**
+ * Compute the on-disk target for a new skill. Pure — no filesystem access.
+ */
+export function resolveTargetPath(args: ResolveTargetPathArgs): ResolvedTargetPath {
+  const root = args.scope === "project" ? args.projectRoot : args.userRoot;
+  const baseDir = join(root, args.name);
+  const file = join(baseDir, "SKILL.md");
+  return { baseDir, file };
+}
+
+/**
+ * Refuse to write if anything exists at `baseDir`. Uses `lstat` so a symlink at
+ * the target is treated as a collision (not followed). Throws on collision;
+ * resolves with `undefined` if the path is free.
+ */
+export async function assertNoCollision(baseDir: string): Promise<void> {
+  try {
+    await lstat(baseDir);
+  } catch (err: any) {
+    if (err && err.code === "ENOENT") return;
+    throw err;
+  }
+  throw new Error(`new_skill: skill already exists at ${baseDir}`);
 }
