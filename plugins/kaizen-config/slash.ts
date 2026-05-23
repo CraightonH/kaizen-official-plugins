@@ -100,7 +100,7 @@ export function registerSlashCommands(reg: SlashRegistryLike, deps: SlashDeps): 
       source: "plugin",
       arguments: [
         { name: "plugin", complete: () => pluginCompletions(deps.store) },
-        { name: "key=value", complete: (prev, query) => keyEqualsValueCompletions(deps.store, prev, query) },
+        { name: "key=value", complete: (prev, query) => keyEqualsValueCompletions(deps.store, prev, query), selfFilters: true },
       ],
       flags: [{ name: "--project", description: "Write to project scope" }],
     },
