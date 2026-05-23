@@ -5,6 +5,13 @@ export interface ArgSlot {
   description?: string;
   complete?: (prev: string[], query: string) =>
     Promise<CompletionItem[]> | CompletionItem[];
+  /**
+   * When true, the slash-arg dispatcher will NOT post-filter results from
+   * `complete`. The plugin is responsible for filtering against `query`
+   * itself. Use only when `query` is structured (e.g. `key=value`) and a
+   * label-substring filter would over-filter.
+   */
+  selfFilters?: boolean;
 }
 
 export interface SlashCommandFlag {
