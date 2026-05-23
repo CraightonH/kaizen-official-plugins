@@ -59,8 +59,28 @@ async function handleGet(
     await ctx.print(`Unknown skill: ${name}. Run /skills:list to see what's available.`);
     return;
   }
-  // Body fetch + header rendering added in the next task.
-  await ctx.print(`(stub: would render ${name})`);
+  let body: string;
+  try {
+    body = await deps.registry.load(name);
+  } catch (e: any) {
+    await ctx.print(`Failed to load skill ${name}: ${e?.message ?? String(e)}`);
+    return;
+  }
+  const layer = deriveLayer(entry.baseDir, deps.projectRoot, deps.userRoot);
+  const headerLines: string[] = [];
+  headerLines.push(`**${entry.name}**`);
+  headerLines.push(`Source: ${layer}`);
+  if (entry.baseDir) headerLines.push(`Path: \`${entry.baseDir}\``);
+  if (typeof entry.tokens === "number") headerLines.push(`Tokens: ${entry.tokens}`);
+  const header = headerLines.join("\n");
+  await ctx.print(`${header}\n\n---\n\n${body}`, { markdown: true });
+}
+
+function deriveLayer(baseDir: string | undefined, projectRoot: string, userRoot: string): string {
+  if (!baseDir) return "programmatic";
+  if (baseDir === projectRoot || baseDir.startsWith(projectRoot + "/")) return "project";
+  if (baseDir === userRoot || baseDir.startsWith(userRoot + "/")) return "user";
+  return "external";
 }
 
 function formatList(entries: SkillManifest[]): string {

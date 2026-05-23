@@ -168,4 +168,33 @@ describe("registerSlashCommands", () => {
       "Unknown skill: not-a-real-skill. Run /skills:list to see what's available."
     );
   });
+
+  test("/skills:get on a project-layer skill prints header + body", async () => {
+    const projectRoot = "/proj/.kaizen/skills";
+    const userRoot = "/home/u/.kaizen/skills";
+    const slash = makeFakeSlash();
+    const registry = makeFakeRegistry({
+      list: [{
+        name: "alpha",
+        description: "Project alpha",
+        tokens: 42,
+        baseDir: `${projectRoot}/alpha`,
+      }],
+      bodies: { alpha: "# Alpha\n\nThe body." },
+    });
+    registerSlashCommands({ registry, slash: slash.service, projectRoot, userRoot });
+    const getEntry = slash.registered.find((r) => r.manifest.name === "skills:get")!;
+    const { ctx, prints } = makeCtx("alpha");
+    await getEntry.handler(ctx);
+    expect(prints).toHaveLength(1);
+    expect(prints[0]!.text).toBe(
+      "**alpha**\n" +
+      "Source: project\n" +
+      "Path: `/proj/.kaizen/skills/alpha`\n" +
+      "Tokens: 42\n" +
+      "\n---\n\n" +
+      "# Alpha\n\nThe body."
+    );
+    expect(prints[0]!.markdown).toBe(true);
+  });
 });
