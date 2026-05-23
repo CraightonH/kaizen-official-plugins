@@ -136,6 +136,33 @@ describe("keyEqualsValueCompletions", () => {
     const items = await keyEqualsValueCompletions(store, ["kaizen-config"], "nopeKey=");
     expect(items).toEqual([]);
   });
+
+  it("field tier: filters fields by case-insensitive substring of pre-= query", async () => {
+    const store = storeWith(
+      { enabled: true, backend: "keychain", apiKey: "x", url: "https://x" },
+      { enabled: "home", backend: "home", apiKey: "home", url: "home" },
+    );
+    const items = await keyEqualsValueCompletions(store, ["kaizen-config"], "back");
+    expect(items.map((i) => i.label)).toEqual(["backend"]);
+  });
+
+  it("field tier: case-folds the query", async () => {
+    const store = storeWith(
+      { enabled: true, backend: "keychain", apiKey: "x", url: "https://x" },
+      { enabled: "home", backend: "home", apiKey: "home", url: "home" },
+    );
+    const items = await keyEqualsValueCompletions(store, ["kaizen-config"], "KEY");
+    expect(items.map((i) => i.label)).toEqual(["apiKey"]);
+  });
+
+  it("field tier: empty query returns all fields (regression)", async () => {
+    const store = storeWith(
+      { enabled: true, backend: "keychain", apiKey: "x", url: "https://x" },
+      { enabled: "home", backend: "home", apiKey: "home", url: "home" },
+    );
+    const items = await keyEqualsValueCompletions(store, ["kaizen-config"], "");
+    expect(items.map((i) => i.label).sort()).toEqual(["apiKey", "backend", "enabled", "url"]);
+  });
 });
 
 describe("keyOnlyCompletions", () => {

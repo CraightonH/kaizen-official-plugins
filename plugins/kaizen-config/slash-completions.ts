@@ -5,6 +5,7 @@ import type {
   FieldSchema,
 } from "llm-contracts/public";
 import { renderFieldRow, renderValueRows } from "./field-rendering.ts";
+import { filterByQuery } from "./query-match.ts";
 
 function resolutionDetail(homeExists: boolean, projectExists: boolean): string {
   const parts: string[] = [];
@@ -53,7 +54,7 @@ export async function keyEqualsValueCompletions(
         isSet: source !== "default",
       }));
     }
-    return rows;
+    return filterByQuery(rows, query);
   }
 
   const key = query.slice(0, eqIdx);
