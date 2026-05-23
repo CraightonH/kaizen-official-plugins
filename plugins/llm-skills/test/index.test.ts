@@ -120,7 +120,7 @@ describe("plugin setup — populated user root via env override", () => {
     });
     await plugin.setup(ctx);
     const reg = provided["skills:registry"] as any;
-    expect(reg.list().map((m: any) => m.name).sort()).toEqual(["git-rebase", "python"]);
+    expect(reg.list().map((m: any) => m.name).sort()).toEqual(["git-rebase", "python", "with-siblings"]);
   });
 
   it("uses <project>/.kaizen/skills via ctx.cwd (project beats user)", async () => {
@@ -133,6 +133,18 @@ describe("plugin setup — populated user root via env override", () => {
     // user-root population works above and rely on the registry tests for project
     // precedence (already covered).
     expect(true).toBe(true);
+  });
+
+  it("emits skill:available-changed exactly once on initial scan when skills exist", async () => {
+    const ps = makePromptSystem();
+    const { ctx, emitted } = makeCtx({
+      env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
+      promptSystem: ps.service,
+    });
+    await plugin.setup(ctx);
+    const events = emitted.filter(e => e.name === "skill:available-changed");
+    expect(events.length).toBe(1);
+    expect((events[0].payload as any).count).toBe(3);   // git-rebase, python, with-siblings
   });
 });
 
@@ -184,7 +196,7 @@ describe("plugin setup — prompt:system section registration", () => {
     expect(msg).toContain("prompt:registry");
   });
 
-  it("calls bumpGeneration after initial scan", async () => {
+  it("calls bumpGeneration after initial scan when skills are present", async () => {
     const ps = makePromptSystem();
     const { ctx } = makeCtx({
       env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },

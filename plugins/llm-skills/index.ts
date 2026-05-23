@@ -81,17 +81,15 @@ const plugin: KaizenPlugin = {
       userRoot,
       warn: (m) => ctx.log(m),
       error: (m) => { void ctx.emit("harness:error", { message: m }); },
-      onChange: () => { sectionHandle?.bumpGeneration(); },
+      onChange: (info) => {
+        sectionHandle?.bumpGeneration();
+        if (info) void ctx.emit("skill:available-changed", { count: info.count });
+      },
     });
-
-    // Initial scan.
-    const initial = await registry.rescan();
 
     ctx.provideService<SkillsRegistryService>("skills:registry", registry);
 
-    void ctx.emit("skill:available-changed", { count: initial.count });
-
-    // Register prompt:system section for available skills.
+    // Register prompt:system section BEFORE the initial scan so onChange can bump.
     if (promptSystem) {
       sectionHandle = promptSystem.register({
         id: "llm-skills:available",
@@ -99,10 +97,18 @@ const plugin: KaizenPlugin = {
         title: "Available skills",
         render: () => buildSkillsBlock(registry.list()),
       });
-      // Bump after initial scan so generation is fresh.
-      sectionHandle.bumpGeneration();
     } else {
       void ctx.emit("harness:error", { message: "llm-skills: missing required service(s): prompt:registry; available-skills section disabled" });
+    }
+
+    // Initial scan. If skills exist, onChange fires once (bump + emit).
+    const initial = await registry.rescan();
+
+    // Empty-registry case: onChange does not fire (no change detected on first
+    // rescan when the snapshot stays empty), so emit once explicitly so the
+    // existing "emits skill:available-changed once" contract holds.
+    if (initial.count === 0) {
+      void ctx.emit("skill:available-changed", { count: 0 });
     }
 
     // Throttled rescan on turn:start.
@@ -111,11 +117,8 @@ const plugin: KaizenPlugin = {
       const now = Date.now();
       if (now - lastScanAt < interval) return;
       lastScanAt = now;
-      const r = await registry.rescan();
-      if (r.changed) {
-        void ctx.emit("skill:available-changed", { count: r.count });
-        sectionHandle?.bumpGeneration();
-      }
+      // bump + emit happen via onChange when the snapshot changes.
+      await registry.rescan();
     });
 
     // Register load_skill into tools:registry if available.
