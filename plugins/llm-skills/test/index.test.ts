@@ -231,9 +231,11 @@ describe("plugin setup — load_skill registered into tools:registry", () => {
       promptSystem: ps.service,
     });
     await plugin.setup(ctx);
-    expect(registered.length).toBe(1);
-    expect(registered[0].schema.name).toBe("load_skill");
-    expect(registered[0].source).toEqual({ kind: "skill" });
+    // Both load_skill and new_skill are registered.
+    expect(registered.length).toBe(2);
+    const loadEntry = registered.find(r => r.schema.name === "load_skill");
+    expect(loadEntry).toBeDefined();
+    expect(loadEntry!.source).toEqual({ kind: "skill" });
   });
 
   it("boots without error when tools:registry is absent", async () => {
@@ -307,7 +309,7 @@ describe("plugin setup — onChange bumpGeneration on programmatic register", ()
 });
 
 describe("plugin stop() — lifecycle cleanup", () => {
-  it("unregisters the load_skill tool and the prompt:system section", async () => {
+  it("unregisters the load_skill and new_skill tools and the prompt:system section", async () => {
     let toolUnregistered = 0;
     const toolsRegistry = {
       registerWith: (_reg: any) => () => { toolUnregistered++; },
@@ -322,7 +324,8 @@ describe("plugin stop() — lifecycle cleanup", () => {
     });
     await plugin.setup(ctx);
     await plugin.stop!({} as any);
-    expect(toolUnregistered).toBe(1);
+    // load_skill + new_skill = 2 unregister calls.
+    expect(toolUnregistered).toBe(2);
     expect(ps.unregister).toHaveBeenCalled();
   });
 
@@ -342,7 +345,8 @@ describe("plugin stop() — lifecycle cleanup", () => {
     await plugin.setup(ctx);
     await plugin.stop!({} as any);
     await plugin.stop!({} as any);
-    expect(toolUnregistered).toBe(1);
+    // load_skill + new_skill = 2 unregister calls total (idempotent: no double-unregister).
+    expect(toolUnregistered).toBe(2);
   });
 });
 
@@ -369,5 +373,46 @@ describe("plugin setup — slash:registry present", () => {
     await plugin.stop!();
     // After stop, both commands should be unregistered.
     expect(slash.registered).toEqual([]);
+  });
+});
+
+describe("plugin setup — new_skill registered into tools:registry", () => {
+  it("registers new_skill alongside load_skill when tools:registry is present", async () => {
+    const registered: any[] = [];
+    const toolsRegistry = {
+      registerWith: (reg: any) => { registered.push(reg); return () => {}; },
+      list: () => registered.map(r => r.schema),
+      invoke: async () => undefined,
+    };
+    const ps = makePromptSystem();
+    const { ctx } = makeCtx({
+      env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
+      toolsRegistry,
+      promptSystem: ps.service,
+    });
+    await plugin.setup(ctx);
+    const names = registered.map(r => r.schema.name).sort();
+    expect(names).toEqual(["load_skill", "new_skill"]);
+    // Both registered with source kind 'skill'.
+    expect(registered.every(r => r.source?.kind === "skill")).toBe(true);
+  });
+
+  it("unregisters new_skill on stop()", async () => {
+    let unregCount = 0;
+    const toolsRegistry = {
+      registerWith: (_reg: any) => () => { unregCount++; },
+      list: () => [],
+      invoke: async () => undefined,
+    };
+    const ps = makePromptSystem();
+    const { ctx } = makeCtx({
+      env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
+      toolsRegistry,
+      promptSystem: ps.service,
+    });
+    await plugin.setup(ctx);
+    await plugin.stop!({} as any);
+    // load_skill + new_skill = 2 unregister calls.
+    expect(unregCount).toBe(2);
   });
 });

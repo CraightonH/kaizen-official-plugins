@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { makeRegistry, type SkillsRegistryServiceImpl } from "./registry.ts";
 import { buildSkillsBlock } from "./injection.ts";
 import { LOAD_SKILL_SCHEMA, makeLoadSkillHandler } from "./tool.ts";
+import { NEW_SKILL_SCHEMA, makeNewSkillHandler } from "./new-skill.ts";
 import { registerSlashCommands } from "./slash-commands.ts";
 import type { SlashRegistryService } from "llm-contracts/public";
 
@@ -43,6 +44,7 @@ function rescanIntervalMs(ctx: any): number {
 
 // Module-scope cleanup handles. setup() populates these; stop() drains them.
 let unregisterTool: (() => void) | undefined;
+let unregisterNewSkill: (() => void) | undefined;
 let sectionHandle: { bumpGeneration(): void; unregister(): void } | undefined;
 let unregisterSlashCommands: (() => void) | undefined;
 
@@ -127,8 +129,15 @@ const plugin: KaizenPlugin = {
     if (tools) {
       const handler = makeLoadSkillHandler(registry, async (event, payload) => { await ctx.emit(event, payload); });
       unregisterTool = tools.registerWith({ schema: LOAD_SKILL_SCHEMA, handler, source: { kind: "skill" } });
+
+      const newSkillHandler = makeNewSkillHandler({ projectRoot, userRoot, registry });
+      unregisterNewSkill = tools.registerWith({
+        schema: NEW_SKILL_SCHEMA,
+        handler: newSkillHandler,
+        source: { kind: "skill" },
+      });
     } else {
-      ctx.log("[llm-skills] tools:registry not available; load_skill not registered");
+      ctx.log("[llm-skills] tools:registry not available; load_skill and new_skill not registered");
     }
 
     // /skills:list and /skills:get — registered when llm-slash-commands is present.
@@ -149,9 +158,11 @@ const plugin: KaizenPlugin = {
 
   async stop() {
     try { unregisterTool?.(); } catch { /* idempotent */ }
+    try { unregisterNewSkill?.(); } catch { /* idempotent */ }
     try { sectionHandle?.unregister(); } catch { /* idempotent */ }
     try { unregisterSlashCommands?.(); } catch { /* idempotent */ }
     unregisterTool = undefined;
+    unregisterNewSkill = undefined;
     sectionHandle = undefined;
     unregisterSlashCommands = undefined;
   },

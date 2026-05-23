@@ -1,5 +1,7 @@
 import { describe, it, expect, mock } from "bun:test";
 import { join } from "node:path";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import plugin from "../index.ts";
 
 const FIXTURES = join(import.meta.dir, "fixtures");
@@ -148,5 +150,69 @@ describe("integration — llm-skills against a fake tools:registry", () => {
       tools.invoke("load_skill", {}, { signal: new AbortController().signal, callId: "c2", log: () => {} }),
     ).rejects.toThrow(/name/i);
     expect(emittedOrder).toContain("tool:error");
+  });
+});
+
+describe("integration — new_skill end-to-end through fake tools:registry", () => {
+  it("writes a SKILL.md, registers it, and load_skill returns its body", async () => {
+    const userRoot = await mkdtemp(join(tmpdir(), "ns-user-"));
+    const subscribers: Record<string, Function[]> = {};
+    const emittedOrder: string[] = [];
+    const emit = async (name: string, payload: unknown) => {
+      emittedOrder.push(name);
+      for (const fn of subscribers[name] ?? []) await fn(payload);
+    };
+    const tools = fakeToolsRegistry(emit);
+    const ps = fakePromptSystem();
+
+    const ctx: any = {
+      cwd: "/does-not-exist",
+      env: { KAIZEN_LLM_SKILLS_PATH: userRoot },
+      log: mock(() => {}),
+      defineEvent: () => {},
+      on: (event: string, fn: Function) => { (subscribers[event] ??= []).push(fn); },
+      emit,
+      defineService: () => {},
+      provideService: () => {},
+      consumeService: () => {},
+      useService: (name: string) => {
+        if (name === "tools:registry") return tools;
+        if (name === "prompt:registry") return ps.service;
+        return undefined;
+      },
+      secrets: { get: async () => undefined, refresh: async () => undefined },
+    };
+
+    await plugin.setup(ctx);
+
+    // 1. Call new_skill through the registry.
+    const newResult = await tools.invoke("new_skill", {
+      name: "demo",
+      description: "Demo skill.",
+      body: "Hello from the demo skill.",
+      scope: "user",
+    }, { signal: new AbortController().signal, callId: "c-new", log: () => {} }) as any;
+    expect(newResult.name).toBe("demo");
+    expect(newResult.scope).toBe("user");
+    expect(newResult.path).toBe(join(userRoot, "demo", "SKILL.md"));
+    expect(newResult.tokens).toBeGreaterThan(0);
+
+    // 2. File is on disk.
+    const fileText = await readFile(join(userRoot, "demo", "SKILL.md"), "utf8");
+    expect(fileText).toContain("name: demo");
+    expect(fileText).toContain("Hello from the demo skill.");
+
+    // 3. load_skill now sees the new skill.
+    const loadResult = await tools.invoke("load_skill", { name: "demo" }, {
+      signal: new AbortController().signal, callId: "c-load", log: () => {},
+    }) as any;
+    expect(loadResult.body).toContain("Hello from the demo skill.");
+
+    // 4. skill:available-changed emitted after the new_skill write (one for
+    //    initial empty scan, one for the post-write rescan-change).
+    const changeCount = emittedOrder.filter(n => n === "skill:available-changed").length;
+    expect(changeCount).toBeGreaterThanOrEqual(2);
+
+    await rm(userRoot, { recursive: true });
   });
 });
