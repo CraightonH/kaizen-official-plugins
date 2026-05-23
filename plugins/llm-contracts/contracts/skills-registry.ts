@@ -3,6 +3,10 @@ export interface SkillManifest {
   description: string;
   /** Cached estimate, in tokens, used by budgeting code. */
   tokens?: number;
+  /** Absolute filesystem path to the skill's root directory, when the skill has one.
+   *  When set, llm-skills' load_skill handler prepends "Base directory for this skill: <baseDir>\n\n"
+   *  to the returned body so the LLM can resolve relative references inside the skill body. */
+  baseDir?: string;
 }
 
 export interface SkillRescanResult {
