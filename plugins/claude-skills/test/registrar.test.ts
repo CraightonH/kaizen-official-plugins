@@ -20,14 +20,15 @@ function makeFakeRegistry() {
   return { registry, calls };
 }
 
-function skill(name: string, body: string): ScannedSkill {
+function skill(name: string, body: string, baseDir?: string): ScannedSkill {
+  const dir = baseDir ?? `/abs/${name}`;
   return {
     name,
     description: `d for ${name}`,
-    baseDir: `/abs/${name}`,
+    baseDir: dir,
     body,
     layer: "user",
-    sourcePath: `/abs/${name}/SKILL.md`,
+    sourcePath: `${dir}/SKILL.md`,
   };
 }
 
@@ -73,6 +74,15 @@ describe("reconcile", () => {
     calls.length = 0;
     snap = reconcile(registry, [skill("a", "A2")], snap);
     expect(calls.map(c => `${c.kind}:${c.name}`)).toEqual(["unregister:a", "register:a"]);
+    expect(snap.size).toBe(1);
+  });
+
+  it("re-registers a skill whose baseDir flipped even when body is unchanged", () => {
+    const { registry, calls } = makeFakeRegistry();
+    let snap = reconcile(registry, [skill("shared", "BODY", "/user/.claude/skills/shared")], new Map());
+    calls.length = 0;
+    snap = reconcile(registry, [skill("shared", "BODY", "/project/.claude/skills/shared")], snap);
+    expect(calls.map(c => `${c.kind}:${c.name}`)).toEqual(["unregister:shared", "register:shared"]);
     expect(snap.size).toBe(1);
   });
 
