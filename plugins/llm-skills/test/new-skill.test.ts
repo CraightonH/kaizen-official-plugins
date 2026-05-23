@@ -97,9 +97,12 @@ describe("validateNewSkillInput", () => {
 });
 
 import { mkdtemp, writeFile, mkdir, symlink, rm } from "node:fs/promises";
+import { readFile, stat as fsStat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolveTargetPath, assertNoCollision } from "../new-skill.ts";
+import { makeNewSkillHandler, composeSkillFile } from "../new-skill.ts";
+import type { SkillsRegistryService } from "../public";
 
 describe("resolveTargetPath", () => {
   it("returns <projectRoot>/<name>/SKILL.md for scope=project", () => {
@@ -143,5 +146,156 @@ describe("assertNoCollision", () => {
     await symlink("/tmp", join(root, "foo"));
     await expect(assertNoCollision(join(root, "foo"))).rejects.toThrow(/already exists/);
     await rm(root, { recursive: true });
+  });
+});
+
+describe("composeSkillFile", () => {
+  it("emits the canonical frontmatter + body shape", () => {
+    const text = composeSkillFile({ name: "foo", description: "bar", body: "baz" });
+    expect(text).toBe("---\nname: foo\ndescription: bar\n---\n\nbaz\n");
+  });
+
+  it("appends a trailing newline if the body does not already end with one", () => {
+    const t1 = composeSkillFile({ name: "foo", description: "bar", body: "baz" });
+    expect(t1.endsWith("\n")).toBe(true);
+    const t2 = composeSkillFile({ name: "foo", description: "bar", body: "baz\n" });
+    expect(t2.endsWith("baz\n")).toBe(true);
+    expect(t2.endsWith("\n\n")).toBe(false);
+  });
+});
+
+function fakeRegistry(opts: { listEntry?: { name: string; tokens?: number; baseDir?: string } } = {}): SkillsRegistryService & { rescanCalls: number } {
+  let calls = 0;
+  return {
+    list: () => opts.listEntry ? [{ name: opts.listEntry.name, description: "d", tokens: opts.listEntry.tokens, baseDir: opts.listEntry.baseDir }] : [],
+    load: async (n: string) => { throw new Error(`unknown skill: ${n}`); },
+    register: () => () => {},
+    rescan: async () => { calls++; return { changed: true, count: opts.listEntry ? 1 : 0 }; },
+    get rescanCalls() { return calls; },
+  } as any;
+}
+
+describe("makeNewSkillHandler", () => {
+  async function makeRoots() {
+    const projectRoot = await mkdtemp(join(tmpdir(), "ns-proj-"));
+    const userRoot = await mkdtemp(join(tmpdir(), "ns-user-"));
+    return { projectRoot, userRoot };
+  }
+
+  it("writes SKILL.md, rescans once, and returns { name, path, scope, tokens }", async () => {
+    const { projectRoot, userRoot } = await makeRoots();
+    const registry = fakeRegistry({ listEntry: { name: "git-rebase", tokens: 17, baseDir: join(projectRoot, "git-rebase") } });
+    const handler = makeNewSkillHandler({ projectRoot, userRoot, registry });
+    const result = await handler({
+      name: "git-rebase",
+      description: "How to rebase cleanly.",
+      body: "Step 1.",
+      scope: "project",
+    }, { signal: new AbortController().signal, callId: "c1", log: () => {} });
+    expect(result).toEqual({
+      name: "git-rebase",
+      path: join(projectRoot, "git-rebase", "SKILL.md"),
+      scope: "project",
+      tokens: 17,
+    });
+    expect(registry.rescanCalls).toBe(1);
+    const written = await readFile(join(projectRoot, "git-rebase", "SKILL.md"), "utf8");
+    expect(written).toBe("---\nname: git-rebase\ndescription: How to rebase cleanly.\n---\n\nStep 1.\n");
+    await rm(projectRoot, { recursive: true });
+    await rm(userRoot, { recursive: true });
+  });
+
+  it("writes under the user root when scope='user'", async () => {
+    const { projectRoot, userRoot } = await makeRoots();
+    const registry = fakeRegistry({ listEntry: { name: "foo", tokens: 5, baseDir: join(userRoot, "foo") } });
+    const handler = makeNewSkillHandler({ projectRoot, userRoot, registry });
+    const result = await handler({ name: "foo", description: "d", body: "b", scope: "user" }, { signal: new AbortController().signal, callId: "c", log: () => {} });
+    expect((result as any).path).toBe(join(userRoot, "foo", "SKILL.md"));
+    expect((result as any).scope).toBe("user");
+    const exists = await fsStat(join(userRoot, "foo", "SKILL.md"));
+    expect(exists.isFile()).toBe(true);
+    await rm(projectRoot, { recursive: true });
+    await rm(userRoot, { recursive: true });
+  });
+
+  it("creates the scope root if missing (mkdir -p)", async () => {
+    const proj = await mkdtemp(join(tmpdir(), "ns-proj-"));
+    const userRoot = join(proj, "nonexistent-user-root");   // does not exist yet
+    const projectRoot = proj;
+    const registry = fakeRegistry({ listEntry: { name: "x", tokens: 1, baseDir: join(userRoot, "x") } });
+    const handler = makeNewSkillHandler({ projectRoot, userRoot, registry });
+    await handler({ name: "x", description: "d", body: "b", scope: "user" }, { signal: new AbortController().signal, callId: "c", log: () => {} });
+    const exists = await fsStat(join(userRoot, "x", "SKILL.md"));
+    expect(exists.isFile()).toBe(true);
+    await rm(proj, { recursive: true });
+  });
+
+  it("falls back to estimateTokens when rescan list does not surface tokens", async () => {
+    const { projectRoot, userRoot } = await makeRoots();
+    const registry: SkillsRegistryService = {
+      list: () => [],   // empty even after rescan
+      load: async () => { throw new Error("nope"); },
+      register: () => () => {},
+      rescan: async () => ({ changed: true, count: 0 }),
+    } as any;
+    const handler = makeNewSkillHandler({ projectRoot, userRoot, registry });
+    const result = await handler({ name: "foo", description: "d", body: "abcd", scope: "user" }, { signal: new AbortController().signal, callId: "c", log: () => {} });
+    // body 'abcd' → estimateTokens = ceil(4/4) = 1
+    expect((result as any).tokens).toBe(1);
+    await rm(projectRoot, { recursive: true });
+    await rm(userRoot, { recursive: true });
+  });
+
+  it("throws and does not write on validation failure", async () => {
+    const { projectRoot, userRoot } = await makeRoots();
+    const registry = fakeRegistry();
+    const handler = makeNewSkillHandler({ projectRoot, userRoot, registry });
+    await expect(handler({ name: "Bad", description: "d", body: "b", scope: "user" }, { signal: new AbortController().signal, callId: "c", log: () => {} })).rejects.toThrow(/name must match/);
+    // No directory created
+    await expect(fsStat(join(userRoot, "Bad"))).rejects.toThrow();
+    expect(registry.rescanCalls).toBe(0);
+    await rm(projectRoot, { recursive: true });
+    await rm(userRoot, { recursive: true });
+  });
+
+  it("throws and does not write on collision", async () => {
+    const { projectRoot, userRoot } = await makeRoots();
+    await mkdir(join(projectRoot, "exists"), { recursive: true });
+    const registry = fakeRegistry();
+    const handler = makeNewSkillHandler({ projectRoot, userRoot, registry });
+    await expect(handler({ name: "exists", description: "d", body: "b", scope: "project" }, { signal: new AbortController().signal, callId: "c", log: () => {} })).rejects.toThrow(/already exists/);
+    expect(registry.rescanCalls).toBe(0);
+    await rm(projectRoot, { recursive: true });
+    await rm(userRoot, { recursive: true });
+  });
+
+  it("wraps registry.rescan() errors with a message naming the written file", async () => {
+    const { projectRoot, userRoot } = await makeRoots();
+    const registry: SkillsRegistryService = {
+      list: () => [],
+      load: async () => { throw new Error("nope"); },
+      register: () => () => {},
+      rescan: async () => { throw new Error("disk broke"); },
+    } as any;
+    const handler = makeNewSkillHandler({ projectRoot, userRoot, registry });
+    const expectedPath = join(projectRoot, "z", "SKILL.md");
+    await expect(handler({ name: "z", description: "d", body: "b", scope: "project" }, { signal: new AbortController().signal, callId: "c", log: () => {} })).rejects.toThrow(new RegExp(`written to.*${expectedPath.replace(/\//g, "\\/")}`));
+    // File was written despite the rescan failure.
+    const exists = await fsStat(expectedPath);
+    expect(exists.isFile()).toBe(true);
+    await rm(projectRoot, { recursive: true });
+    await rm(userRoot, { recursive: true });
+  });
+
+  it("uses write-then-rename so no SKILL.md.tmp-* file remains", async () => {
+    const { projectRoot, userRoot } = await makeRoots();
+    const registry = fakeRegistry({ listEntry: { name: "z", tokens: 2 } });
+    const handler = makeNewSkillHandler({ projectRoot, userRoot, registry });
+    await handler({ name: "z", description: "d", body: "b", scope: "project" }, { signal: new AbortController().signal, callId: "c", log: () => {} });
+    const { readdir } = await import("node:fs/promises");
+    const entries = await readdir(join(projectRoot, "z"));
+    expect(entries).toEqual(["SKILL.md"]);
+    await rm(projectRoot, { recursive: true });
+    await rm(userRoot, { recursive: true });
   });
 });

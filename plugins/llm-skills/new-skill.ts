@@ -1,6 +1,8 @@
-import { lstat } from "node:fs/promises";
-import { join } from "node:path";
+import { lstat, mkdir, rename, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import type { ToolSchema } from "llm-contracts/public";
+import type { SkillsRegistryService } from "./public";
+import { estimateTokens } from "./tokens.ts";
 
 export const NEW_SKILL_SCHEMA: ToolSchema = {
   name: "new_skill",
@@ -135,4 +137,90 @@ export async function assertNoCollision(baseDir: string): Promise<void> {
     throw err;
   }
   throw new Error(`new_skill: skill already exists at ${baseDir}`);
+}
+
+export interface ComposeSkillFileInput {
+  name: string;
+  description: string;
+  body: string;
+}
+
+/**
+ * Build the canonical SKILL.md file text. The frontmatter `name:` is
+ * informational only — the path-derived name is canonical in the registry.
+ */
+export function composeSkillFile(input: ComposeSkillFileInput): string {
+  const body = input.body.endsWith("\n") ? input.body : `${input.body}\n`;
+  return `---\nname: ${input.name}\ndescription: ${input.description}\n---\n\n${body}`;
+}
+
+export interface MakeNewSkillHandlerDeps {
+  projectRoot: string;
+  userRoot: string;
+  registry: SkillsRegistryService;
+}
+
+export type ToolHandlerFn = (
+  args: unknown,
+  ctx: { signal: AbortSignal; callId: string; turnId?: string; log: (m: string) => void },
+) => Promise<unknown>;
+
+export interface NewSkillResult {
+  name: string;
+  path: string;
+  scope: "project" | "user";
+  tokens: number;
+}
+
+/**
+ * Build the new_skill handler. Pure factory; no module-scope state.
+ *
+ * Behaviour on success:
+ *   1. Validate input (throws on violation).
+ *   2. Resolve target path under the chosen scope's root.
+ *   3. Refuse if anything exists at the target dir (lstat — does not follow symlinks).
+ *   4. Compose SKILL.md text; mkdir -p the skill directory.
+ *   5. Atomic write: writeFile to `SKILL.md.tmp-<pid>-<nonce>`, then rename to `SKILL.md`.
+ *   6. await registry.rescan() — the registry's onChange callback fires the
+ *      prompt-section bump and the skill:available-changed emit.
+ *   7. Return { name, path, scope, tokens }, with tokens read from the freshly
+ *      rescanned registry entry (heuristic fallback if absent).
+ */
+export function makeNewSkillHandler(deps: MakeNewSkillHandlerDeps): ToolHandlerFn {
+  return async (args) => {
+    validateNewSkillInput(args);
+
+    const { name, description, body, scope } = args;
+
+    const { baseDir, file } = resolveTargetPath({
+      name,
+      scope,
+      projectRoot: deps.projectRoot,
+      userRoot: deps.userRoot,
+    });
+
+    await mkdir(dirname(baseDir), { recursive: true });   // ensure scope root exists
+    await assertNoCollision(baseDir);
+    await mkdir(baseDir, { recursive: true });             // create skill dir
+
+    const text = composeSkillFile({ name, description, body });
+    const nonce = `${process.pid}-${Math.random().toString(36).slice(2, 10)}`;
+    const tmp = `${file}.tmp-${nonce}`;
+    await writeFile(tmp, text, { encoding: "utf8", mode: 0o644 });
+    await rename(tmp, file);
+
+    try {
+      await deps.registry.rescan();
+    } catch (err: any) {
+      throw new Error(
+        `new_skill: SKILL.md was written to ${file} but registry rescan failed: ${err?.message ?? String(err)}. The skill will be picked up on the next turn:start.`,
+      );
+    }
+
+    const entry = deps.registry.list().find(m => m.name === name);
+    const tokens = typeof entry?.tokens === "number" ? entry.tokens : estimateTokens(body);
+
+    const result: NewSkillResult = { name, path: file, scope, tokens };
+    return result;
+  };
 }
