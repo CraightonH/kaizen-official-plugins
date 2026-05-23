@@ -197,4 +197,67 @@ describe("registerSlashCommands", () => {
     );
     expect(prints[0]!.markdown).toBe(true);
   });
+
+  test("/skills:get on a user-layer skill labels it 'user'", async () => {
+    const projectRoot = "/proj/.kaizen/skills";
+    const userRoot = "/home/u/.kaizen/skills";
+    const slash = makeFakeSlash();
+    const registry = makeFakeRegistry({
+      list: [{
+        name: "beta",
+        description: "User beta",
+        tokens: 10,
+        baseDir: `${userRoot}/beta`,
+      }],
+      bodies: { beta: "Beta body." },
+    });
+    registerSlashCommands({ registry, slash: slash.service, projectRoot, userRoot });
+    const getEntry = slash.registered.find((r) => r.manifest.name === "skills:get")!;
+    const { ctx, prints } = makeCtx("beta");
+    await getEntry.handler(ctx);
+    expect(prints[0]!.text).toContain("Source: user");
+    expect(prints[0]!.text).toContain("Path: `/home/u/.kaizen/skills/beta`");
+  });
+
+  test("/skills:get on a programmatic skill (no baseDir) labels it 'programmatic' and omits Path", async () => {
+    const slash = makeFakeSlash();
+    const registry = makeFakeRegistry({
+      list: [{ name: "gamma", description: "From a plugin", tokens: 5 }],
+      bodies: { gamma: "Gamma body." },
+    });
+    registerSlashCommands({
+      registry,
+      slash: slash.service,
+      projectRoot: "/proj/.kaizen/skills",
+      userRoot: "/home/u/.kaizen/skills",
+    });
+    const getEntry = slash.registered.find((r) => r.manifest.name === "skills:get")!;
+    const { ctx, prints } = makeCtx("gamma");
+    await getEntry.handler(ctx);
+    expect(prints[0]!.text).toContain("Source: programmatic");
+    expect(prints[0]!.text).not.toContain("Path:");
+  });
+
+  test("/skills:get on a baseDir outside both roots labels it 'external'", async () => {
+    const slash = makeFakeSlash();
+    const registry = makeFakeRegistry({
+      list: [{
+        name: "delta",
+        description: "From a plugin cache",
+        baseDir: "/var/cache/kaizen/plugin-x/delta",
+      }],
+      bodies: { delta: "Delta body." },
+    });
+    registerSlashCommands({
+      registry,
+      slash: slash.service,
+      projectRoot: "/proj/.kaizen/skills",
+      userRoot: "/home/u/.kaizen/skills",
+    });
+    const getEntry = slash.registered.find((r) => r.manifest.name === "skills:get")!;
+    const { ctx, prints } = makeCtx("delta");
+    await getEntry.handler(ctx);
+    expect(prints[0]!.text).toContain("Source: external");
+    expect(prints[0]!.text).toContain("Path: `/var/cache/kaizen/plugin-x/delta`");
+  });
 });
