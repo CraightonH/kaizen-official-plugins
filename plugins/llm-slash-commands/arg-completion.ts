@@ -1,5 +1,5 @@
 import { parse } from "./parser.ts";
-import { filterByQuery } from "./query-match.ts";
+import { matchesQuery, filterByQuery } from "./query-match.ts";
 import type { SlashRegistryService, CompletionItem, CompletionSource } from "llm-contracts/public";
 
 export interface ArgSlotInfo {
@@ -109,6 +109,7 @@ export function buildArgCompletionSource(registry: SlashRegistryService): Comple
       }
       return flags
         .filter((f) => !present.has(f.name))
+        .filter((f) => matchesQuery(f.name, slot.query))
         .map<CompletionItem>((f) => ({
           label: f.name,
           // Trailing space so a subsequent flag can be picked without manual spacing.

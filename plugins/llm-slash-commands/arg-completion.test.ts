@@ -169,4 +169,40 @@ describe("buildArgCompletionSource", () => {
     const items = await src.list("", { line: "/self:cmd env", cursor: 13 });
     expect(items.map((i) => i.label).sort()).toEqual(["  env", "✓ keychain"]);
   });
+
+  function withTwoFlags() {
+    const reg = createRegistry();
+    reg.register(
+      {
+        name: "flags:cmd",
+        description: "x",
+        source: "plugin",
+        arguments: [{ name: "a", complete: async () => [{ label: "first", insertText: "first " }] }],
+        flags: [
+          { name: "--project", description: "p" },
+          { name: "--reveal",  description: "r" },
+        ],
+      },
+      async () => {},
+    );
+    return reg;
+  }
+
+  it("flag slot: filters flags by case-insensitive substring of slot query", async () => {
+    const src = buildArgCompletionSource(withTwoFlags());
+    const items = await src.list("", { line: "/flags:cmd a --pro", cursor: 18 });
+    expect(items.map((i) => i.label)).toEqual(["--project"]);
+  });
+
+  it("flag slot: case-folds the query", async () => {
+    const src = buildArgCompletionSource(withTwoFlags());
+    const items = await src.list("", { line: "/flags:cmd a --REVEAL", cursor: 21 });
+    expect(items.map((i) => i.label)).toEqual(["--reveal"]);
+  });
+
+  it("flag slot: empty slot query returns all unconsumed flags (regression)", async () => {
+    const src = buildArgCompletionSource(withTwoFlags());
+    const items = await src.list("", { line: "/flags:cmd a ", cursor: 13 });
+    expect(items.map((i) => i.label).sort()).toEqual(["--project", "--reveal"]);
+  });
 });
