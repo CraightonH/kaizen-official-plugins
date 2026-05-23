@@ -33,7 +33,9 @@ export function makeLoadSkillHandler(
     const body = await registry.load(name);
     const fromList = registry.list().find(m => m.name === name);
     const tokens = typeof fromList?.tokens === "number" ? fromList.tokens : estimateTokens(body);
+    const baseDir = typeof fromList?.baseDir === "string" && fromList.baseDir.length > 0 ? fromList.baseDir : undefined;
+    const finalBody = baseDir ? `Base directory for this skill: ${baseDir}\n\n${body}` : body;
     await emit("skill:loaded", { name, tokens });
-    return { name, tokens, body };
+    return { name, tokens, body: finalBody };
   };
 }

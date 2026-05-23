@@ -69,3 +69,42 @@ describe("makeLoadSkillHandler", () => {
     expect(emit).toHaveBeenCalledWith("skill:loaded", { name: "x", tokens: 1 });
   });
 });
+
+describe("makeLoadSkillHandler — baseDir preamble", () => {
+  it("prepends 'Base directory for this skill:' line when manifest.baseDir is set", async () => {
+    const registry = {
+      list: () => [{ name: "alpha", description: "d", tokens: 10, baseDir: "/abs/skills/alpha" }],
+      load: async () => "BODY",
+      register: () => () => {},
+      rescan: async () => ({ changed: false, count: 0 }),
+    };
+    const emit = mock(async () => {});
+    const handler = makeLoadSkillHandler(registry as any, emit);
+    const result = await handler({ name: "alpha" }, { signal: new AbortController().signal, callId: "c1", log: () => {} }) as { body: string };
+    expect(result.body).toBe("Base directory for this skill: /abs/skills/alpha\n\nBODY");
+  });
+
+  it("returns body verbatim when manifest.baseDir is unset", async () => {
+    const registry = {
+      list: () => [{ name: "alpha", description: "d", tokens: 10 }],
+      load: async () => "BODY",
+      register: () => () => {},
+      rescan: async () => ({ changed: false, count: 0 }),
+    };
+    const handler = makeLoadSkillHandler(registry as any, async () => {});
+    const result = await handler({ name: "alpha" }, { signal: new AbortController().signal, callId: "c1", log: () => {} }) as { body: string };
+    expect(result.body).toBe("BODY");
+  });
+
+  it("treats an empty-string baseDir as unset (no preamble)", async () => {
+    const registry = {
+      list: () => [{ name: "alpha", description: "d", tokens: 10, baseDir: "" }],
+      load: async () => "BODY",
+      register: () => () => {},
+      rescan: async () => ({ changed: false, count: 0 }),
+    };
+    const handler = makeLoadSkillHandler(registry as any, async () => {});
+    const result = await handler({ name: "alpha" }, { signal: new AbortController().signal, callId: "c1", log: () => {} }) as { body: string };
+    expect(result.body).toBe("BODY");
+  });
+});
