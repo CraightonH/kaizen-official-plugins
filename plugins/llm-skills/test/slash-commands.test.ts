@@ -99,4 +99,31 @@ describe("registerSlashCommands", () => {
     expect(prints[0]!.text).toBe("No skills registered.");
     expect(prints[0]!.markdown).toBe(true);
   });
+
+  test("/skills:list prints `<name>` — <description> per skill, alpha sorted", async () => {
+    const slash = makeFakeSlash();
+    const registry = makeFakeRegistry({
+      list: [
+        { name: "zeta", description: "Last one" },
+        { name: "alpha", description: "First one" },
+        { name: "superpowers:brainstorming", description: "Brainstorm features" },
+      ],
+    });
+    registerSlashCommands({
+      registry,
+      slash: slash.service,
+      projectRoot: "/proj/.kaizen/skills",
+      userRoot: "/home/u/.kaizen/skills",
+    });
+    const listEntry = slash.registered.find((r) => r.manifest.name === "skills:list")!;
+    const { ctx, prints } = makeCtx("");
+    await listEntry.handler(ctx);
+    expect(prints).toHaveLength(1);
+    expect(prints[0]!.text).toBe(
+      "`alpha` — First one\n" +
+      "`superpowers:brainstorming` — Brainstorm features\n" +
+      "`zeta` — Last one"
+    );
+    expect(prints[0]!.markdown).toBe(true);
+  });
 });
