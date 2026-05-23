@@ -147,4 +147,25 @@ describe("registerSlashCommands", () => {
       "Usage: /skills:get <name>\nRun /skills:list to see what's available."
     );
   });
+
+  test("/skills:get with unknown name prints not-found hint", async () => {
+    const slash = makeFakeSlash();
+    const registry = makeFakeRegistry({
+      list: [{ name: "alpha", description: "Anything" }],
+      bodies: { alpha: "body" },
+    });
+    registerSlashCommands({
+      registry,
+      slash: slash.service,
+      projectRoot: "/proj/.kaizen/skills",
+      userRoot: "/home/u/.kaizen/skills",
+    });
+    const getEntry = slash.registered.find((r) => r.manifest.name === "skills:get")!;
+    const { ctx, prints } = makeCtx("not-a-real-skill");
+    await getEntry.handler(ctx);
+    expect(prints).toHaveLength(1);
+    expect(prints[0]!.text).toBe(
+      "Unknown skill: not-a-real-skill. Run /skills:list to see what's available."
+    );
+  });
 });

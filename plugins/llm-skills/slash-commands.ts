@@ -54,8 +54,13 @@ async function handleGet(
     await ctx.print("Usage: /skills:get <name>\nRun /skills:list to see what's available.");
     return;
   }
-  // Remaining branches added in subsequent tasks.
-  await ctx.print(`(stub: would look up ${name})`);
+  const entry = deps.registry.list().find((m) => m.name === name);
+  if (!entry) {
+    await ctx.print(`Unknown skill: ${name}. Run /skills:list to see what's available.`);
+    return;
+  }
+  // Body fetch + header rendering added in the next task.
+  await ctx.print(`(stub: would render ${name})`);
 }
 
 function formatList(entries: SkillManifest[]): string {
