@@ -260,4 +260,25 @@ describe("registerSlashCommands", () => {
     expect(prints[0]!.text).toContain("Source: external");
     expect(prints[0]!.text).toContain("Path: `/var/cache/kaizen/plugin-x/delta`");
   });
+
+  test("/skills:get reports load() failures instead of throwing", async () => {
+    const slash = makeFakeSlash();
+    const registry: SkillsRegistryService = {
+      list: () => [{ name: "broken", description: "Will fail to load" }],
+      load: async () => { throw new Error("disk is on fire"); },
+      register: () => () => {},
+      rescan: async () => ({ changed: false, count: 1 }),
+    };
+    registerSlashCommands({
+      registry,
+      slash: slash.service,
+      projectRoot: "/proj/.kaizen/skills",
+      userRoot: "/home/u/.kaizen/skills",
+    });
+    const getEntry = slash.registered.find((r) => r.manifest.name === "skills:get")!;
+    const { ctx, prints } = makeCtx("broken");
+    await getEntry.handler(ctx); // must not throw
+    expect(prints).toHaveLength(1);
+    expect(prints[0]!.text).toBe("Failed to load skill broken: disk is on fire");
+  });
 });
