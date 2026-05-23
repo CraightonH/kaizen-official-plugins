@@ -1,12 +1,23 @@
 import { readdir, readFile, stat } from "node:fs/promises";
-import { join, relative, sep } from "node:path";
+import { join } from "node:path";
 
 export interface ScannedFile {
-  relativeName: string;   // path-derived skill name; '/'-separated; no .md suffix
+  /** Path-derived skill name. Equal to the immediate subdirectory of the scan root. */
+  relativeName: string;
+  /** Absolute path to the SKILL.md file. */
   absolutePath: string;
+  /** Absolute path to the skill's directory (parent of SKILL.md). Surfaced via SkillManifest.baseDir. */
+  baseDir: string;
+  /** Verbatim contents of SKILL.md (frontmatter + body). */
   body: string;
 }
 
+/**
+ * Walk `<absRoot>/<name>/SKILL.md` entries (one level deep). Returns [] if the
+ * root does not exist or is not a directory. Each entry's `relativeName` is the
+ * `<name>` segment. Sibling files inside the skill directory are ignored.
+ * Nested directories (e.g. `<absRoot>/group/name/SKILL.md`) are not scanned.
+ */
 export async function scanRoot(absRoot: string): Promise<ScannedFile[]> {
   let rootStat;
   try {
@@ -16,41 +27,35 @@ export async function scanRoot(absRoot: string): Promise<ScannedFile[]> {
   }
   if (!rootStat.isDirectory()) return [];
 
-  const out: ScannedFile[] = [];
-  const visited = new Set<string>();   // realpath-based dir cycle guard (best-effort)
-
-  async function walk(dir: string): Promise<void> {
-    if (visited.has(dir)) return;
-    visited.add(dir);
-
-    let entries;
-    try {
-      entries = await readdir(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const ent of entries) {
-      if (ent.name.startsWith(".")) continue;        // skip dotfiles + dotdirs
-      const abs = join(dir, ent.name);
-      if (ent.isDirectory()) {
-        await walk(abs);
-      } else if (ent.isFile() || ent.isSymbolicLink()) {
-        if (!ent.name.endsWith(".md")) continue;
-        let body: string;
-        try {
-          body = await readFile(abs, "utf8");
-        } catch {
-          continue;
-        }
-        const rel = relative(absRoot, abs).split(sep).join("/");
-        const relativeName = rel.slice(0, -".md".length);
-        out.push({ relativeName, absolutePath: abs, body });
-      }
-    }
+  let entries;
+  try {
+    entries = await readdir(absRoot, { withFileTypes: true });
+  } catch {
+    return [];
   }
 
-  await walk(absRoot);
-  // Stable order regardless of OS readdir order.
+  const out: ScannedFile[] = [];
+  for (const ent of entries) {
+    if (ent.name.startsWith(".")) continue;
+    // Accept directories and symlinks (which may resolve to directories).
+    if (!ent.isDirectory() && !ent.isSymbolicLink()) continue;
+    const baseDir = join(absRoot, ent.name);
+    const skillFile = join(baseDir, "SKILL.md");
+    let body: string;
+    try {
+      body = await readFile(skillFile, "utf8");
+    } catch {
+      // Missing SKILL.md, unreadable, or symlink target isn't a dir → skip silently.
+      continue;
+    }
+    out.push({
+      relativeName: ent.name,
+      absolutePath: skillFile,
+      baseDir,
+      body,
+    });
+  }
+
   out.sort((a, b) => a.relativeName.localeCompare(b.relativeName));
   return out;
 }
