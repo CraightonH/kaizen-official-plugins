@@ -4,10 +4,12 @@ Owns skill discovery and on-demand loading. Scans markdown files with YAML front
 
 ## What it does
 
-- Scans two roots for `.md` files with frontmatter (`name`, `description`, optional `tokens`):
-  - **Project:** `<cwd>/.kaizen/skills/`
-  - **User:** `~/.kaizen/skills/`
-  - Subdirectories namespace the skill: `python/poetry-deps.md` → `python/poetry-deps`.
+- Scans two roots for `<name>/SKILL.md` files (CC-style directory-per-skill layout):
+  - **Project:** `<cwd>/.kaizen/skills/<name>/SKILL.md`
+  - **User:** `~/.kaizen/skills/<name>/SKILL.md`
+  - The directory name (`<name>`) is the registered skill name. Flat, single segment.
+  - Sibling files in the skill directory (`references/`, `scripts/`, etc.) are left alone by the scanner — the LLM accesses them via filesystem tools using the manifest's `baseDir`.
+  - Frontmatter required: `name`, `description`; optional: `tokens`.
 - Accepts programmatic skill registrations from other plugins (lowest priority).
 - Conflict precedence (highest first): project → user → programmatic. Masked entries are dropped with a warning.
 - Path-derived name always wins over a mismatched frontmatter `name` (with a warning).
@@ -61,6 +63,30 @@ Semantics:
 
 Handler returns `{ name, tokens, body }`. Errors (missing/empty `name`, unknown skill) propagate so `tools:registry` surfaces them via `tool:error`.
 
+**Tool** — `new_skill` (registered into `tools:registry` if available)
+
+```jsonc
+{
+  "name": "new_skill",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "name":        { "type": "string" },
+      "description": { "type": "string" },
+      "body":        { "type": "string" },
+      "scope":       { "type": "string", "enum": ["project", "user"] }
+    },
+    "required": ["name", "description", "body", "scope"],
+    "additionalProperties": false
+  },
+  "tags": ["skills", "synthetic", "mutating"]
+}
+```
+
+Creates a new skill at `<projectRoot|userRoot>/<name>/SKILL.md`. Validates name shape (`[a-z0-9][a-z0-9_-]*`, ≤64 chars), description (single-line, ≤200 chars, non-empty), and body (non-empty). Refuses on collision in the target scope (`lstat` — does not follow symlinks). After the write, triggers an immediate `rescan()` so the new skill is visible in the next turn's system prompt and immediately callable via `load_skill`. Returns `{ name, path, scope, tokens }`.
+
+Routes through `llm-tool-approval` like any other mutating tool — the default `llm-skills:*` allow rule does not match the bare name `new_skill`, so the gate prompts by default. "Approve Always" persists the rule to the project's approval config.
+
 ### Consumes
 
 - **Service** — `tools:registry` (declared in `services.consumes` so kaizen's topo-sort orders this plugin after the registry's provider when one exists). Functionally optional at runtime: if the service is absent, `load_skill` is not registered and the plugin logs a warning; the `prompt:registry` section still appears but the LLM cannot pull bodies.
@@ -89,4 +115,4 @@ The project root is always `<ctx.cwd>/.kaizen/skills` and is not overridable.
 
 ## Permissions
 
-`tier: unscoped` — reads files under `~/.kaizen/skills/` and `<project>/.kaizen/skills/`. No writes, no process execution, no network.
+`tier: unscoped` — reads and writes files under `~/.kaizen/skills/` and `<project>/.kaizen/skills/` (writes only via the `new_skill` tool, which routes through `llm-tool-approval`). No process execution, no network.

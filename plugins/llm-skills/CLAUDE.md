@@ -22,6 +22,13 @@ injection.ts      buildSkillsBlock(list). Pure string builder for the prompt:reg
                   body. Returns "" when list is empty (the registry drops empty sections).
 tool.ts           LOAD_SKILL_SCHEMA and makeLoadSkillHandler(registry, emit). Pure factory;
                   no state.
+new-skill.ts      NEW_SKILL_SCHEMA, validateNewSkillInput, resolveTargetPath,
+                  assertNoCollision, composeSkillFile, makeNewSkillHandler. Pure
+                  factory + pure helpers; the handler is the only function that
+                  touches the filesystem. Validates input, refuses on collision
+                  (lstat — does not follow symlinks), writes SKILL.md via
+                  write-then-rename, triggers a registry rescan, returns
+                  { name, path, scope, tokens }.
 tokens.ts         estimateTokens(body) → ceil(len / 4). One line; the heuristic.
 public.d.ts       Owns SkillManifest, SkillRescanResult, SkillsRegistryService. These are
                   feature-owned by this plugin (skills:registry is a feature service, not a
@@ -31,7 +38,8 @@ public.d.ts       Owns SkillManifest, SkillRescanResult, SkillsRegistryService. 
 
 Boundaries:
 - Only `index.ts` imports `kaizen/types` or touches `ctx`.
-- `scan.ts` is the only module that does filesystem I/O.
+- `scan.ts` is one of two modules that does filesystem I/O (the other is
+  `new-skill.ts`, which only writes).
 - `registry.ts` is the only stateful module. Everything else is pure.
 - Tests for each module live alongside in `test/` and run independently (`bun test`).
 
@@ -45,6 +53,10 @@ Boundaries:
 - **Tokens are cached at registration.** `manifest.tokens` is computed once (heuristic or frontmatter override) and never recomputed by `list()`. The `load_skill` handler recomputes only as a fallback when `list()` doesn't carry a token count for the loaded skill.
 - **`load_skill` is registered late and unregistered on stop.** The `services.consumes: ["tools:registry"]` declaration is what guarantees topological ordering — without it, `useService("tools:registry")` may run before the registry is ready. The cleanup callback is held in a module-scope `let` and drained by `stop()`, which is idempotent.
 - **Rescan throttling is wall-clock based.** `lastScanAt` is captured by the `turn:start` closure. If `KAIZEN_LLM_SKILLS_RESCAN_MS` is invalid or non-positive, fall back to the 30 s default. Never treat 0 as "always rescan".
+- **`new_skill` writes only SKILL.md.** Sibling files in the skill directory
+  (`references/`, `scripts/`, anything else) are the user's concern. The tool
+  refuses on collision via `lstat` so a partial scaffold the user is
+  mid-authoring is not clobbered.
 
 ## Adding a programmatic skill from another plugin
 
@@ -64,7 +76,13 @@ If your plugin needs to advertise a different system-prompt section, register yo
 
 ## Editing scan behavior
 
-`scan.ts` is intentionally narrow: walk directory, skip dotfiles, read `.md` bodies, derive names. Cycles through symlinks are guarded best-effort by a `Set` of visited paths. Don't add a watcher (spec rules it out — scan-on-turn-start is the model). Don't add multi-file skill support (`SKILL.md` + siblings) without a spec amendment.
+`scan.ts` is intentionally narrow: walk top-level subdirectories of each root,
+read `<dir>/SKILL.md` only, derive name from the directory name. Cycles through
+symlinks at the top level are accepted (the readFile will silently fail if the
+target isn't a directory with a SKILL.md). Don't add a watcher (spec rules it
+out — scan-on-turn-start is the model). Multi-file skill *writing* is owned by
+the user (sibling files like `references/`, `scripts/` are left alone by the
+scanner and never touched by `new_skill`).
 
 ## Editing the frontmatter parser
 
