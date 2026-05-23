@@ -26,11 +26,28 @@ function makePromptSystem() {
   };
 }
 
+function makeFakeSlashRegistry() {
+  const registered: { name: string; description: string; source: string }[] = [];
+  const service = {
+    register(manifest: any) {
+      registered.push({ name: manifest.name, description: manifest.description, source: manifest.source });
+      return () => {
+        const i = registered.findIndex((r) => r.name === manifest.name);
+        if (i >= 0) registered.splice(i, 1);
+      };
+    },
+    get: () => undefined,
+    list: () => registered,
+  };
+  return { service, registered };
+}
+
 function makeCtx(opts: {
   cwd?: string;
   env?: Record<string, string | undefined>;
   toolsRegistry?: any;
   promptSystem?: any;
+  slashRegistry?: any;
 } = {}) {
   const env = { ...process.env, HOME: "/tmp/does-not-exist", ...opts.env };
   const subscribers: Record<string, Function[]> = {};
@@ -40,6 +57,7 @@ function makeCtx(opts: {
   const services: Record<string, unknown> = {};
   if (opts.toolsRegistry) services["tools:registry"] = opts.toolsRegistry;
   if (opts.promptSystem) services["prompt:registry"] = opts.promptSystem;
+  if (opts.slashRegistry) services["slash:registry"] = opts.slashRegistry;
 
   const ctx: any = {
     cwd: opts.cwd,
@@ -313,5 +331,31 @@ describe("plugin stop() — lifecycle cleanup", () => {
     await plugin.stop!({} as any);
     await plugin.stop!({} as any);
     expect(toolUnregistered).toBe(1);
+  });
+});
+
+describe("plugin setup — slash:registry absent", () => {
+  it("runs cleanly without slash:registry; /skills:* commands not registered", async () => {
+    const ps = makePromptSystem();
+    const { ctx } = makeCtx({ promptSystem: ps.service });
+    await plugin.setup(ctx);
+    // Plugin must not throw and must still stop cleanly.
+    await plugin.stop!();
+    expect(true).toBe(true);
+  });
+});
+
+describe("plugin setup — slash:registry present", () => {
+  it("registers /skills:list and /skills:get when slash:registry is available", async () => {
+    const ps = makePromptSystem();
+    const slash = makeFakeSlashRegistry();
+    const { ctx } = makeCtx({ promptSystem: ps.service, slashRegistry: slash.service });
+    await plugin.setup(ctx);
+    const names = slash.registered.map((r) => r.name).sort();
+    expect(names).toEqual(["skills:get", "skills:list"]);
+    expect(slash.registered.every((r) => r.source === "plugin")).toBe(true);
+    await plugin.stop!();
+    // After stop, both commands should be unregistered.
+    expect(slash.registered).toEqual([]);
   });
 });
