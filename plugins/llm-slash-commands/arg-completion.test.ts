@@ -107,4 +107,66 @@ describe("buildArgCompletionSource", () => {
     const items = await src.list("", { line: "/config:set kaizen-config k=v --project ", cursor: 40 });
     expect(items).toEqual([]);
   });
+
+  function withQueryUnawareSlot() {
+    const reg = createRegistry();
+    reg.register(
+      {
+        name: "qun:cmd",
+        description: "x",
+        source: "plugin",
+        arguments: [
+          // complete returns the FULL list — dispatcher should filter.
+          { name: "plugin", complete: async () => [
+            { label: "kaizen-config", insertText: "kaizen-config " },
+            { label: "openai-llm",    insertText: "openai-llm "    },
+          ] },
+        ],
+      },
+      async () => {},
+    );
+    return reg;
+  }
+
+  function withSelfFilterSlot() {
+    const reg = createRegistry();
+    reg.register(
+      {
+        name: "self:cmd",
+        description: "x",
+        source: "plugin",
+        arguments: [
+          { name: "key=value",
+            selfFilters: true,
+            complete: async () => [
+              { label: "✓ keychain", insertText: "backend=keychain " },
+              { label: "  env",      insertText: "backend=env "      },
+            ],
+          },
+        ],
+      },
+      async () => {},
+    );
+    return reg;
+  }
+
+  it("positional slot: dispatcher filters by slot query against label (substring + case-fold)", async () => {
+    const src = buildArgCompletionSource(withQueryUnawareSlot());
+    const items = await src.list("", { line: "/qun:cmd KAI", cursor: 12 });
+    expect(items.map((i) => i.label)).toEqual(["kaizen-config"]);
+  });
+
+  it("positional slot: empty slot query returns all plugin items unchanged", async () => {
+    const src = buildArgCompletionSource(withQueryUnawareSlot());
+    const items = await src.list("", { line: "/qun:cmd ", cursor: 9 });
+    expect(items.map((i) => i.label).sort()).toEqual(["kaizen-config", "openai-llm"]);
+  });
+
+  it("positional slot: selfFilters: true bypasses dispatcher filter", async () => {
+    const src = buildArgCompletionSource(withSelfFilterSlot());
+    // Query 'env' would normally filter the '✓ keychain' label out.
+    // With selfFilters: true, dispatcher must NOT filter — both rows return.
+    const items = await src.list("", { line: "/self:cmd env", cursor: 13 });
+    expect(items.map((i) => i.label).sort()).toEqual(["  env", "✓ keychain"]);
+  });
 });

@@ -1,4 +1,5 @@
 import { parse } from "./parser.ts";
+import { filterByQuery } from "./query-match.ts";
 import type { SlashRegistryService, CompletionItem, CompletionSource } from "llm-contracts/public";
 
 export interface ArgSlotInfo {
@@ -94,9 +95,11 @@ export function buildArgCompletionSource(registry: SlashRegistryService): Comple
       const flags = entry.manifest.flags ?? [];
 
       if (slot.slotIndex < args.length && !slot.flagMode) {
-        const fn = args[slot.slotIndex]!.complete;
+        const argSpec = args[slot.slotIndex]!;
+        const fn = argSpec.complete;
         if (!fn) return [];
-        return await fn(slot.prevArgs, slot.query);
+        const items = await fn(slot.prevArgs, slot.query);
+        return argSpec.selfFilters ? items : filterByQuery(items, slot.query);
       }
 
       // Flag slot: return one item per declared flag not yet present in the line.
