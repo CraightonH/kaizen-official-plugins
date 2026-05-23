@@ -1,4 +1,5 @@
 import type {
+  SkillManifest,
   SkillsRegistryService,
   SlashCommandHandler,
   SlashCommandManifest,
@@ -22,7 +23,7 @@ export function registerSlashCommands(deps: RegisterSlashCommandsDeps): () => vo
     source: "plugin",
   };
   const listHandler: SlashCommandHandler = async (ctx) => {
-    await ctx.print("(not implemented)");
+    await ctx.print(formatList(deps.registry.list()), { markdown: true });
   };
   offs.push(slash.register(listManifest, listHandler));
 
@@ -42,4 +43,10 @@ export function registerSlashCommands(deps: RegisterSlashCommandsDeps): () => vo
       try { off(); } catch { /* idempotent */ }
     }
   };
+}
+
+function formatList(entries: SkillManifest[]): string {
+  if (entries.length === 0) return "No skills registered.";
+  const sorted = [...entries].sort((a, b) => a.name.localeCompare(b.name));
+  return sorted.map((e) => `\`${e.name}\` — ${e.description}`).join("\n");
 }

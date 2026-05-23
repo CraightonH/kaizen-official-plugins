@@ -82,4 +82,21 @@ describe("registerSlashCommands", () => {
     off();
     expect(slash.registered).toEqual([]);
   });
+
+  test("/skills:list with empty registry prints 'No skills registered.'", async () => {
+    const slash = makeFakeSlash();
+    const registry = makeFakeRegistry({ list: [] });
+    registerSlashCommands({
+      registry,
+      slash: slash.service,
+      projectRoot: "/proj/.kaizen/skills",
+      userRoot: "/home/u/.kaizen/skills",
+    });
+    const listEntry = slash.registered.find((r) => r.manifest.name === "skills:list")!;
+    const { ctx, prints } = makeCtx("");
+    await listEntry.handler(ctx);
+    expect(prints).toHaveLength(1);
+    expect(prints[0]!.text).toBe("No skills registered.");
+    expect(prints[0]!.markdown).toBe(true);
+  });
 });
