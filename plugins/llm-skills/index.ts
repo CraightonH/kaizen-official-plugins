@@ -58,7 +58,11 @@ const plugin: KaizenPlugin = {
     // a hard boot requirement (no consumeService call backs it up).
     // prompt:registry is optional — the available-skills section is disabled
     // when absent (harness:error emitted), but the plugin otherwise runs fine.
-    consumes: ["tools:registry"],
+    // slash:registry is topo-hint optional — when present, llm-slash-commands
+    // loads first so the registration in setup() succeeds via useService.
+    // When absent, the lookup returns undefined and the /skills:* commands
+    // are simply not registered. No consumeService backs this entry.
+    consumes: ["tools:registry", "slash:registry"],
   },
 
   async setup(ctx) {
