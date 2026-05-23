@@ -40,3 +40,58 @@ export const NEW_SKILL_SCHEMA: ToolSchema = {
   },
   tags: ["skills", "synthetic", "mutating"],
 };
+
+export interface NewSkillInput {
+  name: string;
+  description: string;
+  body: string;
+  scope: "project" | "user";
+}
+
+const NAME_RE = /^[a-z0-9][a-z0-9_-]*$/;
+const NAME_MAX = 64;
+const DESCRIPTION_MAX = 200;
+
+/**
+ * Validate the shape and values of a new_skill input. Throws on the first
+ * violation with a message naming the field and the rule. Does not touch the
+ * filesystem.
+ */
+export function validateNewSkillInput(raw: unknown): asserts raw is NewSkillInput {
+  if (typeof raw !== "object" || raw === null) {
+    throw new Error("new_skill: args must be an object");
+  }
+  const { name, description, body, scope } = raw as Record<string, unknown>;
+
+  if (typeof name !== "string") throw new Error("new_skill: 'name' is required and must be a string");
+  if (!NAME_RE.test(name)) {
+    throw new Error("new_skill: name must match [a-z0-9_-], starting with [a-z0-9]");
+  }
+  if (name.length > NAME_MAX) {
+    throw new Error(`new_skill: name must be ≤ ${NAME_MAX} chars (got ${name.length})`);
+  }
+
+  if (typeof description !== "string") {
+    throw new Error("new_skill: 'description' is required and must be a string");
+  }
+  if (description.trim().length === 0) {
+    throw new Error("new_skill: description must be non-empty");
+  }
+  if (description.includes("\n") || description.includes("\r")) {
+    throw new Error("new_skill: description must be single-line (no \\n or \\r)");
+  }
+  if (description.length > DESCRIPTION_MAX) {
+    throw new Error(`new_skill: description must be ≤ ${DESCRIPTION_MAX} chars (got ${description.length})`);
+  }
+
+  if (typeof body !== "string") {
+    throw new Error("new_skill: 'body' is required and must be a string");
+  }
+  if (body.trim().length === 0) {
+    throw new Error("new_skill: body must be non-empty");
+  }
+
+  if (scope !== "project" && scope !== "user") {
+    throw new Error("new_skill: 'scope' must be \"project\" or \"user\"");
+  }
+}
