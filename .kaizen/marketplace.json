@@ -97,6 +97,7 @@
       "description": "Shim Claude Code skills (user, project, plugin-cache layouts) into skills:registry for the local harness.",
       "categories": ["skills", "claude-code"],
       "versions": [
+        { "version": "0.1.2", "source": { "type": "file", "path": "plugins/claude-skills" } },
         { "version": "0.1.1", "source": { "type": "file", "path": "plugins/claude-skills" } },
         { "version": "0.1.0", "source": { "type": "file", "path": "plugins/claude-skills" } }
       ]

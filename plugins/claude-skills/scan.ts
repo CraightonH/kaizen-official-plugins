@@ -120,11 +120,15 @@ async function scanPluginCacheRoot(root: string, hooks: ScanHooks): Promise<Scan
     }
   }
 
-  if (droppedVersions.length > 0) {
-    hooks.log(
-      `[claude-skills] plugin-cache version dedup dropped:\n  ${droppedVersions.join("\n  ")}`,
-    );
-  }
+  // Dedup log is intentionally disabled — feels out of place in the harness
+  // log stream. droppedVersions is still computed in case we want to surface
+  // it elsewhere (e.g. a dedicated event or status item).
+  // if (droppedVersions.length > 0) {
+  //   hooks.log(
+  //     `[claude-skills] plugin-cache version dedup dropped:\n  ${droppedVersions.join("\n  ")}`,
+  //   );
+  // }
+  void droppedVersions;
   for (const { skill } of byKey.values()) out.push(skill);
   return out;
 }

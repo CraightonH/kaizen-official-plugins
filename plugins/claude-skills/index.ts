@@ -65,7 +65,9 @@ const plugin: KaizenPlugin = {
     const roots = resolveRoots(ctx);
     const hooks = {
       onError: (m: string) => { void ctx.emit("harness:error", { message: m }); },
-      log: (m: string) => { ctx.log(m); },
+      // Disabled — see scan.ts dedup-log call. Re-enable to surface dedup info.
+      // log: (m: string) => { ctx.log(m); },
+      log: (_m: string) => { /* intentionally silent */ },
     };
 
     const initial = await scanRoots(roots, hooks);

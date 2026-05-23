@@ -40,7 +40,11 @@ describe("scanRoots — three-roots fixture", () => {
     const idx = byName(result);
     expect(idx["plug-a:cached-a"]!.body).toBe("NEW VERSION\n");
     expect(idx["plug-a:cached-a"]!.baseDir).toContain("plug-a/2.0.0/");
-    expect(logs.join("\n")).toContain("1.0.0");
+    // Dedup log is currently muted in scan.ts (it lands in the harness log
+    // and felt out of place); the dropped-version list is still computed
+    // but not surfaced. If we wire it up to an event or status item later,
+    // re-enable this assertion against that surface.
+    void logs;
   });
 
   it("sets baseDir to the absolute directory containing SKILL.md", async () => {

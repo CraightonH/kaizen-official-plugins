@@ -16,7 +16,7 @@
     "official/llm-tavily-search@0.1.1",
     "official/llm-mcp-bridge@0.1.3",
     "official/llm-skills@0.1.3",
-    "official/claude-skills@0.1.1",
+    "official/claude-skills@0.1.2",
     "official/llm-memory@0.1.3",
     "official/llm-axioms@0.1.0",
     "official/llm-environment@0.1.0",
