@@ -163,7 +163,17 @@ describe("integration — new_skill end-to-end through fake tools:registry", () 
       for (const fn of subscribers[name] ?? []) await fn(payload);
     };
     const tools = fakeToolsRegistry(emit);
+
+    // Track bumpGeneration calls for the new_skill test.
+    let bumpCount = 0;
     const ps = fakePromptSystem();
+    const origRegister = ps.service.register;
+    ps.service.register = (section: any) => {
+      const result = origRegister.call(ps.service, section);
+      const origBump = result.bumpGeneration;
+      result.bumpGeneration = () => { bumpCount++; origBump(); };
+      return result;
+    };
 
     const ctx: any = {
       cwd: "/does-not-exist",
@@ -185,7 +195,8 @@ describe("integration — new_skill end-to-end through fake tools:registry", () 
 
     await plugin.setup(ctx);
 
-    // 1. Call new_skill through the registry.
+    // 1. Call new_skill through the registry. Capture bump count before.
+    const bumpBefore = bumpCount;
     const newResult = await tools.invoke("new_skill", {
       name: "demo",
       description: "Demo skill.",
@@ -196,6 +207,8 @@ describe("integration — new_skill end-to-end through fake tools:registry", () 
     expect(newResult.scope).toBe("user");
     expect(newResult.path).toBe(join(userRoot, "demo", "SKILL.md"));
     expect(newResult.tokens).toBeGreaterThan(0);
+    // Prompt-section generation bump happened after new_skill write.
+    expect(bumpCount).toBeGreaterThan(bumpBefore);
 
     // 2. File is on disk.
     const fileText = await readFile(join(userRoot, "demo", "SKILL.md"), "utf8");

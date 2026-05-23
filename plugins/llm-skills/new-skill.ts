@@ -129,14 +129,14 @@ export function resolveTargetPath(args: ResolveTargetPathArgs): ResolvedTargetPa
  * the target is treated as a collision (not followed). Throws on collision;
  * resolves with `undefined` if the path is free.
  */
-export async function assertNoCollision(baseDir: string): Promise<void> {
+export async function assertNoCollision(baseDir: string, name: string): Promise<void> {
   try {
     await lstat(baseDir);
   } catch (err: any) {
     if (err && err.code === "ENOENT") return;
     throw err;
   }
-  throw new Error(`new_skill: skill already exists at ${baseDir}`);
+  throw new Error(`new_skill: skill '${name}' already exists at ${baseDir}`);
 }
 
 export interface ComposeSkillFileInput {
@@ -200,7 +200,7 @@ export function makeNewSkillHandler(deps: MakeNewSkillHandlerDeps): ToolHandlerF
     });
 
     await mkdir(dirname(baseDir), { recursive: true });   // ensure scope root exists
-    await assertNoCollision(baseDir);
+    await assertNoCollision(baseDir, name);
     await mkdir(baseDir, { recursive: true });             // create skill dir
 
     const text = composeSkillFile({ name, description, body });

@@ -123,28 +123,28 @@ describe("assertNoCollision", () => {
 
   it("returns successfully when nothing exists at the target", async () => {
     const root = await makeTmpRoot();
-    await expect(assertNoCollision(join(root, "foo"))).resolves.toBeUndefined();
+    await expect(assertNoCollision(join(root, "foo"), "foo")).resolves.toBeUndefined();
     await rm(root, { recursive: true });
   });
 
   it("throws when a directory already exists at the target (even without SKILL.md)", async () => {
     const root = await makeTmpRoot();
     await mkdir(join(root, "foo"), { recursive: true });
-    await expect(assertNoCollision(join(root, "foo"))).rejects.toThrow(/already exists/);
+    await expect(assertNoCollision(join(root, "foo"), "foo")).rejects.toThrow(/already exists/);
     await rm(root, { recursive: true });
   });
 
   it("throws when a file exists at the target", async () => {
     const root = await makeTmpRoot();
     await writeFile(join(root, "foo"), "");
-    await expect(assertNoCollision(join(root, "foo"))).rejects.toThrow(/already exists/);
+    await expect(assertNoCollision(join(root, "foo"), "foo")).rejects.toThrow(/already exists/);
     await rm(root, { recursive: true });
   });
 
   it("throws when a symlink exists at the target (and does not follow it)", async () => {
     const root = await makeTmpRoot();
     await symlink("/tmp", join(root, "foo"));
-    await expect(assertNoCollision(join(root, "foo"))).rejects.toThrow(/already exists/);
+    await expect(assertNoCollision(join(root, "foo"), "foo")).rejects.toThrow(/already exists/);
     await rm(root, { recursive: true });
   });
 });
