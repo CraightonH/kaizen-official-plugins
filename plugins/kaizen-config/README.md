@@ -98,17 +98,21 @@ top to bottom):
 1. `defaults` from `ConfigSpec`.
 2. Home file.
 3. Project file (overrides home).
-4. Secret-ref resolution via `secrets:registry` after `ready()`.
+4. Env-var override (when the field declares `envVars: { fieldName: "ENV_NAME" }`).
+5. Secret-ref resolution via `secrets:registry` after `ready()`.
 
 Writes are atomic (tmp + rename). The plugin watches both files and
-notifies subscribers on change with ~150 ms debounce.
+notifies subscribers on change with ~150 ms debounce. Env vars are
+read once at `register()` time and again on each file-change recompute;
+changing an env var mid-session has no effect until the next file
+write or restart.
 
-> **Legacy:** `envvars.ts` still implements a per-field env-var override
-> that sits between layer 3 and 4, kept for backward compatibility with
-> any pre-migration plugin still declaring `envVars` on its `ConfigSpec`.
-> New plugins must not declare `envVars` — see
-> `docs/config-migration/INTEGRATION.md`. To pull values from the
-> environment, use the `env:` secret scheme via `secrets:registry`.
+> **Status:** `envVars` mappings are a first-class feature, but the
+> 2026-05 config migration deferred wiring them up across plugins while
+> two implementation gaps are addressed (no try/catch around the env
+> parser, no array/object parsing). See `docs/TODO.md`. For secrets
+> supplied via environment, prefer the `env:` scheme on
+> `secrets:registry` — it keeps the no-plaintext-on-disk invariant.
 
 ## Slash commands
 

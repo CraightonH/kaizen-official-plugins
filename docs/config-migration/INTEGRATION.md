@@ -25,11 +25,14 @@ shapes, watches for live updates, and supports secret fields via the
 
 ## What this migration does NOT do
 
-- **No env-var support.** Direct `process.env` reads in plugins are being
-  removed, not migrated to the `envVars` mapping. Env-var resolution is buggy
-  today; this migration establishes a clean file-based foundation and env
-  vars will be revisited later. Concretely: **do not declare `envVars`** on
-  the `ConfigSpec` you pass to `register()`.
+- **Env-var wiring deferred, not dropped.** Direct `process.env` reads in
+  plugins are being removed in favor of centralizing env support through the
+  `envVars` mapping on `ConfigSpec`. That mapping is a first-class kaizen-config
+  feature, but has two known implementation gaps (no try/catch around the env
+  parser; no array/object parsing) that this migration intentionally defers.
+  Concretely: **do not declare `envVars` on `ConfigSpec`** for now — leave
+  fields file-only until the work in `docs/TODO.md` lands. After that, the
+  former env reads can be re-added as `envVars` mappings.
 - **No backward-compat shims** for old per-plugin config files. If a plugin
   previously read `~/.kaizen/plugins/<plugin>/config.json` or similar, delete
   the read path. The user is rebuilding from scratch with the new store.

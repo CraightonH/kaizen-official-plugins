@@ -31,12 +31,13 @@ output until the user actually sets them. Do not re-inline the schema in
 - **Schema validation is mandatory on every load + every write.** A
   validation failure on boot logs and falls back to defaults; a failure
   on `set()` rejects the call.
-- **Env-var resolution is legacy.** `envvars.ts` and the store's env
-  override path still work for backward compatibility, but new plugins
-  must **not** declare `envVars` on their `ConfigSpec` —
-  `docs/config-migration/INTEGRATION.md` is the policy. The env *secret*
-  scheme (`env:VAR_NAME` via `secrets:registry`) is the supported way to
-  pull values from the environment.
+- **Env-var resolution is first-class but currently deferred.**
+  `envvars.ts` and the store's env override path work correctly for
+  scalar fields. The 2026-05 migration deferred plugin-side adoption
+  while two implementation gaps are addressed (no try/catch around
+  `parseEnvValue`; no array/object parsing). Until the work in
+  `docs/TODO.md` lands, plugins should not add new `envVars` mappings;
+  do not remove the runtime path.
 - **`store.ts`, `paths.ts`, `schema.ts`, `envvars.ts`, `atomic-write.ts`
   must remain pure** (deps-injected I/O). Only `index.ts` and `slash.ts`
   touch `ctx`.
