@@ -1,6 +1,6 @@
 import { describe, it, expect, mock } from "bun:test";
 import { makeService } from "../service.ts";
-import { DEFAULT_CONFIG } from "../defaults.ts";
+import { DEFAULT_CONFIG } from "../config.ts";
 import type { OpenAILLMConfig } from "../public.d.ts";
 
 function sse(...lines: string[]): ReadableStream<Uint8Array> {

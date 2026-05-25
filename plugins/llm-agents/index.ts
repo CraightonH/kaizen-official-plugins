@@ -7,6 +7,7 @@ import type { SessionsStoreService } from "llm-contracts/public";
 import type { SystemPromptService } from "llm-contracts/public";
 import type { SlashRegistryService } from "llm-contracts/public";
 import type { AgentsConfigFile } from "./public.d.ts";
+import { DEFAULT_CONFIG, CONFIG_SCHEMA } from "./config.ts";
 import { makeSlashHandlers } from "./slash.ts";
 import { resolveDir } from "./paths.ts";
 import { loadFromDirs } from "./loader.ts";
@@ -48,29 +49,31 @@ const plugin: KaizenPlugin = {
 
   async setup(ctx) {
     ctx.consumeService("events:vocabulary");
-    ctx.consumeService("config:store");
     const log = (m: string) => ctx.log(m);
 
+    // Load config (topo-hint optional).
+    let cfg: AgentsConfigFile = { ...DEFAULT_CONFIG };
     const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
-    cfgSvc.register<AgentsConfigFile>({
-      plugin: "llm-agents",
-      defaults: {
-        maxDepth: 3,
-        userDir: "~/.kaizen/agents",
-        projectDir: ".kaizen/agents",
-      },
-      schema: {
-        maxDepth: { type: "number", integer: true, min: 1 },
-        userDir: { type: "string", min: 1 },
-        projectDir: { type: "string", min: 1 },
-      },
-    });
-    const cfg = cfgSvc.get<AgentsConfigFile>("llm-agents");
+    if (cfgSvc) {
+      try {
+        cfgSvc.register<AgentsConfigFile>({
+          plugin: "llm-agents",
+          defaults: { ...DEFAULT_CONFIG },
+          schema: CONFIG_SCHEMA,
+        });
+        cfg = cfgSvc.get<AgentsConfigFile>("llm-agents");
+      } catch (e) {
+        log(`llm-agents: config:store register failed (${(e as Error).message}); using defaults`);
+      }
+    } else {
+      log("llm-agents: config:store unavailable; using DEFAULT_CONFIG");
+    }
+
     const home = homedir();
     const cwd = process.cwd();
-    const resolvedUserDir = resolveDir(cfg.userDir!, home, cwd);
-    const resolvedProjectDir = resolveDir(cfg.projectDir!, home, cwd);
-    const maxDepth = cfg.maxDepth!;
+    const resolvedUserDir = resolveDir(cfg.userDir, home, cwd);
+    const resolvedProjectDir = resolveDir(cfg.projectDir, home, cwd);
+    const maxDepth = cfg.maxDepth;
 
     // bumpGeneration callback — closure-captured so both the initial empty
     // registry and the post-discovery registry can call it without knowing

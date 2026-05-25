@@ -2,24 +2,13 @@ import type { KaizenPlugin } from "kaizen/types";
 import type { SkillsRegistryService, ConfigStoreService } from "llm-contracts/public";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import type { ClaudeSkillsConfig } from "./public.d.ts";
+import { DEFAULT_CONFIG, CONFIG_SCHEMA } from "./config.ts";
 import { scanRoots } from "./scan.ts";
 import { reconcile, type RegistrarSnapshot } from "./registrar.ts";
 
-interface ClaudeSkillsConfig {
-  rescanIntervalMs: number;
-}
-
-const DEFAULTS: ClaudeSkillsConfig = { rescanIntervalMs: 30000 };
-
-function readEnv(ctx: any, key: string): string | undefined {
-  const fromCtx = ctx.env && typeof ctx.env === "object" ? (ctx.env as Record<string, string | undefined>)[key] : undefined;
-  if (typeof fromCtx === "string" && fromCtx.length > 0) return fromCtx;
-  const fromProc = process.env[key];
-  return fromProc && fromProc.length > 0 ? fromProc : undefined;
-}
-
 function resolveRoots(ctx: any): { projectRoot: string; userRoot: string; pluginCacheRoot: string } {
-  const home = readEnv(ctx, "HOME") ?? homedir();
+  const home = homedir();
   const cwd = typeof ctx.cwd === "string" && ctx.cwd.length > 0 ? ctx.cwd : process.cwd();
   return {
     projectRoot: join(cwd, ".claude", "skills"),
@@ -30,7 +19,7 @@ function resolveRoots(ctx: any): { projectRoot: string; userRoot: string; plugin
 
 let snapshot: RegistrarSnapshot = new Map();
 let unwatchConfig: (() => void) | undefined;
-let currentIntervalMs = DEFAULTS.rescanIntervalMs;
+let currentIntervalMs = DEFAULT_CONFIG.rescanIntervalMs;
 
 const plugin: KaizenPlugin = {
   name: "claude-skills",
@@ -39,28 +28,34 @@ const plugin: KaizenPlugin = {
   services: { consumes: ["skills:registry", "config:store"] },
 
   async setup(ctx) {
-    ctx.consumeService("skills:registry");
-    ctx.consumeService("config:store");
+    const log = (m: string) => ctx.log?.(m);
 
     const skills = ctx.useService<SkillsRegistryService>("skills:registry");
     if (!skills) throw new Error("claude-skills: skills:registry service not available");
 
+    // Load config (topo-hint optional — falls back to DEFAULT_CONFIG so
+    // plugin tests with a fake ctx keep working without spinning up
+    // config:store).
+    let config: ClaudeSkillsConfig = { ...DEFAULT_CONFIG };
     const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
-    if (!cfgSvc) throw new Error("claude-skills: config:store service not available");
-
-    cfgSvc.register<ClaudeSkillsConfig>({
-      plugin: "claude-skills",
-      defaults: { ...DEFAULTS },
-      schema: {
-        rescanIntervalMs: { type: "number", integer: true, min: 1 },
-      },
-      envVars: { rescanIntervalMs: "KAIZEN_CLAUDE_SKILLS_RESCAN_MS" },
-    });
-    const initialCfg = cfgSvc.get<ClaudeSkillsConfig>("claude-skills");
-    currentIntervalMs = initialCfg.rescanIntervalMs;
-    unwatchConfig = cfgSvc.watch<ClaudeSkillsConfig>("claude-skills", (next) => {
-      currentIntervalMs = next.rescanIntervalMs;
-    });
+    if (cfgSvc) {
+      try {
+        cfgSvc.register<ClaudeSkillsConfig>({
+          plugin: "claude-skills",
+          defaults: { ...DEFAULT_CONFIG },
+          schema: CONFIG_SCHEMA,
+        });
+        config = cfgSvc.get<ClaudeSkillsConfig>("claude-skills");
+      } catch (e) {
+        log(`claude-skills: config:store register failed (${(e as Error).message}); using defaults`);
+      }
+      unwatchConfig = cfgSvc.watch<ClaudeSkillsConfig>("claude-skills", (next) => {
+        currentIntervalMs = next.rescanIntervalMs;
+      });
+    } else {
+      log("claude-skills: config:store unavailable; using DEFAULT_CONFIG");
+    }
+    currentIntervalMs = config.rescanIntervalMs;
 
     const roots = resolveRoots(ctx);
     const hooks = {

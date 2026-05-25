@@ -9,14 +9,14 @@ This plugin registers exactly one tool, `execute_typescript`, with `tools:regist
 ## Module map
 
 ```
-index.ts            Plugin lifecycle. Loads config, renders the kaizen.tools .d.ts
-                    from the live registry, registers `execute_typescript` with the
-                    registry. The only file that touches `ctx`. Does NOT register
-                    a TUI renderer — that lives in `llm-tui/tool-renderers/
-                    defaults.tsx` (see "No React/Ink" note below).
-config.ts           loadConfig(deps) → CodeModeConfig. Reads
-                    ~/.kaizen/plugins/llm-codemode/config.json (or
-                    KAIZEN_LLM_CODEMODE_CONFIG override).
+index.ts            Plugin lifecycle. Loads config from config:store (topo-hint
+                    optional, falls back to DEFAULT_CONFIG), renders the
+                    kaizen.tools .d.ts from the live registry, registers
+                    `execute_typescript` with the registry. The only file that
+                    touches `ctx`. Does NOT register a TUI renderer — that lives
+                    in `llm-tui/tool-renderers/defaults.tsx` (see "No React/Ink"
+                    note below).
+config.ts           DEFAULT_CONFIG (frozen) + CONFIG_SCHEMA for config:store.
 sandbox-host.ts     runInSandbox(...). Spawns Worker, owns message loop, enforces
                     timeout, aggregates stdout, bridges tool RPC. Emits
                     `tool:progress` with stdout deltas when an outerCallId is

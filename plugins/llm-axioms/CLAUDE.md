@@ -9,6 +9,8 @@ index.ts          Plugin lifecycle. Subscribes to session:active-changed.
                   Registers axioms:registry service, two prompt sections,
                   three tools, three slash commands. Only file touching ctx.
 config.ts         DEFAULT_CONFIG (frozen) + CONFIG_SCHEMA for config:store.
+                  Includes methodologyPriority (default 50) and workspacePriority
+                  (default 180) — read once in setup(); changes require harness restart.
 paths.ts          resolveAxiomsDir, ensureDir, sessionFilePath, sweepStaleTempFiles.
                   Pure FS helpers.
 schema.ts         validateAxiomId, validateAxiomEntry, AxiomValidationError.

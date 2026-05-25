@@ -5,9 +5,12 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 ## Module map
 
 ```
-index.ts          Plugin lifecycle: consumes `config:store`, registers schema, wires
-                  service, registers slash commands, emits status-bar events, hooks
-                  `harness:end` for shutdown. The only file that touches `ctx`.
+index.ts          Plugin lifecycle: consumes `config:store` (topo-hint optional),
+                  registers schema, wires service, registers slash commands, emits
+                  status-bar events, hooks `harness:end` for shutdown. The only file
+                  that touches `ctx`.
+config.ts         DEFAULT_CONFIG (frozen) + CONFIG_SCHEMA for config:store.
+                  Pure module: no I/O, no ctx.
 servers.ts        resolveServers(servers, env) → { servers, warnings }. Pure logic.
                   Takes the `servers` map loaded by `config:store` and applies
                   plugin-specific transforms: `${env:VAR}` interpolation, server-name
@@ -52,7 +55,7 @@ Boundaries:
 - **Backoff curve is fixed.** 1s/2s/4s/8s/16s, capped at 60s; `RETRY_BUDGET = 5`. Tests assert this. If you change it, update both `backoff.ts` and the README.
 - **Prompts are ignored in v0.** A `prompts: {}` capability logs at debug and registers nothing. Do not add `prompts/list` calls in the v0 path; defer to the v1 design (slash commands, not skills).
 - **Resources are not enumerated into the registry.** Two universal tools route by `server` argument. Don't change this without a tool-budget conversation — some servers expose thousands of resources.
-- **Config interpolation is at load time, deep, and skip-on-miss.** Missing `${env:VAR}` skips one server with a warning; others continue. Do not throw on a single missing var. This is plugin-specific interpolation in `servers.ts::resolveServers`, distinct from the `envVars` overrides that `config:store` applies to top-level keys.
+- **Config interpolation is at load time, deep, and skip-on-miss.** Missing `${env:VAR}` skips one server with a warning; others continue. Do not throw on a single missing var. This is plugin-specific interpolation in `servers.ts::resolveServers` over server-entry string fields; it is not a `config:store` mechanism (env-var overrides at the config layer are not currently supported — see `docs/config-migration/INTEGRATION.md`).
 - **Control tools register as `kind: "local"`, not `kind: "mcp"`.** `read_mcp_resource` and `list_mcp_resources` (in `service.ts`) are registered with `source: { kind: "local" }`. They are *implemented* by this plugin, not brokered from any MCP server, so they belong in the consumer's "local" presentation bucket (e.g. `kaizen.tools.*` in `llm-codemode`, not `kaizen.mcp.*`). The `mcp` kind is reserved for tools that came from a real MCP server and carry a `server: string`. After the `ToolSource` open-shape refactor (`llm-tools-registry@0.3.0`), a future change here could introduce a dedicated provenance kind (e.g. `mcp-bridge-control`) without coordinating a registry version bump — but only do so if a downstream consumer needs to distinguish these tools from genuinely local plugin tools.
 
 ## Adding a new transport

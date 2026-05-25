@@ -24,6 +24,7 @@ function makeCtx(opts: { driver?: any; sessions?: any; tuiCompletion?: any } = {
         if (!opts.tuiCompletion) throw new Error(`useService: no provider for '${name}'`);
         return opts.tuiCompletion as T;
       }
+      if (name === "config:store") return undefined;
       throw new Error(`useService: no provider for '${name}'`);
     }),
     on: mock((event: string, fn: any, o?: { priority?: number }) => {

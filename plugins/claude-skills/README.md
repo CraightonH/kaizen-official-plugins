@@ -18,18 +18,18 @@ Each registered manifest carries `baseDir` (absolute path to the skill's directo
 
 Throttled rescan on `turn:start`. Interval is configurable via `config:store`:
 
-| Key | Default | Env | Where |
-|---|---|---|---|
-| `rescanIntervalMs` | 30000 | `KAIZEN_CLAUDE_SKILLS_RESCAN_MS` | `/config:set claude-skills rescanIntervalMs=<ms>` |
+| Key | Default | Where |
+|---|---|---|
+| `rescanIntervalMs` | 30000 | `/config:set claude-skills rescanIntervalMs=<ms>` |
 
 Live updates from `config:store` are honored on the next rescan.
 
 ## Wiring
 
-### Consumes (both hard)
+### Consumes
 
-- `skills:registry` — no value without it; declared in `services.consumes` + `consumeService` + `useService`.
-- `config:store` — same.
+- `skills:registry` — hard. No value without it; the plugin refuses to boot if missing.
+- `config:store` — topo-hint optional. When unavailable, falls back to `DEFAULT_CONFIG` (so plugin tests with a fake ctx keep working).
 
 ### Provides
 

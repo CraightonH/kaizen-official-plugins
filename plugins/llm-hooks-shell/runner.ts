@@ -20,15 +20,16 @@ export interface HookOutcome {
   stderr: string;
 }
 
-const DEFAULT_TIMEOUT_MS = 30_000;
+const FALLBACK_DEFAULT_TIMEOUT_MS = 30_000;
 
 export async function runHook(
   entry: HookEntry,
   baseEnv: Record<string, string>,
   deps: RunnerDeps,
+  defaultTimeoutMs: number = FALLBACK_DEFAULT_TIMEOUT_MS,
 ): Promise<HookOutcome> {
   const env = { ...baseEnv, ...(entry.env ?? {}) };
-  const timeoutMs = entry.timeout_ms ?? DEFAULT_TIMEOUT_MS;
+  const timeoutMs = entry.timeout_ms ?? defaultTimeoutMs;
   const cwd = entry.cwd;
 
   let res: ExecResult;

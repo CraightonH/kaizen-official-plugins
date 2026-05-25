@@ -1,6 +1,7 @@
 import type { KaizenPlugin } from "kaizen/types";
 import type { ConfigStoreService, SystemPromptService, RegisteredSection } from "llm-contracts/public";
-import { DEFAULT_CONFIG } from "./defaults.ts";
+import { homedir } from "node:os";
+import { DEFAULT_CONFIG, CONFIG_SCHEMA } from "./config.ts";
 import type { MemoryConfig } from "./public.d.ts";
 import { resolveDirs, ensureDir, sweepStaleTempFiles } from "./paths.ts";
 import { makeMemoryStore } from "./service.ts";
@@ -30,22 +31,27 @@ const plugin: KaizenPlugin = {
 
   async setup(ctx) {
     const log = (m: string) => ctx.log(m);
-    ctx.consumeService("config:store");
+
+    // Load config (topo-hint optional).
+    let config: MemoryConfig = { ...DEFAULT_CONFIG };
     const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
-    cfgSvc.register<MemoryConfig>({
-      plugin: "llm-memory",
-      defaults: { ...DEFAULT_CONFIG, extractTriggers: [...DEFAULT_CONFIG.extractTriggers], denyTypes: [...DEFAULT_CONFIG.denyTypes] },
-      schema: {
-        injectionByteCap: { type: "number", min: 0 },
-        autoExtract: { type: "boolean" },
-        extractTriggers: { type: "array", items: { type: "string" } },
-        denyTypes: { type: "array", items: { type: "enum", values: ["user", "feedback", "project", "reference"] } },
-        staleTempMs: { type: "number", min: 0 },
-      },
-    });
-    const config = cfgSvc.get<MemoryConfig>("llm-memory");
+    if (cfgSvc) {
+      try {
+        cfgSvc.register<MemoryConfig>({
+          plugin: "llm-memory",
+          defaults: { ...DEFAULT_CONFIG },
+          schema: CONFIG_SCHEMA,
+        });
+        config = cfgSvc.get<MemoryConfig>("llm-memory");
+      } catch (e) {
+        log(`llm-memory: config:store register failed (${(e as Error).message}); using defaults`);
+      }
+    } else {
+      log("llm-memory: config:store unavailable; using DEFAULT_CONFIG");
+    }
+
     const { globalDir, projectDir } = resolveDirs({
-      home: process.env.HOME ?? "/",
+      home: process.env.HOME ?? homedir(),
       cwd: process.cwd(),
       config: { globalDir: config.globalDir, projectDir: config.projectDir },
     });

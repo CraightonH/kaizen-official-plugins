@@ -44,7 +44,7 @@ function makeDeps(over: Partial<SlashDeps> = {}): SlashDeps {
     homePath: "/h/config.json",
     projectPath: "/p/config.json",
     harnessKey: "default",
-    editor: "vi",
+    editor: () => "vi",
     log: () => {},
     spawnEditor: () => Promise.resolve(0),
     registry: {

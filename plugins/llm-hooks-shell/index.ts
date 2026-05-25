@@ -2,6 +2,7 @@ import type { KaizenPlugin } from "kaizen/types";
 import { CANCEL_TOOL, CODEMODE_CANCEL_SENTINEL } from "llm-events";
 import type { ConfigStoreService } from "llm-contracts/public";
 import type { HookEntry, HooksConfig } from "./public";
+import { DEFAULT_CONFIG, CONFIG_SCHEMA } from "./config.ts";
 import { envify } from "./envify.ts";
 import { runHook, type RunnerDeps } from "./runner.ts";
 
@@ -21,36 +22,32 @@ const plugin: KaizenPlugin = {
   services: { consumes: ["events:vocabulary", "config:store"] },
 
   async setup(ctx) {
-    ctx.consumeService("events:vocabulary");
-    ctx.consumeService("config:store");
+    const log = (m: string) => ctx.log?.(m);
 
     const vocabObj = ctx.useService<Record<string, string>>("events:vocabulary") ?? {};
     const vocab = new Set(Object.values(vocabObj));
 
+    // Load config (topo-hint optional).
+    let config: HooksConfig = { ...DEFAULT_CONFIG };
     const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
-    cfgSvc.register<HooksConfig>({
-      plugin: "llm-hooks-shell",
-      defaults: { hooks: [] },
-      schema: {
-        hooks: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              event: { type: "string", min: 1 },
-              command: { type: "string", min: 1 },
-              cwd: { type: "string" },
-              block_on_nonzero: { type: "boolean" },
-              timeout_ms: { type: "number", min: 1 },
-            },
-            additionalProperties: true,
-          },
-        },
-      },
-    });
+    if (cfgSvc) {
+      try {
+        cfgSvc.register<HooksConfig>({
+          plugin: "llm-hooks-shell",
+          defaults: { ...DEFAULT_CONFIG },
+          schema: CONFIG_SCHEMA,
+        });
+        config = cfgSvc.get<HooksConfig>("llm-hooks-shell");
+      } catch (e) {
+        log(`llm-hooks-shell: config:store register failed (${(e as Error).message}); using defaults`);
+      }
+    } else {
+      log("llm-hooks-shell: config:store unavailable; using DEFAULT_CONFIG");
+    }
 
-    const cfg = cfgSvc.get<HooksConfig>("llm-hooks-shell");
-    const entries: HookEntry[] = Array.isArray(cfg?.hooks) ? cfg.hooks : [];
+    const entries: HookEntry[] = Array.isArray(config.hooks) ? config.hooks : [];
+    const defaultTimeoutMs = config.defaultTimeoutMs ?? DEFAULT_CONFIG.defaultTimeoutMs;
+    const depthCap = config.depthCap ?? DEFAULT_CONFIG.depthCap;
 
     // Validate every entry's event against the vocabulary (fail loud).
     for (const e of entries) {
@@ -87,8 +84,8 @@ const plugin: KaizenPlugin = {
     for (const [eventName, hooks] of byEvent.entries()) {
       ctx.on(eventName, async (payload: any) => {
         for (const entry of hooks) {
-          const env = envify(eventName, payload);
-          const outcome = await runHook(entry, env, runnerDeps);
+          const env = envify(eventName, payload, depthCap);
+          const outcome = await runHook(entry, env, runnerDeps, defaultTimeoutMs);
 
           if (outcome.ok) continue;
 

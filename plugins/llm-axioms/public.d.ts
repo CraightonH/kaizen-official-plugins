@@ -9,4 +9,6 @@ export interface AxiomsConfig {
   methodologyEnabled: boolean;
   workspaceEnabled: boolean;
   staleTempMs: number;
+  methodologyPriority: number;
+  workspacePriority: number;
 }

@@ -70,14 +70,14 @@ const plugin: KaizenPlugin = {
       if (config.methodologyEnabled) {
         methodologyHandle = promptSystem.register({
           id: "llm-axioms:methodology",
-          priority: 50,
+          priority: config.methodologyPriority,
           render: async () => renderMethodology(),
         });
       }
       if (config.workspaceEnabled) {
         workspaceHandle = promptSystem.register({
           id: "llm-axioms:workspace",
-          priority: 180,
+          priority: config.workspacePriority,
           render: async () => {
             const block = buildWorkspaceBlock(store.list(), config.injectionByteCap);
             return block ?? "";

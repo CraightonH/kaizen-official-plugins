@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { classifyError, computeBackoff, sleep } from "../retry.ts";
-import { DEFAULT_CONFIG } from "../defaults.ts";
+import { DEFAULT_CONFIG } from "../config.ts";
 
 describe("classifyError", () => {
   it("network errors retryable", () => {

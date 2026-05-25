@@ -54,6 +54,7 @@ Per `AGENTS.md`, only the foundation event vocabulary is declared as a hard
 - **Service** — `sessions:store` (soft). Creates or resumes child sessions for `dispatch_agent`. If absent, dispatch is disabled and a `harness:error` is emitted.
 - **Service** — `prompt:registry` (soft). When present, the plugin registers an `Available agents` section. When absent, a `harness:error` is emitted and the section is skipped.
 - **Service** — `skills:registry` (soft). When present, sub-agents additionally see `load_skill` regardless of their declared filter.
+- **Service** — `config:store` (topo-hint optional). When present, the plugin registers its config (`maxDepth`, `userDir`, `projectDir`) so the user can override the defaults via the shared harness config file. When absent, `DEFAULT_CONFIG` is used.
 
 ### Events consumed
 
@@ -67,21 +68,31 @@ Per `AGENTS.md`, only the foundation event vocabulary is declared as a hard
 
 ## Configuration
 
-Config file (JSON). Defaults shown.
+Config is routed through the shared `config:store` service (provided by
+`kaizen-config`). The plugin registers under the section key `llm-agents`
+in the harness config file (`~/.kaizen/harnesses/<key>/config.json` for
+user scope, `./.kaizen/harnesses/<key>/config.json` for project scope).
+
+Defaults:
 
 ```jsonc
 {
-  "maxDepth": 3,            // integer >= 1; cap on dispatch chain length
-  "userDir":  "~/.kaizen/agents",
-  "projectDir": ".kaizen/agents"
+  "plugins": {
+    "llm-agents": {
+      "maxDepth": 3,            // integer >= 1; cap on dispatch chain length
+      "userDir": "~/.kaizen/agents",
+      "projectDir": ".kaizen/agents"
+    }
+  }
 }
 ```
 
 Resolution:
-- Default path: `~/.kaizen/plugins/llm-agents/config.json`. Missing file → defaults.
-- `KAIZEN_LLM_AGENTS_CONFIG` overrides the path. Missing override file → warning + defaults.
-- Malformed JSON or invalid `maxDepth` → throws at setup.
-- `userDir` / `projectDir` accept `~` and relative paths (resolved against `cwd`).
+- Defaults apply when no override is present.
+- Home → project layering is handled by `config:store` (project shadows home).
+- `userDir` / `projectDir` accept `~` and relative paths (resolved against `cwd` at setup).
+- Validation failures log and fall back to defaults; the plugin still boots.
+- If `config:store` is not provided by the harness, `DEFAULT_CONFIG` is used.
 
 ## Permissions
 

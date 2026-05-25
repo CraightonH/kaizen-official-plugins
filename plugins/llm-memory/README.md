@@ -77,16 +77,17 @@ The plugin emits no events of its own. Tool invocations flow through `tools:regi
 
 ## Configuration
 
-Settings file (JSON):
-
-- Default path: `~/.kaizen/plugins/llm-memory/config.json`
-- Override path: `KAIZEN_LLM_MEMORY_CONFIG=/abs/path/to/config.json`
-- Missing file → defaults; malformed JSON throws at setup.
+Configuration is routed through the harness `config:store` service
+(`kaizen-config`). The user-facing file is the shared harness config at
+`~/.kaizen/harnesses/<key>/config.json` (with an optional project layer at
+`<cwd>/.kaizen/harnesses/<key>/config.json`); the `/config` slash commands
+from `kaizen-config` inspect and edit it in-place. Missing section ⇒ all
+defaults.
 
 | Key | Default | Notes |
 |-----|---------|-------|
-| `globalDir` | `~/.kaizen/memory` | Override (e.g. point at a Claude path for a shared store). `~/` is expanded. |
-| `projectDir` | `<cwd>/.kaizen/memory` | Set to `null` to disable the project layer entirely. `~/` is expanded. |
+| `globalDir` | `~/.kaizen/memory` | Override (e.g. point at a Claude path for a shared store). `~/` is expanded. Not schema-validated (`string | null`). |
+| `projectDir` | `<cwd>/.kaizen/memory` | Set to `null` to disable the project layer entirely. `~/` is expanded. Not schema-validated (`string | null`). |
 | `injectionByteCap` | `2048` | Per-layer cap for the index body and overall cap for the catalog list. Truncates oldest-first; appends `... [truncated]`. |
 | `autoExtract` | `false` | Enable opt-in side-call extraction on `turn:end`. |
 | `extractTriggers` | `["from now on", "remember that", "always", "never", "i prefer", "my "]` | Phrases that gate extraction. Matched case-insensitively with a left word boundary. |

@@ -5,13 +5,16 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 ## Module map
 
 ```
-index.ts        Plugin lifecycle. Registers config:store spec, fetches the
-                merged config, builds handler with injected fetch, registers
+index.ts        Plugin lifecycle. Registers config:store spec, awaits ready()
+                so the secret apiKey resolves to plaintext, fetches the merged
+                config, builds handler with injected fetch, registers
                 web_search via tools:registry. Holds the unregister callback
                 in module scope and calls it from stop(). Only file that
                 touches ctx.
-defaults.ts     DEFAULT_CONFIG — baseline TavilyConfig values used as register()
-                defaults and in tests.
+config.ts       DEFAULT_CONFIG (frozen) + CONFIG_SCHEMA for config:store.
+                apiKey is declared `secret: true` so the store routes it
+                through `secrets:registry` and persists only a `$ref` pointer.
+defaults.ts     Thin re-export of DEFAULT_CONFIG from config.ts (back-compat).
 tool.ts         Schema + makeHandler({config, fetch, log}). Pure factory — no I/O,
                 no globals. POSTs to Tavily /search. Wires ctx.signal to AbortController.
                 Imports ToolSchema and ToolExecutionContext from llm-tools-registry/public.
@@ -23,8 +26,12 @@ test/           bun:test suites — tool.test.ts, scaffold.test.ts.
 Boundaries:
 - Only `index.ts` imports `kaizen/types` or touches `ctx`.
 - `tool.ts` is framework-free and takes `fetch` as a dep so tests stub it.
-- API key plumbing comes from `config:store` (`envVars: { apiKey: "TAVILY_API_KEY" }`).
-  Don't re-read env in `tool.ts`.
+- API key plumbing comes from `config:store`. `apiKey` is a secret field —
+  the user sets it via `/config:set llm-tavily-search apiKey=<key>` and the
+  store stashes plaintext in `secrets:registry`; `config.json` holds only a
+  `$ref` pointer. The plugin must `await cfgSvc.ready()` between `register()`
+  and the first `get()` so the secret resolves to plaintext. Don't re-read
+  env in `tool.ts`.
 - Shared tool types come from `llm-tools-registry/public`. Don't import
   `llm-events/public` here — this plugin doesn't depend on `llm-events`.
 
@@ -44,8 +51,9 @@ Reads via `config:store` from the harness-scoped file at
 `plugins["llm-tavily-search"]`. For the `official/local`
 harness, `<harnessKey>` is `official_local`.
 
-Override with `TAVILY_API_KEY` env var (beats file values) or set via
-`/config:set llm-tavily-search apiKey=<key>`.
+Set via `/config:set llm-tavily-search apiKey=<key>`. The `apiKey` field is
+a secret — plaintext is held in `secrets:registry`; only a `$ref` pointer
+appears in the on-disk config file. No env-var override.
 
 ## Tavily API quick reference
 

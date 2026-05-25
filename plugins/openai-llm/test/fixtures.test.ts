@@ -2,7 +2,7 @@ import { describe, it, expect } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { makeService } from "../service.ts";
-import { DEFAULT_CONFIG } from "../defaults.ts";
+import { DEFAULT_CONFIG } from "../config.ts";
 
 function loadFixture(name: string): Uint8Array {
   const text = readFileSync(join(import.meta.dir, "fixtures", name), "utf8")

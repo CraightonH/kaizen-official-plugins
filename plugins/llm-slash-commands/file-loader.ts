@@ -12,8 +12,10 @@ export interface DriverLike {
 }
 
 export interface FileLoaderDeps {
-  home: string;
-  cwd: string;
+  /** Absolute path to the user-scope command directory. Caller resolves `~`. */
+  userDir: string;
+  /** Absolute path to the project-scope command directory. Caller resolves cwd. */
+  projectDir: string;
   registry: SlashRegistryService;
   readDir: (path: string) => Promise<string[]>;
   readFile: (path: string) => Promise<string>;
@@ -31,8 +33,8 @@ interface DiscoveredFile {
 export async function loadFileCommands(deps: FileLoaderDeps): Promise<string[]> {
   const warnings: string[] = [];
   const userOffs = new Map<string, () => void>();
-  const userDir = `${deps.home.replace(/\/$/, "")}/.kaizen/commands`;
-  const projectDir = `${deps.cwd.replace(/\/$/, "")}/.kaizen/commands`;
+  const userDir = deps.userDir.replace(/\/$/, "");
+  const projectDir = deps.projectDir.replace(/\/$/, "");
 
   for (const f of await listMarkdown(deps, userDir, "user")) {
     await loadOne(deps, f, warnings, userOffs, /*allowReplace*/ false);

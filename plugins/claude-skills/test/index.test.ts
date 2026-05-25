@@ -11,10 +11,8 @@ interface FakeServices {
 
 function makeCtx(opts: {
   cwd?: string;
-  env?: Record<string, string | undefined>;
   services?: FakeServices;
 } = {}) {
-  const env = { ...process.env, HOME: "/tmp/does-not-exist", ...opts.env };
   const subscribers: Record<string, Function[]> = {};
   const services: Record<string, unknown> = {};
   if (opts.services?.skillsRegistry) services["skills:registry"] = opts.services.skillsRegistry;
@@ -22,14 +20,12 @@ function makeCtx(opts: {
 
   const ctx: any = {
     cwd: opts.cwd,
-    env,
     log: mock(() => {}),
     emit: mock(async () => {}),
     on: mock((event: string, fn: Function) => {
       (subscribers[event] ??= []).push(fn);
       return () => { subscribers[event] = (subscribers[event] ?? []).filter(f => f !== fn); };
     }),
-    consumeService: mock((_id: string) => {}),
     useService: mock(<T>(id: string) => services[id] as T | undefined),
     provideService: mock(() => {}),
   };
@@ -77,21 +73,9 @@ function makeFakeConfigStore(initial = { rescanIntervalMs: 30000 }) {
 }
 
 describe("claude-skills plugin", () => {
-  it("declares hard deps on skills:registry and config:store", () => {
+  it("declares skills:registry and config:store in services.consumes", () => {
     expect(plugin.services?.consumes).toContain("skills:registry");
     expect(plugin.services?.consumes).toContain("config:store");
-  });
-
-  it("calls consumeService for both services in setup", async () => {
-    const { ctx } = makeCtx({
-      services: {
-        skillsRegistry: makeFakeSkillsRegistry().service,
-        configStore: makeFakeConfigStore().service,
-      },
-    });
-    await plugin.setup!(ctx);
-    expect((ctx.consumeService as any).mock.calls.flat()).toContain("skills:registry");
-    expect((ctx.consumeService as any).mock.calls.flat()).toContain("config:store");
   });
 
   it("throws if skills:registry is absent", async () => {
@@ -99,12 +83,14 @@ describe("claude-skills plugin", () => {
     await expect(plugin.setup!(ctx)).rejects.toThrow();
   });
 
-  it("throws if config:store is absent", async () => {
-    const { ctx } = makeCtx({ services: { skillsRegistry: makeFakeSkillsRegistry().service } });
-    await expect(plugin.setup!(ctx)).rejects.toThrow();
+  it("falls back to DEFAULT_CONFIG when config:store is absent (topo-hint optional)", async () => {
+    const skills = makeFakeSkillsRegistry();
+    const { ctx } = makeCtx({ services: { skillsRegistry: skills.service } });
+    // Should not throw; should log a fallback notice and continue boot.
+    await expect(plugin.setup!(ctx)).resolves.toBeUndefined();
   });
 
-  it("registers a config schema with claude-skills' rescanIntervalMs field", async () => {
+  it("registers a config schema with claude-skills' rescanIntervalMs field and no envVars", async () => {
     const skills = makeFakeSkillsRegistry();
     const config = makeFakeConfigStore();
     const { ctx } = makeCtx({ services: { skillsRegistry: skills.service, configStore: config.service } });
@@ -112,20 +98,22 @@ describe("claude-skills plugin", () => {
     expect(config.specs.length).toBe(1);
     expect(config.specs[0].plugin).toBe("claude-skills");
     expect(config.specs[0].defaults.rescanIntervalMs).toBe(30000);
-    expect(config.specs[0].envVars?.rescanIntervalMs).toBe("KAIZEN_CLAUDE_SKILLS_RESCAN_MS");
+    // Env-var support is intentionally dropped in pass-2 migration.
+    expect(config.specs[0].envVars).toBeUndefined();
   });
 
-  it("performs an initial scan and registers skills found in the user root", async () => {
+  it("performs an initial scan and registers skills found in the project root", async () => {
     const skills = makeFakeSkillsRegistry();
     const config = makeFakeConfigStore();
     const { ctx } = makeCtx({
-      cwd: "/tmp/does-not-exist-cwd",
-      env: { HOME: join(FIXTURES, "three-roots/user") },
+      // Project root is derived from ctx.cwd; user/plugin-cache roots come
+      // from homedir() and won't resolve to the fixture tree.
+      cwd: join(FIXTURES, "three-roots/project"),
       services: { skillsRegistry: skills.service, configStore: config.service },
     });
     await plugin.setup!(ctx);
     const names = skills.registered.map(r => r.name).sort();
-    expect(names).toContain("user-only");
+    expect(names).toContain("proj-only");
     expect(names).toContain("shared");
   });
 
@@ -143,7 +131,7 @@ describe("claude-skills plugin", () => {
     const skills = makeFakeSkillsRegistry();
     const config = makeFakeConfigStore();
     const { ctx } = makeCtx({
-      env: { HOME: join(FIXTURES, "three-roots/user") },
+      cwd: join(FIXTURES, "three-roots/project"),
       services: { skillsRegistry: skills.service, configStore: config.service },
     });
     await plugin.setup!(ctx);

@@ -9,4 +9,6 @@ export interface HookEntry {
 
 export interface HooksConfig {
   hooks: HookEntry[];
+  defaultTimeoutMs: number;
+  depthCap: number;
 }

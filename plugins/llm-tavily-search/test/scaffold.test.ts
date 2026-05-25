@@ -1,7 +1,7 @@
 // plugins/llm-tavily-search/test/scaffold.test.ts
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "../index.ts";
-import { DEFAULT_CONFIG } from "../defaults.ts";
+import { DEFAULT_CONFIG } from "../config.ts";
 
 function makeRegistry() {
   const registered: string[] = [];
@@ -28,6 +28,7 @@ function makeConfigStore() {
     set: mock(async () => {}),
     watch: mock(() => () => {}),
     list: mock(() => []),
+    ready: mock(async () => {}),
   };
 }
 

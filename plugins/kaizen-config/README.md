@@ -1,38 +1,136 @@
 # kaizen-config
 
-Harness-scoped plugin configuration store for the local harness. Provides the `config:store` service that lets peer plugins register typed configuration fields and persist them per-harness, with home and project layers merged on read and env-var overrides winning over both.
+Harness-scoped plugin configuration store for the local harness. Provides
+the `config:store` and `secrets:registry` services. Peer plugins register
+typed configuration fields and `kaizen-config` persists them per-harness
+across a home layer and a project layer, with optional secret-field
+indirection through a pluggable backend registry.
 
-## Service
+For the consumer-facing integration guide (how a peer plugin wires up its
+own config), see `docs/config-migration/INTEGRATION.md`. That is the
+authoritative reference; this README only documents the service surface
+and storage layout that the guide builds on.
 
-Provides `config:store` (contract owned by `llm-contracts`):
+## Services
 
-- `register(pluginName, schema)` — declare typed fields and optional env-var mappings.
-- `get(pluginName)` / `get(pluginName, field)` — read merged value (home + project + env).
-- `set(pluginName, field, value)` — atomic write to the project layer by default.
-- `subscribe(pluginName, cb)` — fire when on-disk values change (debounced).
+### `config:store`
 
-Validation runs on every load and every write. A validation failure on boot logs and falls back to defaults; a failure on `set()` rejects the call.
+Contract owned by `llm-contracts/public` (`ConfigStoreService`). Method
+summary:
+
+- `register<T>(spec: ConfigSpec<T>): void` — one-shot per plugin per
+  harness boot. The `ConfigSpec` carries `plugin`, `defaults`, and an
+  optional `schema: ConfigSchema<T>`. Calling twice for the same plugin
+  name throws.
+- `get<T>(plugin: string): T` — return the merged value for a plugin.
+  Throws if the plugin is not registered.
+- `set<T>(plugin: string, partial: Partial<T>, scope?: "home" | "project"): Promise<void>`
+  — atomic write of `partial` into the chosen layer. Default scope is
+  `"home"`. Validates against the schema and rejects on failure.
+- `unset(plugin: string, key: string, scope?: "home" | "project"): Promise<void>`
+  — remove a single key from a layer; also deletes the corresponding
+  secret-backend entry if the value was a `$ref`.
+- `watch<T>(plugin: string, cb: (v: T) => void): () => void` — fire
+  whenever the merged value changes (debounced ~150 ms after on-disk
+  edits). Does **not** fire on initial `register()`.
+- `list(): ConfigStatus[]` — snapshot of every registered plugin with
+  paths, layer existence flags, and per-field resolution (which layer
+  each key came from).
+- `ready(): Promise<void>` — await before reading secret-typed fields.
+  At boot, secret fields are surfaced as `{ $ref: "scheme:opaque" }`
+  pointers; `ready()` resolves once every backend-resolvable ref has
+  been fetched and swapped for plaintext in the cached value. Cached
+  per-call: subsequent calls reuse the same promise until the on-disk
+  files change.
+- `getSpec(plugin: string): ConfigSpec<unknown> | undefined` — used by
+  the `/config:get` slash command to look up field schemas for
+  redaction; rarely needed by other consumers.
+
+### `secrets:registry`
+
+Contract owned by `llm-contracts/public` (`SecretsRegistryService`).
+Pluggable backend registry: each backend declares a `scheme` (e.g.
+`"env"`, `"keychain"`, `"file"`) and the registry routes
+`store`/`resolve`/`delete` to the matching backend. The built-in
+`env:VAR_NAME` resolver is registered at boot and is read-only; it lets
+plugins point a secret field at an environment variable without
+`kaizen-config` ever persisting the plaintext.
+
+## Self-registered fields
+
+`kaizen-config` registers itself under the plugin name `"kaizen-config"`
+with two optional fields (both omitted from defaults — they appear in
+`/config:list` only after the user sets them):
+
+| Field                  | Type     | Purpose                                                                                                                                 |
+|------------------------|----------|-----------------------------------------------------------------------------------------------------------------------------------------|
+| `defaultSecretBackend` | `string` | When a secret field is set and multiple writable backends are registered, `selectBackend` uses this scheme name. Optional when exactly one writable backend exists. |
+| `editor`               | `string` | Command used by `/config:edit`. Falls back to `$EDITOR` then `vi`. Settable live via `/config:set kaizen-config editor=…`.              |
+
+Set them like any other plugin field, e.g.
+`/config:set kaizen-config editor=nvim`.
+
+## Secret fields
+
+Declare a field as `{ type: "string", secret: true }` and `set()` will
+route the plaintext to a registered backend, persisting only a
+`{ $ref: "scheme:opaque" }` pointer to disk. On read, `get()` returns
+the `$ref` until `await store.ready()` resolves; after that,
+secret-typed fields are surfaced as plaintext from the cached value.
+Use `unset()` (or `set()` with a new value) to rotate; the previous
+backend entry is deleted automatically.
+
+See `docs/config-migration/INTEGRATION.md` § "Secret fields" for the
+consumer-side patterns.
 
 ## Storage
 
 Two JSON files per harness, identified by `harnessKey(harness)`:
 
-| Path | Layer |
-|---|---|
-| `~/.kaizen/harnesses/<harnessKey>/config.json` | Home (user-global) |
-| `<cwd>/.kaizen/harnesses/<harnessKey>/config.json` | Project (project keys win over home) |
+| Path                                              | Layer                                  |
+|---------------------------------------------------|----------------------------------------|
+| `~/.kaizen/harnesses/<harnessKey>/config.json`    | Home (user-global)                     |
+| `<cwd>/.kaizen/harnesses/<harnessKey>/config.json`| Project (project keys win over home)   |
 
-Env-var values, declared per-field via `register()`, beat all file layers.
+Resolution order for a given field (`get()` returns the first hit going
+top to bottom):
 
-Writes are atomic (tmp + rename). The plugin watches both files and notifies subscribers on change.
+1. `defaults` from `ConfigSpec`.
+2. Home file.
+3. Project file (overrides home).
+4. Secret-ref resolution via `secrets:registry` after `ready()`.
+
+Writes are atomic (tmp + rename). The plugin watches both files and
+notifies subscribers on change with ~150 ms debounce.
+
+> **Legacy:** `envvars.ts` still implements a per-field env-var override
+> that sits between layer 3 and 4, kept for backward compatibility with
+> any pre-migration plugin still declaring `envVars` on its `ConfigSpec`.
+> New plugins must not declare `envVars` — see
+> `docs/config-migration/INTEGRATION.md`. To pull values from the
+> environment, use the `env:` secret scheme via `secrets:registry`.
 
 ## Slash commands
 
-When `slash:registry` is available, the plugin registers `/config` commands for inspecting and editing the merged config and the underlying files in `$EDITOR`. If the registry isn't available, `/config` is silently disabled and the service still works.
+Registered when `slash:registry` is available; silently disabled
+otherwise (the service still works).
+
+- `/config:list` — list registered plugins, per-field resolution layer,
+  registered secret backends, and the active harness paths.
+- `/config:get <plugin> [key.path] [--reveal]` — print the merged value.
+  Secret fields are redacted unless `--reveal`.
+- `/config:set <plugin> <key>=<value> [--project]` — atomic write to the
+  home layer (default) or project layer.
+- `/config:unset <plugin> <key> [--project]` — remove a key from a layer
+  (back to defaults / lower layer).
+- `/config:edit [--project]` — open the chosen layer's config file in
+  the configured editor.
 
 ## Permissions
 
 Scoped tier:
 - `fs.read` / `fs.write`: `~/.kaizen/harnesses/**`, `./.kaizen/harnesses/**`.
 
-The plugin uses `node:fs` and `node:child_process` directly (for `fs.watch` and `spawn $EDITOR`). The runtime enforcer gates these by the declared fs paths above.
+The plugin uses `node:fs` and `node:child_process` directly (for
+`fs.watch` and `spawn $EDITOR`). The runtime enforcer gates these by the
+declared fs paths above.

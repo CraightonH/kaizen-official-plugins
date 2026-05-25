@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import plugin from "../index.ts";
-import { DEFAULT_CONFIG } from "../defaults.ts";
+import { DEFAULT_CONFIG } from "../config.ts";
 
 function makeFakeCtx() {
   const services = new Map<string, unknown>();
@@ -68,9 +68,8 @@ test("does NOT provide dispatch:strategy", async () => {
   expect(ctx.consumed.has("dispatch:strategy")).toBe(false);
 });
 
-test("consumes tools:registry and config:store", async () => {
-  const ctx = makeFakeCtx();
-  await (plugin as any).setup(ctx);
-  expect(ctx.consumed.has("tools:registry")).toBe(true);
-  expect(ctx.consumed.has("config:store")).toBe(true);
+test("declares tools:registry and config:store in services.consumes", () => {
+  const consumes = (plugin as any).services?.consumes ?? [];
+  expect(consumes).toContain("tools:registry");
+  expect(consumes).toContain("config:store");
 });

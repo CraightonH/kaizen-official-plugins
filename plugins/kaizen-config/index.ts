@@ -10,6 +10,8 @@ import { createStore, type StoreDeps } from "./store.ts";
 import { createRegistry } from "./secrets/registry.ts";
 import { createEnvResolver } from "./secrets/env-resolver.ts";
 import { registerSlashCommands } from "./slash.ts";
+import { DEFAULT_CONFIG, CONFIG_SCHEMA } from "./config.ts";
+import type { KaizenConfigConfig } from "./public.d.ts";
 
 const teardowns: Array<() => void> = [];
 
@@ -71,12 +73,10 @@ const plugin: KaizenPlugin = {
     const store = createStore(deps);
     ctx.provideService<ConfigStoreService>("config:store", store);
 
-    store.register({
+    store.register<KaizenConfigConfig>({
       plugin: "kaizen-config",
-      defaults: { defaultSecretBackend: undefined as string | undefined },
-      schema: {
-        defaultSecretBackend: { type: "string" },
-      },
+      defaults: { ...DEFAULT_CONFIG },
+      schema: CONFIG_SCHEMA,
     });
 
     try {
@@ -86,7 +86,10 @@ const plugin: KaizenPlugin = {
         homePath,
         projectPath,
         harnessKey: key,
-        editor: process.env.EDITOR ?? "vi",
+        editor: () =>
+          store.get<KaizenConfigConfig>("kaizen-config").editor
+            ?? process.env.EDITOR
+            ?? "vi",
         log: ctx.log.bind(ctx),
         spawnEditor: (editor, path) => new Promise<number>((resolve, reject) => {
           const child = spawn(editor, [path], { stdio: "inherit" });
@@ -94,7 +97,7 @@ const plugin: KaizenPlugin = {
           child.on("error", reject);
         }),
         registry,
-        defaultSecretBackend: () => (store.get<{ defaultSecretBackend?: string }>("kaizen-config")).defaultSecretBackend,
+        defaultSecretBackend: () => store.get<KaizenConfigConfig>("kaizen-config").defaultSecretBackend,
       }));
     } catch (err) {
       ctx.log(`kaizen-config: slash:registry unavailable (${(err as Error).message}); /config commands disabled`);

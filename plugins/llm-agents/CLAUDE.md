@@ -10,8 +10,9 @@ index.ts        Plugin lifecycle: loads config, wires registry handle, turn trac
                 `agents:list` / `agents:show` slash commands. Schedules discovery in a
                 microtask. Module-scope `toolUnregister` / `sectionHandle` / `slashOffs`
                 let `stop()` clean up idempotently on reload. The only file that touches `ctx`.
-config.ts       loadConfig({ home, cwd, env, readFile, log }) → AgentsConfig.
-                Resolves config path, expands ~ and relatives, validates maxDepth.
+config.ts       DEFAULT_CONFIG (frozen) + CONFIG_SCHEMA for config:store.
+                Pure module — no I/O, no ctx. Defaults: maxDepth=3,
+                userDir="~/.kaizen/agents", projectDir=".kaizen/agents".
 loader.ts       loadFromDirs({ userDir, projectDir, deps }) → { manifests, errors }.
                 Depth-first recursive walk per scope (max depth 8). Hidden dirs (dot-prefix)
                 skipped. Per-scope dedupe by lex-first full path. Directory symlink-cycle
@@ -47,7 +48,7 @@ public.d.ts     Owns AgentManifest and AgentsRegistryService for this plugin. Th
 Boundaries:
 - `index.ts` is the only file that imports `kaizen/types` or touches `ctx`.
 - `registry.ts` and `turn-tracker.ts` are the only stateful modules.
-- `frontmatter.ts`, `loader.ts`, `depth.ts`, `tool-filter.ts`, `injector.ts`, `dispatch.ts`, and `config.ts` are pure factories — all I/O and clocks come in via injected deps.
+- `frontmatter.ts`, `loader.ts`, `depth.ts`, `tool-filter.ts`, `injector.ts`, and `dispatch.ts` are pure factories — all I/O and clocks come in via injected deps. `config.ts` is a pure constants module (DEFAULT_CONFIG + CONFIG_SCHEMA).
 - Tests live alongside in `test/` and run independently (`bun test`).
 
 ## Invariants

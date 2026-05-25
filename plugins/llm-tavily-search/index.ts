@@ -2,7 +2,7 @@
 import type { KaizenPlugin } from "kaizen/types";
 import type { ConfigStoreService } from "llm-contracts/public";
 import type { ToolsRegistryService } from "llm-tools-registry/public";
-import { DEFAULT_CONFIG } from "./defaults.ts";
+import { DEFAULT_CONFIG, CONFIG_SCHEMA } from "./config.ts";
 import type { TavilyConfig } from "./public.d.ts";
 import { schema, makeHandler } from "./tool.ts";
 
@@ -17,34 +17,37 @@ const plugin: KaizenPlugin = {
   services: { consumes: ["tools:registry", "config:store"] },
 
   async setup(ctx) {
-    ctx.consumeService("tools:registry");
-    ctx.consumeService("config:store");
+    const log = (m: string) => ctx.log?.(m);
 
     const registry = ctx.useService<ToolsRegistryService>("tools:registry");
     if (!registry) throw new Error("llm-tavily-search: tools:registry service not available");
 
+    // Load config (topo-hint optional).
+    let config: TavilyConfig = { ...DEFAULT_CONFIG };
     const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
-    if (!cfgSvc) throw new Error("llm-tavily-search: config:store service not available");
-
-    cfgSvc.register<TavilyConfig>({
-      plugin: "llm-tavily-search",
-      defaults: { ...DEFAULT_CONFIG },
-      schema: {
-        apiKey: { type: "string" },
-        endpoint: { type: "string", min: 1 },
-        defaultMaxResults: { type: "number", integer: true, min: 1, max: 20 },
-        defaultSearchDepth: { type: "enum", values: ["basic", "advanced"] },
-        defaultIncludeAnswer: { type: "boolean" },
-        requestTimeoutMs: { type: "number", min: 1 },
-      },
-      envVars: { apiKey: "TAVILY_API_KEY" },
-    });
-    const config = cfgSvc.get<TavilyConfig>("llm-tavily-search");
+    if (cfgSvc) {
+      try {
+        cfgSvc.register<TavilyConfig>({
+          plugin: "llm-tavily-search",
+          defaults: { ...DEFAULT_CONFIG },
+          schema: CONFIG_SCHEMA,
+        });
+        // Wait for secret-ref resolution before reading apiKey, otherwise
+        // the first get() may return the `$ref` pointer object rather than
+        // the resolved plaintext.
+        await cfgSvc.ready();
+        config = cfgSvc.get<TavilyConfig>("llm-tavily-search");
+      } catch (e) {
+        log(`llm-tavily-search: config:store register failed (${(e as Error).message}); using defaults`);
+      }
+    } else {
+      log("llm-tavily-search: config:store unavailable; using DEFAULT_CONFIG");
+    }
 
     if (!config.apiKey) {
-      ctx.log(
+      log(
         "llm-tavily-search: no API key found; web_search will error on call. " +
-          "Set TAVILY_API_KEY or run /config:set llm-tavily-search apiKey=<key>",
+          "Run /config:set llm-tavily-search apiKey=<key>",
       );
     }
 

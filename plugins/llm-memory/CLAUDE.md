@@ -11,10 +11,9 @@ index.ts        Plugin lifecycle: loads config, resolves dirs, ensures global di
                 `tools:registry` (optional), and (if autoExtract) subscribes to `turn:end`.
                 The only file that touches `ctx`. Module-scope handles (`sectionHandle`, `toolsUnregister`)
                 let `stop()` clean up idempotently on reload.
-config.ts       loadConfig({ home, env, readFile, log }) → MemoryConfig. Reads
-                `~/.kaizen/plugins/llm-memory/config.json` (or KAIZEN_LLM_MEMORY_CONFIG override).
-                Pure logic; defaults frozen as DEFAULT_CONFIG. Validates injectionByteCap, staleTempMs,
-                denyTypes.
+config.ts       DEFAULT_CONFIG (frozen) + CONFIG_SCHEMA for config:store.
+                Schema omits globalDir/projectDir (string | null not expressible in the current
+                FieldSchema union — runtime tolerance lives in paths.ts:resolveDirs).
 paths.ts        resolveDirs (home/cwd + config → { globalDir, projectDir }), ensureDir,
                 listMemoryFiles (skips MEMORY.md, dotfiles, non-.md), sweepStaleTempFiles.
                 Pure FS helpers.
@@ -70,7 +69,7 @@ Names must match `[a-z0-9_-]{1,64}`. Use `description` (max 200 chars) — that 
 
 ## Adding a new memory `type`
 
-`MemoryType` is exported from `public.d.ts` and re-validated in three places: `frontmatter.ts` (parse), `tools.ts` (JSON schema enums), and `config.ts` (`VALID_TYPES` for `denyTypes`). Update all three together and add a fixture.
+`MemoryType` is exported from `public.d.ts` and re-validated in three places: `frontmatter.ts` (parse), `tools.ts` (JSON schema enums), and `config.ts` (the `denyTypes` enum in `CONFIG_SCHEMA`). Update all three together and add a fixture.
 
 ## Editing injection
 

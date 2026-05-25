@@ -4,7 +4,7 @@ Owns the lifecycle of one or more Model Context Protocol (MCP) servers and re-pu
 
 ## What it does
 
-- Reads MCP server config from disk (project, user, and `${KAIZEN_MCP_CONFIG}` paths) and resolves env interpolation (`${env:VAR}`).
+- Reads MCP server config from `config:store` and resolves env interpolation (`${env:VAR}`).
 - For each enabled server, runs a state machine: `connecting` → `connected` → `reconnecting` → `quarantined` (or `disabled`).
   - **Connect:** stdio subprocess (`StdioClientTransport`), SSE (`SSEClientTransport`), or streamable HTTP (`StreamableHTTPClientTransport`).
   - **Handshake:** MCP `initialize`, then `tools/list` + `resources/list` based on advertised capabilities.
@@ -88,6 +88,7 @@ The bridge declares `source.kind = "mcp"` (with `server: string`) only for tools
 - `tools:registry` — **optional.** Without it the bridge installs a no-op `mcp:bridge` and registers nothing.
 - `events:vocabulary` — consumed for boot-order guarantee (optional, no useService call).
 - `slash:registry` — **optional.** If absent, the `/mcp:*` commands are not registered; tool surfacing still works.
+- `config:store` — **topo-hint optional.** Provides the `llm-mcp-bridge.servers` map. If absent, the bridge boots with an empty servers map and a log line; `/mcp:reload` becomes a no-op re-resolution of the boot-time snapshot.
 
 **Events listened to**
 - `harness:end` — runs graceful shutdown for every server (cancel timers, close transports, unregister tools, force-kill stdio after 5s).
@@ -102,13 +103,11 @@ This plugin defines no event vocabulary of its own.
 
 ## Configuration
 
-Files (resolved in order; later overrides earlier on key collisions, with a warning):
-
-1. `~/.kaizen/mcp/servers.json` (user)
-2. `<cwd>/.kaizen/mcp/servers.json` (project)
-3. `${KAIZEN_MCP_CONFIG}` (full path; CI/one-off)
-
-Absence of all three is not an error.
+Config lives under the `llm-mcp-bridge.servers` key in the harness config file
+(`~/.kaizen/harnesses/<key>/config.json`, with project-layer override at
+`./.kaizen/harnesses/<key>/config.json`). See
+`docs/config-migration/INTEGRATION.md` for the layer model. Absence of the
+section is not an error — the bridge boots with an empty servers map.
 
 ### Schema
 

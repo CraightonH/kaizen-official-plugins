@@ -1,19 +1,15 @@
 import type { KaizenPlugin } from "kaizen/types";
 import { randomUUID } from "node:crypto";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import pkg from "./package.json" with { type: "json" };
 import { harnessKey } from "./harness-key";
 import type { SessionsStoreService, ConfigStoreService } from "llm-contracts/public";
+import type { SessionManagerConfig } from "./public.d.ts";
+import { DEFAULT_CONFIG, CONFIG_SCHEMA } from "./config.ts";
 import { makeStore } from "./store";
 import { makeTraceSubscriber } from "./trace-subscriber";
 import { makeCommands } from "./commands.ts";
 import { registerSlashCommands, type SlashRegistryLike } from "./slash.ts";
 import { registerToolCommands, type ToolsRegistryLike } from "./tools.ts";
-
-interface SessionManagerConfig {
-  sessionsBase?: string;
-}
 
 const TRACE_EVENTS = [
   "session:renamed",
@@ -52,15 +48,26 @@ const plugin: KaizenPlugin = {
   },
 
   async setup(ctx) {
-    ctx.consumeService("events:vocabulary");
-    ctx.consumeService("config:store");
+    const log = (m: string) => ctx.log?.(m);
+
+    // Load config (topo-hint optional).
+    let config: SessionManagerConfig = { ...DEFAULT_CONFIG };
     const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
-    cfgSvc.register({
-      plugin: "llm-session-manager",
-      defaults: { sessionsBase: join(homedir(), ".kaizen", "sessions") },
-      schema: { sessionsBase: { type: "string", min: 1 } },
-    });
-    const config = cfgSvc.get<SessionManagerConfig>("llm-session-manager");
+    if (cfgSvc) {
+      try {
+        cfgSvc.register<SessionManagerConfig>({
+          plugin: "llm-session-manager",
+          defaults: { ...DEFAULT_CONFIG },
+          schema: CONFIG_SCHEMA,
+        });
+        config = cfgSvc.get<SessionManagerConfig>("llm-session-manager");
+      } catch (e) {
+        log(`llm-session-manager: config:store register failed (${(e as Error).message}); using defaults`);
+      }
+    } else {
+      log("llm-session-manager: config:store unavailable; using DEFAULT_CONFIG");
+    }
+
     const sessionsBase = config.sessionsBase;
     // ctx.harness is a Kaizen runtime extension not yet on PluginContext.
     const key = harnessKey((ctx as { harness?: import("./harness-key").HarnessIdentity }).harness ?? {});

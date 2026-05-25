@@ -1,7 +1,7 @@
 import type { KaizenPlugin } from "kaizen/types";
 import type { ConfigStoreService, ToolSchema } from "llm-contracts/public";
 import type { ToolExecutionContext, ToolHandler, ToolsRegistryService } from "llm-tools-registry/public";
-import { DEFAULT_CONFIG } from "./defaults.ts";
+import { DEFAULT_CONFIG, CONFIG_SCHEMA } from "./config.ts";
 import type { CodeModeConfig } from "./public.d.ts";
 import { renderSurface, surfaceHash } from "./assembler.ts";
 import { runInSandbox, type SandboxRunResult } from "./sandbox-host.ts";
@@ -34,21 +34,25 @@ const plugin: KaizenPlugin = {
   },
 
   async setup(ctx) {
-    ctx.consumeService("tools:registry");
-    ctx.consumeService("config:store");
+    const log = (m: string) => ctx.log?.(m);
 
+    // Load config (topo-hint optional).
+    let config: CodeModeConfig = { ...DEFAULT_CONFIG };
     const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
-    cfgSvc.register<CodeModeConfig>({
-      plugin: "llm-codemode",
-      defaults: { ...DEFAULT_CONFIG },
-      schema: {
-        timeoutMs: { type: "number", min: 1 },
-        maxStdoutBytes: { type: "number", min: 1 },
-        maxReturnBytes: { type: "number", min: 1 },
-        sandbox: { type: "enum", values: ["bun-worker"] },
-      },
-    });
-    const config = cfgSvc.get<CodeModeConfig>("llm-codemode");
+    if (cfgSvc) {
+      try {
+        cfgSvc.register<CodeModeConfig>({
+          plugin: "llm-codemode",
+          defaults: { ...DEFAULT_CONFIG },
+          schema: CONFIG_SCHEMA,
+        });
+        config = cfgSvc.get<CodeModeConfig>("llm-codemode");
+      } catch (e) {
+        log(`llm-codemode: config:store register failed (${(e as Error).message}); using defaults`);
+      }
+    } else {
+      log("llm-codemode: config:store unavailable; using DEFAULT_CONFIG");
+    }
 
     const toolsRegistry = ctx.useService<ToolsRegistryService>("tools:registry");
     if (!toolsRegistry || typeof toolsRegistry.listRegistrations !== "function") {

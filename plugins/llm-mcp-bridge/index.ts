@@ -2,7 +2,9 @@ import type { KaizenPlugin } from "kaizen/types";
 import type { ConfigStoreService, McpBridgeService, ServerInfo } from "llm-contracts/public";
 import type { ToolsRegistryService } from "llm-tools-registry/public";
 import pkg from "./package.json" with { type: "json" };
-import { resolveServers, type ServerConfig } from "./servers.ts";
+import type { McpBridgeConfig } from "./public.d.ts";
+import { DEFAULT_CONFIG, CONFIG_SCHEMA } from "./config.ts";
+import { resolveServers } from "./servers.ts";
 import { createClient } from "./client.ts";
 import { makeBridgeService } from "./service.ts";
 import { registerSlashCommands, type SlashRegistryLike } from "./slash.ts";
@@ -26,32 +28,34 @@ const plugin: KaizenPlugin = {
 
   async setup(ctx) {
     const log = (m: string) => ctx.log(m);
-    ctx.consumeService("config:store");
 
+    // Load config (topo-hint optional). The `useService` + try/catch pattern
+    // matches `llm-axioms` — graceful fallback to DEFAULT_CONFIG keeps fake-ctx
+    // tests and degraded-harness boots working.
+    let config: McpBridgeConfig = { ...DEFAULT_CONFIG };
     const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
-    cfgSvc.register<{ servers: Record<string, ServerConfig> }>({
-      plugin: "llm-mcp-bridge",
-      defaults: { servers: {} },
-      schema: {
-        servers: {
-          type: "object",
-          properties: {},
-          additionalProperties: {
-            type: "object",
-            properties: {
-              transport: { type: "enum", values: ["stdio", "sse", "http"] },
-              enabled: { type: "boolean" },
-              timeoutMs: { type: "number", min: 1 },
-              healthCheckMs: { type: "number", min: 1 },
-            },
-            additionalProperties: true,
-          },
-        },
-      },
-    });
+    if (cfgSvc) {
+      try {
+        cfgSvc.register<McpBridgeConfig>({
+          plugin: "llm-mcp-bridge",
+          defaults: { ...DEFAULT_CONFIG },
+          schema: CONFIG_SCHEMA,
+        });
+        config = cfgSvc.get<McpBridgeConfig>("llm-mcp-bridge");
+      } catch (e) {
+        log(`llm-mcp-bridge: config:store register failed (${(e as Error).message}); using defaults`);
+      }
+    } else {
+      log("llm-mcp-bridge: config:store unavailable; using DEFAULT_CONFIG");
+    }
 
+    // `loadResolved` re-reads through `cfgSvc` when available so `/mcp:reload`
+    // picks up on-disk edits. Without `cfgSvc`, fall back to the boot-time
+    // snapshot — reload becomes a re-resolution of the same servers map.
     const loadResolved = () => {
-      const cfg = cfgSvc.get<{ servers: Record<string, ServerConfig> }>("llm-mcp-bridge");
+      const cfg = cfgSvc
+        ? cfgSvc.get<McpBridgeConfig>("llm-mcp-bridge")
+        : config;
       const res = resolveServers(cfg.servers, process.env);
       for (const w of res.warnings) log(`llm-mcp-bridge: ${w}`);
       return res.servers;

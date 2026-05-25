@@ -12,3 +12,10 @@ export {
   DuplicateRegistrationError,
   InvalidNameError,
 } from "./errors";
+
+// Plugin-private config shape used with config:store. Not consumed by other
+// plugins; exported here so it can be imported across this plugin's modules.
+export interface SlashCommandsConfig {
+  userDir: string;
+  projectDir: string;
+}

@@ -12,7 +12,9 @@ export interface SlashDeps {
   homePath: string;
   projectPath: string;
   harnessKey: string;
-  editor: string;
+  // Getter so live `/config:set kaizen-config editor=...` updates take
+  // effect without a restart.
+  editor: () => string;
   log: (msg: string) => void;
   spawnEditor: (editor: string, path: string) => Promise<number>;
   registry: SecretsRegistryService;
@@ -164,7 +166,7 @@ export function registerSlashCommands(reg: SlashRegistryLike, deps: SlashDeps): 
       const useProject = ctx.args.trim() === "--project";
       const path = useProject ? deps.projectPath : deps.homePath;
       try {
-        const code = await deps.spawnEditor(deps.editor, path);
+        const code = await deps.spawnEditor(deps.editor(), path);
         await ctx.print(code === 0 ? `Saved ${path}` : `Editor exited with code ${code}; not reloaded.`);
       } catch (err) {
         await ctx.print(`Error: ${(err as Error).message}`);

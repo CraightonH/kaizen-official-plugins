@@ -1,7 +1,7 @@
 // plugins/llm-tavily-search/test/tool.test.ts
 import { describe, it, expect } from "bun:test";
 import { schema, makeHandler } from "../tool.ts";
-import { DEFAULT_CONFIG } from "../defaults.ts";
+import { DEFAULT_CONFIG } from "../config.ts";
 
 function makeCtx(signal?: AbortSignal) {
   return { signal: signal ?? new AbortController().signal, callId: "c1", log: () => {} } as any;

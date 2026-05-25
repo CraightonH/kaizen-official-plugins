@@ -27,7 +27,9 @@ The `dispatch:strategy` contract is cardinality-one: exactly one plugin provides
 
 ## Configuration
 
-`~/.kaizen/plugins/llm-codemode/config.json` (override via `KAIZEN_LLM_CODEMODE_CONFIG`):
+Configuration lives in the shared harness config under the `"llm-codemode"`
+section (`~/.kaizen/harnesses/<harness>/config.json`, managed by
+`kaizen-config`). Use `/config` to inspect or edit values.
 
 | Key | Default | Description |
 | --- | --- | --- |
@@ -35,7 +37,3 @@ The `dispatch:strategy` contract is cardinality-one: exactly one plugin provides
 | `maxStdoutBytes` | 16384 | Cap on captured stdout (bytes). |
 | `maxReturnBytes` | 4096 | Cap on returned-value serialization length (bytes). |
 | `sandbox` | `"bun-worker"` | Sandbox backend. Only `bun-worker` is supported today. |
-
-Unknown keys in `config.json` are silently ignored. The previous
-`maxBlocksPerResponse` key was reserved and never consulted; it was removed in
-0.3.0. Existing configs that set it continue to load without error.

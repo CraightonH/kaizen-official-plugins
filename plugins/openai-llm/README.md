@@ -23,7 +23,7 @@ are owned by `llm-contracts/public` and should be imported from there.
 
 **Provides**: `llm:complete`
 
-**Consumes**: `events:vocabulary`
+**Consumes**: `events:vocabulary`, `config:store`
 
 The service implementation satisfies `LLMCompleteService` from
 `llm-contracts/public`.
@@ -31,7 +31,9 @@ The service implementation satisfies `LLMCompleteService` from
 `llm-contracts` defines the neutral `llm:complete` service slot. `openai-llm`
 declares a dependency on `events:vocabulary` so `llm-events` setup runs
 first, then this plugin binds the concrete OpenAI-compatible implementation with
-`ctx.provideService("llm:complete", ...)`.
+`ctx.provideService("llm:complete", ...)`. `config:store` is a topo-hint
+optional dependency — if it is unavailable at boot the plugin falls back to
+its compiled-in defaults and logs a single line.
 
 ## Public Surface
 
@@ -44,39 +46,40 @@ import type { LLMCompleteService, LLMRequest } from "llm-contracts/public";
 
 ## Configuration
 
-Configuration is read during `setup()` from:
+Configuration is routed through the harness `config:store` service
+(`kaizen-config`). The plugin section in the user's harness config file is
+`openai-llm`:
 
-1. `KAIZEN_OPENAI_LLM_CONFIG`, when set.
-2. `~/.kaizen/plugins/openai-llm/config.json`, otherwise.
-
-If the default path is missing, defaults are used. If an override path is
-missing, the plugin logs that it fell back to defaults. Malformed JSON or invalid
-field types fail setup.
-
-```json
+```jsonc
+// ~/.kaizen/harnesses/<key>/config.json
 {
-  "baseUrl": "http://localhost:1234/v1",
-  "apiKey": "",
-  "apiKeyEnv": "OPENAI_API_KEY",
-  "defaultModel": "local-model",
-  "defaultTemperature": 0.7,
-  "requestTimeoutMs": 120000,
-  "connectTimeoutMs": 10000,
-  "retry": {
-    "maxAttempts": 3,
-    "initialDelayMs": 500,
-    "maxDelayMs": 8000,
-    "jitter": "full"
-  },
-  "extraHeaders": {}
+  "plugins": {
+    "openai-llm": {
+      "baseUrl": "http://localhost:1234/v1",
+      "apiKey": { "$ref": "keychain:openai-llm/apiKey" },
+      "defaultModel": "local-model",
+      "defaultTemperature": 0.7,
+      "requestTimeoutMs": 120000,
+      "connectTimeoutMs": 10000,
+      "retry": {
+        "maxAttempts": 3,
+        "initialDelayMs": 500,
+        "maxDelayMs": 8000,
+        "jitter": "full"
+      },
+      "extraHeaders": {}
+    }
+  }
 }
 ```
+
+Use the `/config` slash commands exposed by `kaizen-config` to inspect and
+edit values; `set()` validates against the schema before writing.
 
 | Key | Effect |
 |-----|--------|
 | `baseUrl` | OpenAI-compatible API base URL, such as `https://api.openai.com/v1` or `http://localhost:1234/v1`. |
-| `apiKey` | Optional bearer token. Sent as `Authorization: Bearer <apiKey>` when non-empty. |
-| `apiKeyEnv` | Optional environment variable name. When set and non-empty, its value overrides `apiKey`. |
+| `apiKey` | Bearer token (**secret field**). Stored via `secrets:registry`; only a `{ $ref: ... }` pointer is persisted in `config.json`. Sent as `Authorization: Bearer <apiKey>` when non-empty. The default is `""` (LM Studio and other local OpenAI-compatible servers do not require a key). |
 | `defaultModel` | Model sent when `LLMRequest.model` is omitted or empty. |
 | `defaultTemperature` | Temperature sent when `LLMRequest.temperature` is omitted. |
 | `requestTimeoutMs` | Per-attempt deadline covering response headers and the full stream. |
@@ -99,10 +102,12 @@ construction.
 
 `tier: "unscoped"` is intentional. The plugin:
 
-- Reads config from the user's home directory or an arbitrary override path.
-- Reads environment variables for config and optional API keys.
 - Connects to an arbitrary user-configured `baseUrl`.
-- Optionally writes debug request files under `~/.kaizen/debug`.
+- Optionally writes debug request files under `~/.kaizen/debug` when
+  `KAIZEN_DEBUG_REQUESTS=1` is set (see *Debug Requests* above).
+
+Config I/O happens inside `kaizen-config`'s permission boundary; this plugin
+does not need `fs.read` / `fs.write` paths for its own configuration.
 
 ## Tests
 

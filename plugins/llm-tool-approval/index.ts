@@ -7,18 +7,16 @@ import type {
   UiChannelService,
   ConfigStoreService,
 } from "llm-contracts/public";
-import defaultsRaw from "./defaults.json" with { type: "json" };
+import type { ToolApprovalConfig } from "./public.d.ts";
+import { DEFAULT_CONFIG, CONFIG_SCHEMA } from "./config.ts";
 import { makeSubscriber, type Subscriber } from "./subscriber.ts";
 import { registerSlashCommands, type SlashRegistryLike, type ApprovalState } from "./slash.ts";
 import { persistProjectAllow } from "./persist.ts";
 
-export interface ToolApprovalConfig {
-  allow: string[];
-  deny: string[];
-}
+const PLUGIN_NAME = "llm-tool-approval";
 
 const plugin: KaizenPlugin = {
-  name: "llm-tool-approval",
+  name: PLUGIN_NAME,
   apiVersion: "3.0.0",
   permissions: { tier: "unscoped" },
   services: {
@@ -26,29 +24,41 @@ const plugin: KaizenPlugin = {
   },
 
   async setup(ctx) {
-    ctx.consumeService("ui:prompt");
-    ctx.consumeService("ui:tool-renderer");
-    ctx.consumeService("ui:channel");
-    ctx.consumeService("slash:registry");
-    ctx.consumeService("config:store");
+    const log = (m: string) => ctx.log?.(m);
 
-    const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
-    cfgSvc.register<ToolApprovalConfig>({
-      plugin: "llm-tool-approval",
-      defaults: {
-        allow: Array.isArray((defaultsRaw as any).allow) ? ((defaultsRaw as any).allow as string[]) : [],
-        deny: Array.isArray((defaultsRaw as any).deny) ? ((defaultsRaw as any).deny as string[]) : [],
-      },
-      schema: {
-        allow: { type: "array", items: { type: "string" } },
-        deny: { type: "array", items: { type: "string" } },
-      },
-    });
+    // Load config (topo-hint optional). If config:store is unavailable or
+    // register() throws, fall back to the shipped DEFAULT_CONFIG so the gate
+    // still gates — every persistence attempt becomes a best-effort no-op
+    // (consistent with the "write failure ≠ approval failure" invariant).
+    let config: ToolApprovalConfig = { ...DEFAULT_CONFIG };
+    let cfgSvc: ConfigStoreService | null = null;
+    try {
+      cfgSvc = ctx.useService<ConfigStoreService>("config:store") ?? null;
+    } catch {
+      cfgSvc = null;
+    }
+    if (cfgSvc) {
+      try {
+        cfgSvc.register<ToolApprovalConfig>({
+          plugin: PLUGIN_NAME,
+          defaults: { ...DEFAULT_CONFIG },
+          schema: CONFIG_SCHEMA,
+        });
+        config = cfgSvc.get<ToolApprovalConfig>(PLUGIN_NAME);
+      } catch (e) {
+        log(`${PLUGIN_NAME}: config:store register failed (${(e as Error).message}); using defaults`);
+      }
+    } else {
+      log(`${PLUGIN_NAME}: config:store unavailable; using DEFAULT_CONFIG`);
+    }
 
     const state: ApprovalState = { paused: false };
 
     const rules = (): ToolApprovalConfig => {
-      const v = cfgSvc.get<ToolApprovalConfig>("llm-tool-approval");
+      if (!cfgSvc) {
+        return { allow: [...config.allow], deny: [...config.deny] };
+      }
+      const v = cfgSvc.get<ToolApprovalConfig>(PLUGIN_NAME);
       return {
         allow: Array.isArray(v?.allow) ? v.allow : [],
         deny: Array.isArray(v?.deny) ? v.deny : [],
@@ -56,7 +66,11 @@ const plugin: KaizenPlugin = {
     };
 
     const persistAllow = async (entry: string): Promise<void> => {
-      await persistProjectAllow("llm-tool-approval", entry, { cfgSvc, log: ctx.log });
+      if (!cfgSvc) {
+        log(`${PLUGIN_NAME}: config:store unavailable; cannot persist "${entry}" — approval is one-time`);
+        return;
+      }
+      await persistProjectAllow(PLUGIN_NAME, entry, { cfgSvc, log: ctx.log });
     };
 
     let teardowns: Array<() => void> = [];
@@ -72,7 +86,7 @@ const plugin: KaizenPlugin = {
       try {
         uiPrompt = ctx.useService<UiPromptService>("ui:prompt");
       } catch (err) {
-        ctx.log(`llm-tool-approval: ui:prompt service unavailable — every call will auto-deny. (${(err as Error).message})`);
+        ctx.log(`${PLUGIN_NAME}: ui:prompt service unavailable — every call will auto-deny. (${(err as Error).message})`);
       }
 
       let summarize: (name: string, args: unknown) => string = (name, args) =>
@@ -81,7 +95,7 @@ const plugin: KaizenPlugin = {
         const renderer = ctx.useService<UiToolRendererService>("ui:tool-renderer");
         summarize = (name, args) => renderer.summarize(name, args);
       } catch (err) {
-        ctx.log(`llm-tool-approval: ui:tool-renderer missing — falling back to JSON stringify. (${(err as Error).message})`);
+        ctx.log(`${PLUGIN_NAME}: ui:tool-renderer missing — falling back to JSON stringify. (${(err as Error).message})`);
       }
 
       let writeNotice: (text: string) => void = (text) => ctx.log(text);
@@ -97,10 +111,14 @@ const plugin: KaizenPlugin = {
 
       try {
         const slash = ctx.useService<SlashRegistryLike>("slash:registry");
-        const offs = registerSlashCommands(slash, { state, setStatus, cfgSvc });
-        teardowns.push(...offs);
+        if (cfgSvc) {
+          const offs = registerSlashCommands(slash, { state, setStatus, cfgSvc });
+          teardowns.push(...offs);
+        } else {
+          log(`${PLUGIN_NAME}: config:store unavailable; slash commands not registered`);
+        }
       } catch (err) {
-        ctx.log(`llm-tool-approval: slash:registry unavailable — slash commands not registered. (${(err as Error).message})`);
+        ctx.log(`${PLUGIN_NAME}: slash:registry unavailable — slash commands not registered. (${(err as Error).message})`);
       }
 
       const subscriber = makeSubscriber({

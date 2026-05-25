@@ -40,60 +40,48 @@ hundreds of KB per result and blow up the model context. Pair with
 
 ## Setup
 
-Get an API key at <https://tavily.com> and supply it via either:
-
-**Environment variable (recommended):**
+Get an API key at <https://tavily.com> and store it via the harness `config:store`:
 
 ```sh
-export TAVILY_API_KEY=tvly-...
+/config:set llm-tavily-search apiKey=tvly-...
 ```
 
-**Or config file** at `~/.kaizen/plugins/llm-tavily-search/config.json`:
+`apiKey` is a **secret field**. The plaintext value is stashed in the
+harness's `secrets:registry` backend (e.g. the OS keychain); only a
+`{ "$ref": "..." }` pointer is persisted in
+`~/.kaizen/harnesses/<harnessKey>/config.json` under
+`plugins["llm-tavily-search"]`.
 
-```json
-{
-  "apiKey": "tvly-...",
-  "defaultMaxResults": 5,
-  "defaultSearchDepth": "basic",
-  "defaultIncludeAnswer": false
-}
-```
-
-If `apiKey` is empty, the environment variable named by `apiKeyEnv` (default
-`TAVILY_API_KEY`) is consulted as a fallback.
-
-If no key is found, the plugin still loads but logs a warning; the first
+If no key is configured, the plugin still loads but logs a warning; the first
 `web_search` call returns a clear `web_search: TAVILY_API_KEY not set` error.
 
 ## Configuration
 
 | Key | Default | Effect |
 |-----|---------|--------|
-| `apiKey` | `""` | Tavily API key. Overridden by the env var named by `apiKeyEnv` when set. |
-| `apiKeyEnv` | `"TAVILY_API_KEY"` | Environment variable name to consult when `apiKey` is empty. |
+| `apiKey` | `""` | Tavily API key. Secret field — stored via `secrets:registry`. |
 | `endpoint` | `"https://api.tavily.com/search"` | Tavily search endpoint. |
 | `defaultMaxResults` | `5` | Default `max_results` (1..20). |
 | `defaultSearchDepth` | `"basic"` | Default `search_depth` (`"basic"` or `"advanced"`). |
 | `defaultIncludeAnswer` | `false` | Default `include_answer`. |
 | `requestTimeoutMs` | `30000` | Per-call timeout for the underlying HTTP request. |
 
-Set `KAIZEN_TAVILY_CONFIG=/path/to/config.json` to override the config-file
-location. Missing override paths log a warning and fall back to defaults;
-malformed JSON or invalid field types fail setup.
+All fields are managed by `kaizen-config` via the `config:store` service.
+Set via `/config:set llm-tavily-search <key>=<value>` or edit the harness
+config file directly.
 
 ## Permissions
 
 `tier: "trusted"` is intentional. The plugin:
 
-- Reads config from the user's home directory (or `KAIZEN_TAVILY_CONFIG`).
-- Reads the configured API-key environment variable (default
-  `TAVILY_API_KEY`).
+- Reads its configuration via the harness `config:store` service (the
+  underlying filesystem reads happen inside `kaizen-config`, not this plugin).
 - Connects to the configured Tavily endpoint (default
   `https://api.tavily.com/search`) over HTTPS during tool execution.
 
-No filesystem writes, no other network destinations. Outbound traffic is
-limited to whatever `endpoint` resolves to; override it only if you front
-Tavily with a corporate proxy you trust.
+No filesystem reads/writes from this plugin, no other network destinations.
+Outbound traffic is limited to whatever `endpoint` resolves to; override it
+only if you front Tavily with a corporate proxy you trust.
 
 ## Errors
 

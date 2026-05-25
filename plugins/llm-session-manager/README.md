@@ -15,3 +15,16 @@ Top-level sessions use manager-minted UUID ids. Sub-sessions are nested under a 
 ```
 
 All message writes happen through `TurnHandle`. A committed turn atomically rewrites `snapshot.json`. A rolled-back turn discards buffered messages while leaving trace events intact for auditability. A partially-committed turn (cancellation path) drops a trailing assistant message with unresolved tool_calls and persists the rest; `events.jsonl` is not trimmed in either case.
+
+## Configuration
+
+Tunable via `config:store` (the shared harness config file under
+`~/.kaizen/harnesses/<harness-key>/config.json`, edited via `kaizen-config`'s
+`/config` slash commands):
+
+| Field          | Type   | Default                       | Notes                                                            |
+| -------------- | ------ | ----------------------------- | ---------------------------------------------------------------- |
+| `sessionsBase` | string | `~/.kaizen/sessions` (absolute) | Root directory under which `<harness-key>/<session-id>/` lives. Resolved once at setup; changes require harness restart. |
+
+Read once in `setup()` — there is no `watch()` subscription, so live edits do
+not take effect until the next harness boot.

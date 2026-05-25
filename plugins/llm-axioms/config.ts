@@ -7,6 +7,8 @@ export const DEFAULT_CONFIG: AxiomsConfig = Object.freeze({
   methodologyEnabled: true,
   workspaceEnabled: true,
   staleTempMs: 60_000,
+  methodologyPriority: 50,
+  workspacePriority: 180,
 }) as AxiomsConfig;
 
 // Use a plain Record over the AxiomsConfig keys so this compiles whether or
@@ -18,4 +20,6 @@ export const CONFIG_SCHEMA: Record<keyof AxiomsConfig, FieldSchema> = {
   methodologyEnabled: { type: "boolean" },
   workspaceEnabled: { type: "boolean" },
   staleTempMs: { type: "number", min: 0 },
+  methodologyPriority: { type: "number", min: 0, integer: true },
+  workspacePriority: { type: "number", min: 0, integer: true },
 };

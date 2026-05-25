@@ -29,7 +29,7 @@ describe("loadFileCommands", () => {
     const reg = createRegistry();
     const fs = makeFsDeps({ "/u/.kaizen/commands/echo.md": VALID });
     const warnings = await loadFileCommands({
-      home: "/u", cwd: "/p", registry: reg, ...fs, getDriver: () => undefined,
+      userDir: "/u/.kaizen/commands", projectDir: "/p/.kaizen/commands", registry: reg, ...fs, getDriver: () => undefined,
     });
     expect(warnings).toEqual([]);
     const m = reg.get("echo")!.manifest;
@@ -46,7 +46,7 @@ describe("loadFileCommands", () => {
       "/p/.kaizen/commands/echo.md": VALID.replace("Echo your input.", "Project echo."),
     });
     const warnings = await loadFileCommands({
-      home: "/u", cwd: "/p", registry: reg, ...fs, getDriver: () => undefined,
+      userDir: "/u/.kaizen/commands", projectDir: "/p/.kaizen/commands", registry: reg, ...fs, getDriver: () => undefined,
     });
     expect(warnings).toEqual([]);
     expect(reg.get("echo")!.manifest.description).toBe("Project echo.");
@@ -58,7 +58,7 @@ describe("loadFileCommands", () => {
     registerBuiltins(reg);
     const fs = makeFsDeps({ "/u/.kaizen/commands/help.md": VALID });
     const warnings = await loadFileCommands({
-      home: "/u", cwd: "/p", registry: reg, ...fs, getDriver: () => undefined,
+      userDir: "/u/.kaizen/commands", projectDir: "/p/.kaizen/commands", registry: reg, ...fs, getDriver: () => undefined,
     });
     expect(warnings.length).toBe(1);
     expect(warnings[0]).toMatch(/help\.md/);
@@ -70,7 +70,7 @@ describe("loadFileCommands", () => {
     const reg = createRegistry();
     const fs = makeFsDeps({ "/u/.kaizen/commands/bad.md": "no frontmatter here\n" });
     const warnings = await loadFileCommands({
-      home: "/u", cwd: "/p", registry: reg, ...fs, getDriver: () => undefined,
+      userDir: "/u/.kaizen/commands", projectDir: "/p/.kaizen/commands", registry: reg, ...fs, getDriver: () => undefined,
     });
     expect(reg.get("bad")).toBeUndefined();
     expect(warnings.length).toBe(1);
@@ -84,7 +84,7 @@ describe("loadFileCommands", () => {
     const runConversation = mock(async () => ({ finalMessage: { role: "assistant", content: "" }, usage: { promptTokens: 0, completionTokens: 0 } }));
     const driver = { runConversation };
     await loadFileCommands({
-      home: "/u", cwd: "/p", registry: reg, ...fs, getDriver: () => driver as any, getActiveSessionId: () => "session-1",
+      userDir: "/u/.kaizen/commands", projectDir: "/p/.kaizen/commands", registry: reg, ...fs, getDriver: () => driver as any, getActiveSessionId: () => "session-1",
     });
     const ctx: any = { args: "hello world", raw: "/echo hello world", signal: new AbortController().signal, emit, print: async () => {} };
     await reg.get("echo")!.handler(ctx);
@@ -104,7 +104,7 @@ describe("loadFileCommands", () => {
     });
     const runConversation = mock(async () => ({} as any));
     await loadFileCommands({
-      home: "/u", cwd: "/p", registry: reg, ...fs, getDriver: () => ({ runConversation } as any),
+      userDir: "/u/.kaizen/commands", projectDir: "/p/.kaizen/commands", registry: reg, ...fs, getDriver: () => ({ runConversation } as any),
     });
     const printed: string[] = [];
     const emit = mock(async () => {});
@@ -122,7 +122,7 @@ describe("loadFileCommands", () => {
       readFile: async () => { throw new Error("unreachable"); },
     };
     const warnings = await loadFileCommands({
-      home: "/u", cwd: "/p", registry: reg, ...fs, getDriver: () => undefined,
+      userDir: "/u/.kaizen/commands", projectDir: "/p/.kaizen/commands", registry: reg, ...fs, getDriver: () => undefined,
     });
     expect(warnings).toEqual([]);
   });

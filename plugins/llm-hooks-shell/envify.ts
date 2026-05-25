@@ -1,4 +1,4 @@
-const DEPTH_CAP = 4;
+const DEFAULT_DEPTH_CAP = 4;
 
 export function camelToUpperSnake(name: string): string {
   // Insert underscore between a lowercase or digit followed by an uppercase letter.
@@ -16,29 +16,39 @@ function scalarString(v: unknown): string {
   return JSON.stringify(v);
 }
 
-function flatten(prefix: string, value: unknown, out: Record<string, string>, depth: number): void {
+function flatten(
+  prefix: string,
+  value: unknown,
+  out: Record<string, string>,
+  depth: number,
+  depthCap: number,
+): void {
   // At the depth cap, store the JSON blob and stop descending.
-  if (depth >= DEPTH_CAP) {
+  if (depth >= depthCap) {
     out[prefix] = JSON.stringify(value);
     return;
   }
   if (Array.isArray(value)) {
     out[prefix] = JSON.stringify(value);
-    value.forEach((item, idx) => flatten(`${prefix}_${idx}`, item, out, depth + 1));
+    value.forEach((item, idx) => flatten(`${prefix}_${idx}`, item, out, depth + 1, depthCap));
     return;
   }
   if (value !== null && typeof value === "object") {
     out[prefix] = JSON.stringify(value);
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
       const childKey = `${prefix}_${camelToUpperSnake(k)}`;
-      flatten(childKey, v, out, depth + 1);
+      flatten(childKey, v, out, depth + 1, depthCap);
     }
     return;
   }
   out[prefix] = scalarString(value);
 }
 
-export function envify(eventName: string, payload: unknown): Record<string, string> {
+export function envify(
+  eventName: string,
+  payload: unknown,
+  depthCap: number = DEFAULT_DEPTH_CAP,
+): Record<string, string> {
   const out: Record<string, string> = {};
   out.EVENT_NAME = eventName;
   out.EVENT_JSON = JSON.stringify(payload ?? null);
@@ -48,12 +58,12 @@ export function envify(eventName: string, payload: unknown): Record<string, stri
   }
 
   if (Array.isArray(payload)) {
-    payload.forEach((item, idx) => flatten(`EVENT_${idx}`, item, out, 1));
+    payload.forEach((item, idx) => flatten(`EVENT_${idx}`, item, out, 1, depthCap));
     return out;
   }
 
   for (const [k, v] of Object.entries(payload as Record<string, unknown>)) {
-    flatten(`EVENT_${camelToUpperSnake(k)}`, v, out, 1);
+    flatten(`EVENT_${camelToUpperSnake(k)}`, v, out, 1, depthCap);
   }
   return out;
 }

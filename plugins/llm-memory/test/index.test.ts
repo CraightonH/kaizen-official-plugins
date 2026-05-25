@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import plugin from "../index.ts";
-import { DEFAULT_CONFIG } from "../defaults.ts";
+import { DEFAULT_CONFIG } from "../config.ts";
 
 describe("llm-memory metadata", () => {
   it("name + apiVersion", () => {
