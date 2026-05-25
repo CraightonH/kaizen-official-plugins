@@ -24,10 +24,15 @@ const plugin: KaizenPlugin = {
       read: ["~/.kaizen/harnesses/**", "./.kaizen/harnesses/**"],
       write: ["~/.kaizen/harnesses/**", "./.kaizen/harnesses/**"],
     },
+    events: { subscribe: ["harness:start"] },
   },
   services: {
     provides: ["config:store", "secrets:registry"],
-    consumes: ["slash:registry"],
+    // slash:registry is consumed as a deferred-optional via the harness:start
+    // event below — not declared here. Declaring it would create a cycle:
+    // kaizen-config → slash:registry → llm-slash-commands → config:store →
+    // kaizen-config (llm-slash-commands now consumes config:store).
+    consumes: [],
   },
 
   async setup(ctx) {
@@ -79,29 +84,34 @@ const plugin: KaizenPlugin = {
       schema: CONFIG_SCHEMA,
     });
 
-    try {
-      const slash = ctx.useService<SlashRegistryService>("slash:registry");
-      teardowns.push(...registerSlashCommands(slash, {
-        store,
-        homePath,
-        projectPath,
-        harnessKey: key,
-        editor: () =>
-          store.get<KaizenConfigConfig>("kaizen-config").editor
-            ?? process.env.EDITOR
-            ?? "vi",
-        log: ctx.log.bind(ctx),
-        spawnEditor: (editor, path) => new Promise<number>((resolve, reject) => {
-          const child = spawn(editor, [path], { stdio: "inherit" });
-          child.on("exit", (code) => resolve(code ?? 0));
-          child.on("error", reject);
-        }),
-        registry,
-        defaultSecretBackend: () => store.get<KaizenConfigConfig>("kaizen-config").defaultSecretBackend,
-      }));
-    } catch (err) {
-      ctx.log(`kaizen-config: slash:registry unavailable (${(err as Error).message}); /config commands disabled`);
-    }
+    // Register /config slash commands on harness:start so the slash:registry
+    // provider (which now consumes config:store) is guaranteed to have booted.
+    // See services.consumes comment above for the cycle this avoids.
+    ctx.on("harness:start", async () => {
+      try {
+        const slash = ctx.useService<SlashRegistryService>("slash:registry");
+        teardowns.push(...registerSlashCommands(slash, {
+          store,
+          homePath,
+          projectPath,
+          harnessKey: key,
+          editor: () =>
+            store.get<KaizenConfigConfig>("kaizen-config").editor
+              ?? process.env.EDITOR
+              ?? "vi",
+          log: ctx.log.bind(ctx),
+          spawnEditor: (editor, path) => new Promise<number>((resolve, reject) => {
+            const child = spawn(editor, [path], { stdio: "inherit" });
+            child.on("exit", (code) => resolve(code ?? 0));
+            child.on("error", reject);
+          }),
+          registry,
+          defaultSecretBackend: () => store.get<KaizenConfigConfig>("kaizen-config").defaultSecretBackend,
+        }));
+      } catch (err) {
+        ctx.log(`kaizen-config: slash:registry unavailable (${(err as Error).message}); /config commands disabled`);
+      }
+    });
   },
 
   async stop() {

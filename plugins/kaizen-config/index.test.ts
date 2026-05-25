@@ -31,8 +31,8 @@ describe("kaizen-config", () => {
     expect(plugin.services?.provides).toContain("config:store");
   });
 
-  it("declares slash:registry as a consumed service", () => {
-    expect(plugin.services?.consumes).toContain("slash:registry");
+  it("does not declare slash:registry as a consumed service (deferred via harness:start to avoid a cycle with llm-slash-commands)", () => {
+    expect(plugin.services?.consumes ?? []).not.toContain("slash:registry");
   });
 
   it("uses scoped permission tier with fs grants", () => {
