@@ -28,7 +28,25 @@ function subscribedEvents(vocab: Vocab): string[] {
 const plugin: KaizenPlugin = {
   name: "llm-status-items",
   apiVersion: "3.0.0",
-  permissions: { tier: "trusted" },
+  permissions: {
+    tier: "scoped",
+    events: {
+      subscribe: [
+        "harness:start",
+        "llm:before-call",
+        "llm:done",
+        "turn:start",
+        "turn:end",
+        "tool:before-execute",
+        "tool:result",
+        "tool:error",
+        "conversation:cleared",
+        "session:active-changed",
+        "session:renamed",
+      ],
+      emit: ["status:item-update", "status:item-clear"],
+    },
+  },
   services: { consumes: ["events:vocabulary", "llm:complete", "config:store"] },
 
   async setup(ctx) {
