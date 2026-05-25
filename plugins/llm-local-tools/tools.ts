@@ -8,19 +8,27 @@ import * as grepMod from "./tools/grep.ts";
 import * as bashMod from "./tools/bash.ts";
 import * as webFetchMod from "./tools/web_fetch.ts";
 import type { ToolSchema } from "llm-contracts/public";
+import type { LlmLocalToolsConfig } from "./public.d.ts";
 
 export interface ToolEntry {
   schema: ToolSchema;
   handler: (args: any, ctx: any) => Promise<unknown>;
 }
 
-export const ALL_TOOLS: ToolEntry[] = [
-  { schema: readMod.schema, handler: readMod.handler },
-  { schema: writeMod.schema, handler: writeMod.handler },
-  { schema: createMod.schema, handler: createMod.handler },
-  { schema: editMod.schema, handler: editMod.handler },
-  { schema: globMod.schema, handler: globMod.handler },
-  { schema: grepMod.schema, handler: grepMod.handler },
-  { schema: bashMod.schema, handler: bashMod.handler },
-  { schema: webFetchMod.schema, handler: webFetchMod.handler },
-];
+/**
+ * Construct the full tool set with `config` threaded into every config-aware
+ * handler. `write` / `create` / `edit` have no tunable knobs today; they ship
+ * their handlers verbatim.
+ */
+export function buildAllTools(config: LlmLocalToolsConfig): ReadonlyArray<ToolEntry> {
+  return [
+    { schema: readMod.schema,     handler: readMod.makeHandler(config) },
+    { schema: writeMod.schema,    handler: writeMod.handler },
+    { schema: createMod.schema,   handler: createMod.handler },
+    { schema: editMod.schema,     handler: editMod.handler },
+    { schema: globMod.schema,     handler: globMod.makeHandler(config) },
+    { schema: grepMod.schema,     handler: grepMod.makeHandler({ config }) },
+    { schema: bashMod.schema,     handler: bashMod.makeHandler(config) },
+    { schema: webFetchMod.schema, handler: webFetchMod.makeHandler(config) },
+  ];
+}

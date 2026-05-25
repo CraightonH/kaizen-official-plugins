@@ -1,8 +1,15 @@
 // plugins/llm-local-tools/tools/bash.ts
 import { spawn, type ChildProcess } from "node:child_process";
 import type { ToolSchema } from "llm-contracts/public";
-import { resolvePath, truncateMiddle, BASH_OUTPUT_CAP } from "../util.ts";
+import { resolvePath, truncateMiddle } from "../util.ts";
+import { DEFAULT_CONFIG } from "../config.ts";
+import type { LlmLocalToolsConfig } from "../public.d.ts";
 
+// Schema is registered once at boot. The `description` and the `maximum:`
+// timeout ceiling reflect the static-default contract the LLM sees — they do
+// NOT track user config overrides. Schema bounds also serve as the per-call
+// hard cap so a configured default can never exceed them (CONFIG_SCHEMA
+// enforces the same maximum on bashDefaultTimeoutMs).
 export const schema: ToolSchema = {
   name: "bash",
   description: "Execute a shell command. Captures combined stdout/stderr. Default timeout 120s. Use sparingly — prefer purpose-built tools when one exists.",
@@ -43,68 +50,74 @@ function killGroup(pid: number, signal: string): void {
   }
 }
 
-export async function handler(args: BashArgs, ctx: any): Promise<BashResult> {
-  if (args.run_in_background === true) throw new Error("bash: run_in_background is not supported in v0");
-  const cwd = resolvePath(args.cwd ?? ".");
-  const timeout = Math.min(600000, Math.max(1000, args.timeout ?? 120000));
-  const start = Date.now();
+export function makeHandler(config: LlmLocalToolsConfig) {
+  return async function handler(args: BashArgs, ctx: any): Promise<BashResult> {
+    if (args.run_in_background === true) throw new Error("bash: run_in_background is not supported in v0");
+    const cwd = resolvePath(args.cwd ?? ".");
+    const timeout = Math.min(600000, Math.max(1000, args.timeout ?? config.bashDefaultTimeoutMs));
+    const start = Date.now();
 
-  return new Promise<BashResult>((resolve) => {
-    // detached: true creates a new process group so we can kill the whole group
-    const child: ChildProcess = spawn(args.command, { cwd, shell: true, detached: true });
-    const chunks: Buffer[] = [];
-    let killedByTimeout = false;
-    let killedBySignal = false;
-    let totalBytes = 0;
-    let killTimer: ReturnType<typeof setTimeout> | null = null;
+    return new Promise<BashResult>((resolve) => {
+      // detached: true creates a new process group so we can kill the whole group
+      const child: ChildProcess = spawn(args.command, { cwd, shell: true, detached: true });
+      const chunks: Buffer[] = [];
+      let killedByTimeout = false;
+      let killedBySignal = false;
+      let totalBytes = 0;
+      let killTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const onData = (b: Buffer) => {
-      chunks.push(b);
-      totalBytes += b.length;
-    };
-    child.stdout?.on("data", onData);
-    child.stderr?.on("data", onData);
+      const onData = (b: Buffer) => {
+        chunks.push(b);
+        totalBytes += b.length;
+      };
+      child.stdout?.on("data", onData);
+      child.stderr?.on("data", onData);
 
-    const doKill = (reason: "timeout" | "signal") => {
-      if (reason === "timeout") killedByTimeout = true;
-      else killedBySignal = true;
-      const pid = child.pid;
-      if (pid != null) {
-        killGroup(pid, "SIGTERM");
-        killTimer = setTimeout(() => {
-          try { killGroup(pid, "SIGKILL"); } catch { /* ignore */ }
-        }, 2000);
+      const doKill = (reason: "timeout" | "signal") => {
+        if (reason === "timeout") killedByTimeout = true;
+        else killedBySignal = true;
+        const pid = child.pid;
+        if (pid != null) {
+          killGroup(pid, "SIGTERM");
+          killTimer = setTimeout(() => {
+            try { killGroup(pid, "SIGKILL"); } catch { /* ignore */ }
+          }, 2000);
+        }
+      };
+
+      const timer = setTimeout(() => doKill("timeout"), timeout);
+
+      const onAbort = () => doKill("signal");
+      if (ctx?.signal) {
+        if (ctx.signal.aborted) onAbort();
+        else ctx.signal.addEventListener("abort", onAbort, { once: true });
       }
-    };
 
-    const timer = setTimeout(() => doKill("timeout"), timeout);
-
-    const onAbort = () => doKill("signal");
-    if (ctx?.signal) {
-      if (ctx.signal.aborted) onAbort();
-      else ctx.signal.addEventListener("abort", onAbort, { once: true });
-    }
-
-    child.on("close", (code: number | null, signal: NodeJS.Signals | null) => {
-      clearTimeout(timer);
-      if (killTimer != null) clearTimeout(killTimer);
-      if (ctx?.signal) ctx.signal.removeEventListener?.("abort", onAbort as any);
-      const duration = Date.now() - start;
-      let raw = Buffer.concat(chunks).toString("utf8");
-      if (killedByTimeout) raw += `\n... [killed: timeout after ${timeout}ms]`;
-      else if (killedBySignal) raw += `\n... [killed: cancelled by signal]`;
-      const wasTruncated = totalBytes > BASH_OUTPUT_CAP;
-      const out = wasTruncated
-        ? truncateMiddle(raw, BASH_OUTPUT_CAP, `... [truncated: ${totalBytes - BASH_OUTPUT_CAP} bytes elided from middle] ...`)
-        : raw;
-      const exitCode = code ?? (signal ? 128 + 15 : 1);
-      resolve({
-        exit_code: exitCode,
-        output: out,
-        duration_ms: duration,
-        truncated: wasTruncated,
-        killed_by_timeout: killedByTimeout,
+      child.on("close", (code: number | null, signal: NodeJS.Signals | null) => {
+        clearTimeout(timer);
+        if (killTimer != null) clearTimeout(killTimer);
+        if (ctx?.signal) ctx.signal.removeEventListener?.("abort", onAbort as any);
+        const duration = Date.now() - start;
+        let raw = Buffer.concat(chunks).toString("utf8");
+        if (killedByTimeout) raw += `\n... [killed: timeout after ${timeout}ms]`;
+        else if (killedBySignal) raw += `\n... [killed: cancelled by signal]`;
+        const wasTruncated = totalBytes > config.bashOutputCap;
+        const out = wasTruncated
+          ? truncateMiddle(raw, config.bashOutputCap, `... [truncated: ${totalBytes - config.bashOutputCap} bytes elided from middle] ...`)
+          : raw;
+        const exitCode = code ?? (signal ? 128 + 15 : 1);
+        resolve({
+          exit_code: exitCode,
+          output: out,
+          duration_ms: duration,
+          truncated: wasTruncated,
+          killed_by_timeout: killedByTimeout,
+        });
       });
     });
-  });
+  };
 }
+
+// Default handler closure-bound to DEFAULT_CONFIG so per-tool tests work
+// without threading config through the import site.
+export const handler = makeHandler(DEFAULT_CONFIG);

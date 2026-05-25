@@ -2,7 +2,9 @@
 import { readdir, stat, readFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import type { ToolSchema } from "llm-contracts/public";
-import { resolvePath, hasGitRoot, GLOB_CAP } from "../util.ts";
+import { resolvePath, hasGitRoot } from "../util.ts";
+import { DEFAULT_CONFIG } from "../config.ts";
+import type { LlmLocalToolsConfig } from "../public.d.ts";
 
 export const schema: ToolSchema = {
   name: "glob",
@@ -92,24 +94,30 @@ async function walk(root: string, cwd: string, ig: IgnoreSet | null, out: { abs:
   }
 }
 
-export async function handler(args: GlobArgs, _ctx: unknown): Promise<string> {
-  const cwd = resolvePath(args.cwd ?? ".");
-  const useGitignore = hasGitRoot(cwd);
-  let ig: IgnoreSet | null = null;
-  if (useGitignore) {
-    try {
-      const text = await readFile(join(cwd, ".gitignore"), "utf8");
-      ig = compileGitignore(text);
-    } catch { ig = { patterns: [] }; }
-  }
-  const collected: { abs: string; mtime: number }[] = [];
-  await walk(cwd, cwd, ig, collected);
-  const re = compileGlob(args.pattern);
-  const matches = collected.filter(f => re.test(relative(cwd, f.abs).split(sep).join("/")));
-  matches.sort((a, b) => b.mtime - a.mtime);
-  const total = matches.length;
-  const shown = matches.slice(0, GLOB_CAP).map(m => m.abs);
-  const lines = shown.join("\n");
-  if (total > GLOB_CAP) return `${lines}\n... [truncated: ${total - GLOB_CAP} more matches]`;
-  return lines;
+export function makeHandler(config: LlmLocalToolsConfig) {
+  return async function handler(args: GlobArgs, _ctx: unknown): Promise<string> {
+    const cwd = resolvePath(args.cwd ?? ".");
+    const useGitignore = hasGitRoot(cwd);
+    let ig: IgnoreSet | null = null;
+    if (useGitignore) {
+      try {
+        const text = await readFile(join(cwd, ".gitignore"), "utf8");
+        ig = compileGitignore(text);
+      } catch { ig = { patterns: [] }; }
+    }
+    const collected: { abs: string; mtime: number }[] = [];
+    await walk(cwd, cwd, ig, collected);
+    const re = compileGlob(args.pattern);
+    const matches = collected.filter(f => re.test(relative(cwd, f.abs).split(sep).join("/")));
+    matches.sort((a, b) => b.mtime - a.mtime);
+    const total = matches.length;
+    const shown = matches.slice(0, config.globCap).map(m => m.abs);
+    const lines = shown.join("\n");
+    if (total > config.globCap) return `${lines}\n... [truncated: ${total - config.globCap} more matches]`;
+    return lines;
+  };
 }
+
+// Default handler closure-bound to DEFAULT_CONFIG so per-tool tests work
+// without threading config through the import site.
+export const handler = makeHandler(DEFAULT_CONFIG);

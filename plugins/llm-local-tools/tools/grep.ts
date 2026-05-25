@@ -3,7 +3,9 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import type { ToolSchema } from "llm-contracts/public";
-import { resolvePath, GREP_DEFAULT_MAX } from "../util.ts";
+import { resolvePath } from "../util.ts";
+import { DEFAULT_CONFIG } from "../config.ts";
+import type { LlmLocalToolsConfig } from "../public.d.ts";
 
 export const schema: ToolSchema = {
   name: "grep",
@@ -76,18 +78,26 @@ async function walkFiles(root: string, out: string[]): Promise<void> {
   }
 }
 
-export function makeHandler(opts: { rgPath: string | null }) {
+export interface GrepHandlerOpts {
+  /** Override ripgrep probe — `null` forces JS fallback, omit/undefined to probe lazily. */
+  rgPath?: string | null;
+  /** Effective config. Defaults to DEFAULT_CONFIG. */
+  config?: LlmLocalToolsConfig;
+}
+
+export function makeHandler(opts: GrepHandlerOpts = {}) {
+  const config = opts.config ?? DEFAULT_CONFIG;
   return async function handler(args: GrepArgs, ctx: any): Promise<string> {
     const rg = opts.rgPath !== undefined ? opts.rgPath : probeRgOnce();
-    if (rg) return runRipgrep(args, rg, ctx);
-    return runJsFallback(args);
+    if (rg) return runRipgrep(args, rg, ctx, config);
+    return runJsFallback(args, config);
   };
 }
 
-function runRipgrep(args: GrepArgs, rgPath: string, ctx: any): Promise<string> {
+function runRipgrep(args: GrepArgs, rgPath: string, ctx: any, config: LlmLocalToolsConfig): Promise<string> {
   const root = resolvePath(args.path ?? ".");
   const mode = args.output_mode ?? "content";
-  const maxResults = Math.max(1, args.max_results ?? GREP_DEFAULT_MAX);
+  const maxResults = Math.max(1, args.max_results ?? config.grepDefaultMax);
   const ctxLines = Math.max(0, args.context ?? 0);
 
   const argv: string[] = [
@@ -153,12 +163,12 @@ function runRipgrep(args: GrepArgs, rgPath: string, ctx: any): Promise<string> {
   });
 }
 
-async function runJsFallback(args: GrepArgs): Promise<string> {
+async function runJsFallback(args: GrepArgs, config: LlmLocalToolsConfig): Promise<string> {
   const root = resolvePath(args.path ?? ".");
   const flags = args.case_insensitive ? "i" : "";
   const re = new RegExp(args.pattern, flags);
   const mode = args.output_mode ?? "content";
-  const maxResults = Math.max(1, args.max_results ?? GREP_DEFAULT_MAX);
+  const maxResults = Math.max(1, args.max_results ?? config.grepDefaultMax);
   const ctxLines = Math.max(0, args.context ?? 0);
   const globRe = args.glob ? compileGlob(args.glob) : null;
 
@@ -217,5 +227,5 @@ async function runJsFallback(args: GrepArgs): Promise<string> {
   return out.join("\n");
 }
 
-// Default handler — probes rg lazily and uses it when available.
-export const handler = makeHandler({ rgPath: undefined as any });
+// Default handler — probes rg lazily and uses DEFAULT_CONFIG.
+export const handler = makeHandler();

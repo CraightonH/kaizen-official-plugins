@@ -19,9 +19,8 @@ export interface InputBoxProps {
   copyToClipboard?: (text: string) => Promise<CopyResult>;
 }
 
-// Window during which a second Ctrl+C exits. After this, the next press
-// re-arms instead of exiting — matches Claude Code's behavior.
-const CTRL_C_EXIT_WINDOW_MS = 2000;
+// Window during which a second Ctrl+C exits is now config-driven; see
+// snap.config.ctrlCExitWindowMs below.
 
 // Naive linear scan: returns true if `pos` falls inside an unbalanced
 // quote / backtick region starting from column 0.
@@ -314,7 +313,7 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, sources, th
         return;
       }
       if (ctrlCTimer.current) clearTimeout(ctrlCTimer.current);
-      ctrlCTimer.current = setTimeout(() => { setCtrlCArmed(false); ctrlCTimer.current = null; }, CTRL_C_EXIT_WINDOW_MS);
+      ctrlCTimer.current = setTimeout(() => { setCtrlCArmed(false); ctrlCTimer.current = null; }, snap.config.ctrlCExitWindowMs);
       setCtrlCArmed(true);
       // Cancel an in-flight turn and clear any pending input buffer so the
       // user starts from a clean state on the next prompt.
@@ -629,7 +628,7 @@ export const InputBox: React.FC<InputBoxProps> = ({ store, registry, sources, th
       {ctrlCArmed && (
         <Text color={theme.noticeColor} dimColor>Press Ctrl-C again to exit</Text>
       )}
-      {popup && <CompletionPopup popup={popup} noticeColor={theme.noticeColor} />}
+      {popup && <CompletionPopup popup={popup} noticeColor={theme.noticeColor} maxVisible={snap.config.completionMaxVisible} />}
     </Box>
   );
 };

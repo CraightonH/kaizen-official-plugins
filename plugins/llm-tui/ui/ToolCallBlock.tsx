@@ -11,9 +11,16 @@ export interface ToolCallBlockProps {
   entry: ToolCallEntry;
   registry: ToolRendererRegistry;
   theme: UiTheme;
+  /**
+   * Char cap for the one-line preview text rendered alongside the tool's
+   * collapsed summary. Optional so existing tests can keep passing this
+   * component without threading config through; falls back to the
+   * DEFAULT_CONFIG.toolPreviewChars baked into util.ts.
+   */
+  previewMax?: number;
 }
 
-export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ entry, registry, theme }) => {
+export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ entry, registry, theme, previewMax }) => {
   const [frame, setFrame] = useState(0);
   useEffect(() => {
     if (entry.status !== "running") return;
@@ -22,7 +29,7 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ entry, registry, t
   }, [entry.status]);
 
   const renderer = registry.lookup(entry.name);
-  const summary = renderer ? renderer.collapsedSummary(entry.args) : defaultCollapsedSummary(entry.args);
+  const summary = renderer ? renderer.collapsedSummary(entry.args) : defaultCollapsedSummary(entry.args, previewMax);
 
   let glyph: string;
   let glyphColor = theme.outputColor;
@@ -42,7 +49,7 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ entry, registry, t
   // — the ⎿ block already shows the same content, more legibly. Errors keep
   // the trail (errorMessage) since the expansion is usually null for error cases.
   const resultPreview = entry.status === "done" && !expanded && !hasActivity
-    ? (entry.stdout && entry.stdout.length > 0 ? defaultResultPreview(entry.stdout) : defaultResultPreview(entry.result))
+    ? (entry.stdout && entry.stdout.length > 0 ? defaultResultPreview(entry.stdout, previewMax) : defaultResultPreview(entry.result, previewMax))
     : "";
   const trail =
     entry.status === "error" && entry.errorMessage ? ` — ${entry.errorMessage}` :

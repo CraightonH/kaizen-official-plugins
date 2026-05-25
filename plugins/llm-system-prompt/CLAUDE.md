@@ -5,16 +5,17 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 ## Module map
 
 ```
-index.ts        Plugin lifecycle: consumes events:vocabulary, wires service, registers identity at p=10,
+index.ts        Plugin lifecycle: consumes events:vocabulary + config:store, wires service, registers identity at p=10,
                 and registers slash commands when slash:registry is present.
                 The only file that touches `ctx`.
+config.ts       DEFAULT_CONFIG (frozen) + CONFIG_SCHEMA for config:store. Plain values + FieldSchema map.
 registry.ts     createRegistry({ emit }) → SystemPromptServiceImpl. Pure logic. Owns generation counter
                 and assembly cache. Handle-scoped ownership: each register() returns an unregister/bumpGeneration handle.
-identity.ts     resolveIdentity({ globalPath, projectPath, env? }) → { section, reload }. Pure logic.
-                Caches file contents in closure; date is interpolated per render() (not cached).
+identity.ts     resolveIdentity({ globalPath, projectPath, enabled?, projectHeader?, fallbackPrefix? }) → { section, reload }.
+                Pure logic. Caches file contents in closure; date is interpolated per render() (not cached).
 slash.ts        makePromptSlashHandlers({ registry, reloadIdentity }) → { show, reload, disable, enable }.
                 Pure factory; no state.
-public.d.ts     Exported types — SystemPromptSection, RegisteredSection, SystemPromptService.
+public.d.ts     Exported types — SystemPromptSection, RegisteredSection, SystemPromptService + plugin-internal LlmSystemPromptConfig.
                 The canonical service contract.
 ```
 
@@ -53,9 +54,15 @@ Use a namespaced id (`plugin-name:section-name`) to avoid collisions.
 
 ## Editing identity behavior
 
-`identity.ts` is intentionally narrow — global+project file merge, env kill-switch, fallback. Don't add features here; if a peer plugin needs different behavior, it should register its own section instead of changing identity.
+`identity.ts` is intentionally narrow — global+project file merge, `enabled` kill-switch, fallback. Don't add features here; if a peer plugin needs different behavior, it should register its own section instead of changing identity.
 
-The `FALLBACK_TEMPLATE` is the prompt users see when neither file exists. Treat changes to it as user-visible — update tests and document the new wording.
+The built-in fallback prompt (composed in `buildFallback(fallbackPrefix, date)`) is the prompt users see when neither file exists. The `fallbackPrefix` is user-configurable via `config:store`; the rest of the template (date stamping + tools/skills guidance) is hardcoded. Treat changes to the template as user-visible — update tests and document the new wording.
+
+## Configuration via `config:store`
+
+The plugin registers `llm-system-prompt` with `config:store` at setup. Five fields: `enabled`, `globalPath`, `projectPath`, `projectHeader`, `fallbackPrefix`. Defaults and schema live in `config.ts`.
+
+Config is read once at setup. There is no `watch()` — identity file reloads happen via the explicit `/prompt:reload` (or `prompt_reload` tool) contract. Changes to the config fields themselves require a harness restart to take effect.
 
 ## Testing
 

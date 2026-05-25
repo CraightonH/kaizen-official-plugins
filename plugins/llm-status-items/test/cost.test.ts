@@ -1,56 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import { loadRateTable, tokensToCents, formatDollars, type CostDeps } from "../cost.ts";
-
-const FIXTURE = resolve(import.meta.dir, "fixtures/cost-table.json");
-
-function makeDeps(overrides: Partial<CostDeps> = {}): CostDeps {
-  return {
-    home: "/home/u",
-    readFile: async () => { throw Object.assign(new Error("ENOENT"), { code: "ENOENT" }); },
-    ...overrides,
-  };
-}
-
-describe("loadRateTable", () => {
-  it("returns empty rates when file is absent", async () => {
-    const t = await loadRateTable(makeDeps());
-    expect(t).toEqual({});
-  });
-
-  it("loads rates from a real file", async () => {
-    const t = await loadRateTable(makeDeps({ readFile: () => readFile(FIXTURE, "utf8") }));
-    expect(t["gpt-4.1-mini"]).toEqual({ promptCentsPerMTok: 15, completionCentsPerMTok: 60 });
-    expect(t["gpt-4.1"]).toEqual({ promptCentsPerMTok: 200, completionCentsPerMTok: 800 });
-  });
-
-  it("throws on malformed JSON", async () => {
-    await expect(
-      loadRateTable(makeDeps({ readFile: async () => "{not-json" })),
-    ).rejects.toThrow(/llm-status-items.*cost-table.*malformed/i);
-  });
-
-  it("throws when rates is not an object", async () => {
-    await expect(
-      loadRateTable(makeDeps({ readFile: async () => JSON.stringify({ rates: [] }) })),
-    ).rejects.toThrow(/rates.*object/i);
-  });
-
-  it("throws when a rate entry is missing numeric prices", async () => {
-    await expect(
-      loadRateTable(makeDeps({ readFile: async () => JSON.stringify({ rates: { "bad-model": { promptCentsPerMTok: "free" } } }) })),
-    ).rejects.toThrow(/bad-model.*promptCentsPerMTok.*completionCentsPerMTok/i);
-  });
-
-  it("uses ~/.kaizen/plugins/llm-status-items/cost-table.json by default", async () => {
-    let path = "";
-    await loadRateTable(makeDeps({
-      readFile: async (p: string) => { path = p; return JSON.stringify({ rates: {} }); },
-    }));
-    expect(path).toBe("/home/u/.kaizen/plugins/llm-status-items/cost-table.json");
-  });
-});
+import { tokensToCents, formatDollars } from "../cost.ts";
 
 describe("tokensToCents", () => {
   const rates = {
@@ -74,9 +23,14 @@ describe("tokensToCents", () => {
 });
 
 describe("formatDollars", () => {
-  it("formats cents with 4 decimal places", () => {
-    expect(formatDollars(0)).toBe("$0.0000");
-    expect(formatDollars(1.23)).toBe("$0.0123");
-    expect(formatDollars(12345)).toBe("$123.4500");
+  it("formats cents with the requested decimal places", () => {
+    expect(formatDollars(0, 4)).toBe("$0.0000");
+    expect(formatDollars(1.23, 4)).toBe("$0.0123");
+    expect(formatDollars(12345, 4)).toBe("$123.4500");
+  });
+
+  it("honors a different decimal precision", () => {
+    expect(formatDollars(12345, 2)).toBe("$123.45");
+    expect(formatDollars(0, 0)).toBe("$0");
   });
 });

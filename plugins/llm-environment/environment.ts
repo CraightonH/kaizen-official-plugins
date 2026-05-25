@@ -5,7 +5,7 @@ import type { EnvironmentSnapshot, GitSnapshot } from "./public";
 
 export interface CaptureOptions {
   cwd: string;
-  env?: Record<string, string | undefined>;
+  enabled?: boolean;
 }
 
 export interface SectionLike {
@@ -67,7 +67,7 @@ function readGitAt(gitPath: string): GitSnapshot {
 }
 
 export function captureEnvironment(opts: CaptureOptions): EnvironmentHandle {
-  const env = opts.env ?? process.env;
+  const enabled = opts.enabled ?? true;
   let snapshot: EnvironmentSnapshot = {
     cwd: opts.cwd,
     platform: `${process.platform} (${release()})`,
@@ -83,7 +83,7 @@ export function captureEnvironment(opts: CaptureOptions): EnvironmentHandle {
   }
 
   function render(): string {
-    if (env.KAIZEN_ENVIRONMENT_DISABLE === "1") return "";
+    if (!enabled) return "";
     const lines: string[] = [
       `- Working directory: ${snapshot.cwd}`,
       `- Platform: ${snapshot.platform}`,

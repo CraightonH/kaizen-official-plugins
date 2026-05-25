@@ -3,15 +3,8 @@ import { stat as fsStat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, isAbsolute, resolve, sep } from "node:path";
 
-export const MAX_READ_BYTES = 50 * 1024 * 1024;
-export const READ_CAP_BYTES = 256 * 1024;
-export const READ_CAP_LINES = 2000;
-export const BASH_OUTPUT_CAP = 256 * 1024;
-export const GREP_DEFAULT_MAX = 200;
-export const GLOB_CAP = 1000;
-export const WEB_FETCH_CAP_BYTES = 512 * 1024;
-export const WEB_FETCH_DOWNLOAD_CAP_BYTES = 50 * 1024 * 1024;
-export const WEB_FETCH_DEFAULT_TIMEOUT_MS = 30000;
+// Size-cap constants have moved to ./config.ts (DEFAULT_CONFIG). Tools receive
+// their effective caps via a closure-bound LlmLocalToolsConfig from makeHandler().
 
 const BINARY_CT_PREFIXES = ["image/", "audio/", "video/", "font/"];
 const BINARY_CT_EXACT = new Set([

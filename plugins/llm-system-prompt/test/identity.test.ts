@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { join } from "node:path";
-import { resolveIdentity, FALLBACK_PREFIX } from "../identity.ts";
+import { resolveIdentity } from "../identity.ts";
+
+const FALLBACK_PREFIX =
+  "You are a helpful assistant running locally via the kaizen local harness.";
 
 const FIXTURES = join(import.meta.dir, "fixtures");
 
@@ -78,12 +81,12 @@ describe("identity — section shape", () => {
   });
 });
 
-describe("identity — env disable", () => {
-  it("KAIZEN_SYSTEM_PROMPT_DISABLE=1 renders empty", async () => {
+describe("identity — config disable", () => {
+  it("enabled: false renders empty", async () => {
     const r = resolveIdentity({
       globalPath: join(FIXTURES, "identity-global-only", "system-prompt.md"),
       projectPath: join(FIXTURES, "does-not-exist", "system-prompt.md"),
-      env: { KAIZEN_SYSTEM_PROMPT_DISABLE: "1" },
+      enabled: false,
     });
     await r.reload();
     const out = await r.section.render();

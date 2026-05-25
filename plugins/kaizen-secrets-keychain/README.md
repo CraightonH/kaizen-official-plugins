@@ -26,8 +26,9 @@ cannot be suppressed by a CLI caller.
 ## Service constant
 
 All entries created by this plugin use the keychain service
-`kaizen-secrets`. Account names take the form `<plugin>/<field>`. You can
-inspect entries with:
+`kaizen-secrets` by default. Override via `/config` (field
+`keychainService`); old entries are not migrated. Account names take the
+form `<plugin>/<field>`. You can inspect entries with:
 
 ```
 security dump-keychain | grep '"svce"<blob>="kaizen-secrets"'

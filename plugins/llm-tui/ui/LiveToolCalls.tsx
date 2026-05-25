@@ -27,7 +27,7 @@ export const LiveToolCalls: React.FC<LiveToolCallsProps> = ({ store, registry, t
     <Box flexDirection="column">
       {[...snap.liveToolCalls.values()].map((entry) => (
         <Box key={entry.callId} flexDirection="column">
-          <ToolCallBlock entry={entry} registry={registry} theme={theme} />
+          <ToolCallBlock entry={entry} registry={registry} theme={theme} previewMax={snap.config.toolPreviewChars} />
           {entry.stdout && (
             <Box flexDirection="column" paddingLeft={2}>
               {entry.stdout.split("\n").map((line, i) => (

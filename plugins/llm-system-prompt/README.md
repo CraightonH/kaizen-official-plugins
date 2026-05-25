@@ -70,13 +70,15 @@ Events are declared in the `llm-events` VOCAB (`PROMPT_REBUILT`, `PROMPT_RELOAD`
 
 ## Configuration
 
-Environment variables (read at setup time):
+Configured via `config:store` (`~/.kaizen/harnesses/<key>/config.json`, section `"llm-system-prompt"`). Read once at setup; use `/prompt:reload` to re-read identity files from disk. Changes to config fields require a harness restart.
 
-| Var | Effect |
-|-----|--------|
-| `KAIZEN_SYSTEM_PROMPT_GLOBAL` | Override global file path. |
-| `KAIZEN_SYSTEM_PROMPT_PROJECT` | Override project file path. |
-| `KAIZEN_SYSTEM_PROMPT_DISABLE=1` | Identity section renders empty (kill switch). |
+| Field | Default | Effect |
+|-------|---------|--------|
+| `enabled` | `true` | When `false`, identity section renders empty (kill switch). |
+| `globalPath` | `"~/.kaizen/system-prompt.md"` | Global identity markdown path. Tilde-expanded. |
+| `projectPath` | `"./.kaizen/system-prompt.md"` | Project identity markdown path. Relative paths resolve against the harness cwd. |
+| `projectHeader` | `"## Project context"` | Heading between global and project bodies. Empty string drops the heading. |
+| `fallbackPrefix` | `"You are a helpful assistant running locally via the kaizen local harness."` | Prefix sentence used in the built-in fallback when neither identity file exists. |
 
 ## Permissions
 

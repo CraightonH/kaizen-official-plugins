@@ -1,13 +1,18 @@
 import { makePromptToolHandlers } from "./tool.ts";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import type { KaizenPlugin, PluginContext } from "kaizen/types";
 import { createRegistry, type SystemPromptServiceImpl } from "./registry.ts";
 import { resolveIdentity } from "./identity.ts";
 import { makePromptSlashHandlers } from "./slash.ts";
-import type { SystemPromptService } from "llm-contracts/public";
-import type { SlashRegistryService } from "llm-contracts/public";
-import type { ToolsRegistryService } from "llm-contracts/public";
+import type {
+  ConfigStoreService,
+  SystemPromptService,
+  SlashRegistryService,
+  ToolsRegistryService,
+} from "llm-contracts/public";
+import type { LlmSystemPromptConfig } from "./public.d.ts";
+import { DEFAULT_CONFIG, CONFIG_SCHEMA } from "./config.ts";
 
 interface PromptEventVocabulary {
   PROMPT_REBUILT: string;
@@ -19,25 +24,38 @@ type RuntimeHints = {
   cwd?: string;
 };
 
-function readEnv(ctx: RuntimeHints, key: string): string | undefined {
-  const fromCtx = ctx.env?.[key];
-  if (typeof fromCtx === "string" && fromCtx.length > 0) return fromCtx;
-  const fromProc = process.env[key];
-  return fromProc && fromProc.length > 0 ? fromProc : undefined;
+function expandTilde(path: string, home: string): string {
+  if (path === "~") return home;
+  if (path.startsWith("~/")) return join(home, path.slice(2));
+  return path;
 }
 
-function resolveGlobalPath(ctx: RuntimeHints): string {
-  const override = readEnv(ctx, "KAIZEN_SYSTEM_PROMPT_GLOBAL");
-  if (override !== undefined) return override;
-  const home = readEnv(ctx, "HOME") ?? homedir();
-  return join(home, ".kaizen", "system-prompt.md");
+function resolveGlobalPath(runtime: RuntimeHints, configured: string): string {
+  const home =
+    (typeof runtime.env?.HOME === "string" && runtime.env.HOME.length > 0
+      ? runtime.env.HOME
+      : undefined) ?? homedir();
+  const expanded = expandTilde(configured, home);
+  if (isAbsolute(expanded)) return expanded;
+  const cwd =
+    typeof runtime.cwd === "string" && runtime.cwd.length > 0
+      ? runtime.cwd
+      : process.cwd();
+  return join(cwd, expanded);
 }
 
-function resolveProjectPath(ctx: RuntimeHints): string {
-  const override = readEnv(ctx, "KAIZEN_SYSTEM_PROMPT_PROJECT");
-  if (override !== undefined) return override;
-  const cwd = typeof ctx.cwd === "string" && ctx.cwd.length > 0 ? ctx.cwd : process.cwd();
-  return join(cwd, ".kaizen", "system-prompt.md");
+function resolveProjectPath(runtime: RuntimeHints, configured: string): string {
+  const home =
+    (typeof runtime.env?.HOME === "string" && runtime.env.HOME.length > 0
+      ? runtime.env.HOME
+      : undefined) ?? homedir();
+  const expanded = expandTilde(configured, home);
+  if (isAbsolute(expanded)) return expanded;
+  const cwd =
+    typeof runtime.cwd === "string" && runtime.cwd.length > 0
+      ? runtime.cwd
+      : process.cwd();
+  return join(cwd, expanded);
 }
 
 function safeUseService<T>(ctx: PluginContext, name: string): T | undefined {
@@ -58,14 +76,35 @@ const plugin: KaizenPlugin = {
   permissions: { tier: "unscoped" },
   services: {
     provides: ["prompt:registry"],
-    consumes: ["events:vocabulary", "tools:registry"],
+    consumes: ["events:vocabulary", "config:store", "tools:registry"],
   },
 
   async setup(ctx) {
     const runtime = ctx as PluginContext & RuntimeHints;
+    const log = (m: string) => ctx.log?.(m);
     ctx.consumeService("events:vocabulary");
     const vocab = ctx.useService<PromptEventVocabulary>("events:vocabulary");
     // prompt:rebuilt / prompt:reload are defined by llm-events (canonical VOCAB owner).
+
+    // Load config (topo-hint optional).
+    let config: LlmSystemPromptConfig = { ...DEFAULT_CONFIG };
+    const cfgSvc = safeUseService<ConfigStoreService>(ctx, "config:store");
+    if (cfgSvc) {
+      try {
+        cfgSvc.register<LlmSystemPromptConfig>({
+          plugin: "llm-system-prompt",
+          defaults: { ...DEFAULT_CONFIG },
+          schema: CONFIG_SCHEMA,
+        });
+        config = cfgSvc.get<LlmSystemPromptConfig>("llm-system-prompt");
+      } catch (e) {
+        log(
+          `llm-system-prompt: config:store register failed (${(e as Error).message}); using defaults`,
+        );
+      }
+    } else {
+      log("llm-system-prompt: config:store unavailable; using DEFAULT_CONFIG");
+    }
 
     const registry: SystemPromptServiceImpl = createRegistry({
       events: { promptRebuilt: vocab.PROMPT_REBUILT },
@@ -77,9 +116,11 @@ const plugin: KaizenPlugin = {
     ctx.provideService<SystemPromptService>("prompt:registry", registry);
 
     const identity = resolveIdentity({
-      globalPath: resolveGlobalPath(runtime),
-      projectPath: resolveProjectPath(runtime),
-      env: runtime.env ?? process.env,
+      globalPath: resolveGlobalPath(runtime, config.globalPath),
+      projectPath: resolveProjectPath(runtime, config.projectPath),
+      enabled: config.enabled,
+      projectHeader: config.projectHeader,
+      fallbackPrefix: config.fallbackPrefix,
     });
     await identity.reload();
     identityHandle = registry.register(identity.section);

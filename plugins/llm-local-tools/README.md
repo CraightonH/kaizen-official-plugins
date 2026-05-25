@@ -170,7 +170,22 @@ Binary content types — `image/*`, `audio/*`, `video/*`, `font/*`, `application
 
 ## Configuration
 
-No environment variables. All limits live in `util.ts` as named constants (`MAX_READ_BYTES`, `READ_CAP_BYTES`, `READ_CAP_LINES`, `BASH_OUTPUT_CAP`, `GREP_DEFAULT_MAX`, `GLOB_CAP`, `WEB_FETCH_CAP_BYTES`, `WEB_FETCH_DOWNLOAD_CAP_BYTES`, `WEB_FETCH_DEFAULT_TIMEOUT_MS`).
+All limits are registered with `config:store` under the `llm-local-tools` section. Edit `~/.kaizen/harnesses/<key>/config.json` (or the project-scoped equivalent) to override. Fields:
+
+| Field | Default | What it controls |
+|---|---|---|
+| `readMaxBytes` | 52428800 (50 MB) | `read` hard refusal threshold |
+| `readCapBytes` | 262144 (256 KB) | `read` returned-body truncation cap |
+| `readCapLines` | 2000 | `read` line cap + default `limit` |
+| `bashOutputCap` | 262144 (256 KB) | `bash` middle-truncation threshold |
+| `bashDefaultTimeoutMs` | 120000 | `bash` default `timeout` (per-call hard cap 600000 stays in the schema) |
+| `grepDefaultMax` | 200 | `grep` default `max_results` |
+| `globCap` | 1000 | `glob` hard cap on result count |
+| `webFetchCapBytes` | 524288 (512 KB) | `web_fetch` default in-context body cap |
+| `webFetchDownloadCapBytes` | 52428800 (50 MB) | `web_fetch` hard cap on `save_to` file size |
+| `webFetchDefaultTimeoutMs` | 30000 | `web_fetch` default `timeout_ms` (per-call hard cap 120000 stays in the schema) |
+
+Schema `description`/`maximum:` strings on the tool surface reflect the static defaults and do not retroactively update when the user overrides a value. The schema ceilings on `bash.timeout` / `web_fetch.timeout_ms` are hardcoded guards above any configurable default. No environment variables.
 
 ## Permissions
 

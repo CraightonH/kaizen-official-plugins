@@ -42,14 +42,37 @@ function makeFakeSlashRegistry() {
   return { service, registered };
 }
 
+function makeFakeConfigStore(overrides: Record<string, unknown> = {}) {
+  // Minimal config:store stand-in. Merges per-plugin overrides onto whatever
+  // `register()` declared as defaults; mirrors enough of the real store for
+  // these tests without spinning up kaizen-config.
+  const sections = new Map<string, { defaults: Record<string, unknown> }>();
+  return {
+    register(spec: { plugin: string; defaults: Record<string, unknown> }) {
+      sections.set(spec.plugin, { defaults: spec.defaults });
+    },
+    get(plugin: string) {
+      const sec = sections.get(plugin);
+      const defaults = sec?.defaults ?? {};
+      return { ...defaults, ...(overrides ?? {}) };
+    },
+    set: async () => {},
+    watch: () => () => {},
+    list: () => [],
+    ready: async () => {},
+    unset: async () => {},
+    getSpec: () => undefined,
+  };
+}
+
 function makeCtx(opts: {
   cwd?: string;
-  env?: Record<string, string | undefined>;
+  config?: Record<string, unknown>;
   toolsRegistry?: any;
   promptSystem?: any;
   slashRegistry?: any;
+  configStore?: any;
 } = {}) {
-  const env = { ...process.env, HOME: "/tmp/does-not-exist", ...opts.env };
   const subscribers: Record<string, Function[]> = {};
   const provided: Record<string, unknown> = {};
   const emitted: { name: string; payload: unknown }[] = [];
@@ -58,10 +81,13 @@ function makeCtx(opts: {
   if (opts.toolsRegistry) services["tools:registry"] = opts.toolsRegistry;
   if (opts.promptSystem) services["prompt:registry"] = opts.promptSystem;
   if (opts.slashRegistry) services["slash:registry"] = opts.slashRegistry;
+  // Always wire a fake config:store so the plugin reads its defaults (plus
+  // any per-test overrides) instead of falling all the way back to
+  // DEFAULT_CONFIG.userRoot pointing at the real ~/.kaizen/skills.
+  services["config:store"] = opts.configStore ?? makeFakeConfigStore(opts.config ?? {});
 
   const ctx: any = {
     cwd: opts.cwd,
-    env,
     log: mock(() => {}),
     config: {},
     defineEvent: (n: string) => { definedEvents.push(n); },
@@ -100,7 +126,10 @@ describe("plugin metadata", () => {
 describe("plugin setup — empty environment", () => {
   it("provides skills:registry with list()=[] and emits skill:available-changed once", async () => {
     const ps = makePromptSystem();
-    const { ctx, provided, emitted } = makeCtx({ promptSystem: ps.service });
+    const { ctx, provided, emitted } = makeCtx({
+      config: { userRoot: "/tmp/does-not-exist/llm-skills-empty" },
+      promptSystem: ps.service,
+    });
     await plugin.setup(ctx);
     const reg = provided["skills:registry"] as any;
     expect(reg).toBeDefined();
@@ -111,11 +140,11 @@ describe("plugin setup — empty environment", () => {
   });
 });
 
-describe("plugin setup — populated user root via env override", () => {
-  it("registers skills from KAIZEN_LLM_SKILLS_PATH", async () => {
+describe("plugin setup — populated user root via config override", () => {
+  it("registers skills from config.userRoot", async () => {
     const ps = makePromptSystem();
     const { ctx, provided } = makeCtx({
-      env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
+      config: { userRoot: join(FIXTURES, "ok-flat") },
       promptSystem: ps.service,
     });
     await plugin.setup(ctx);
@@ -138,7 +167,7 @@ describe("plugin setup — populated user root via env override", () => {
   it("emits skill:available-changed exactly once on initial scan when skills exist", async () => {
     const ps = makePromptSystem();
     const { ctx, emitted } = makeCtx({
-      env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
+      config: { userRoot: join(FIXTURES, "ok-flat") },
       promptSystem: ps.service,
     });
     await plugin.setup(ctx);
@@ -152,7 +181,7 @@ describe("plugin setup — prompt:system section registration", () => {
   it("registers section with id llm-skills:available, priority 160, title Available skills", async () => {
     const ps = makePromptSystem();
     const { ctx } = makeCtx({
-      env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
+      config: { userRoot: join(FIXTURES, "ok-flat") },
       promptSystem: ps.service,
     });
     await plugin.setup(ctx);
@@ -166,7 +195,7 @@ describe("plugin setup — prompt:system section registration", () => {
   it("render returns block with preamble + bullets (no ## heading)", async () => {
     const ps = makePromptSystem();
     const { ctx } = makeCtx({
-      env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
+      config: { userRoot: join(FIXTURES, "ok-flat") },
       promptSystem: ps.service,
     });
     await plugin.setup(ctx);
@@ -180,7 +209,10 @@ describe("plugin setup — prompt:system section registration", () => {
 
   it("render returns empty string when registry is empty", async () => {
     const ps = makePromptSystem();
-    const { ctx } = makeCtx({ promptSystem: ps.service });
+    const { ctx } = makeCtx({
+      config: { userRoot: "/tmp/does-not-exist/llm-skills-empty" },
+      promptSystem: ps.service,
+    });
     await plugin.setup(ctx);
     const section = ps.sections.find(s => s.id === "llm-skills:available");
     const rendered = await section!.render();
@@ -188,7 +220,9 @@ describe("plugin setup — prompt:system section registration", () => {
   });
 
   it("emits harness:error and skips section when prompt:registry unavailable", async () => {
-    const { ctx, emitted } = makeCtx();
+    const { ctx, emitted } = makeCtx({
+      config: { userRoot: "/tmp/does-not-exist/llm-skills-empty" },
+    });
     await plugin.setup(ctx);
     const errors = emitted.filter(e => e.name === "harness:error");
     expect(errors.length).toBeGreaterThan(0);
@@ -199,7 +233,7 @@ describe("plugin setup — prompt:system section registration", () => {
   it("calls bumpGeneration after initial scan when skills are present", async () => {
     const ps = makePromptSystem();
     const { ctx } = makeCtx({
-      env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
+      config: { userRoot: join(FIXTURES, "ok-flat") },
       promptSystem: ps.service,
     });
     await plugin.setup(ctx);
@@ -210,7 +244,10 @@ describe("plugin setup — prompt:system section registration", () => {
 describe("plugin setup — no llm:before-call subscription", () => {
   it("does not subscribe to llm:before-call", async () => {
     const ps = makePromptSystem();
-    const { ctx, subscribers } = makeCtx({ promptSystem: ps.service });
+    const { ctx, subscribers } = makeCtx({
+      config: { userRoot: "/tmp/does-not-exist/llm-skills-empty" },
+      promptSystem: ps.service,
+    });
     await plugin.setup(ctx);
     expect(subscribers["llm:before-call"]).toBeUndefined();
   });
@@ -226,7 +263,7 @@ describe("plugin setup — load_skill registered into tools:registry", () => {
     };
     const ps = makePromptSystem();
     const { ctx } = makeCtx({
-      env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
+      config: { userRoot: join(FIXTURES, "ok-flat") },
       toolsRegistry,
       promptSystem: ps.service,
     });
@@ -240,7 +277,10 @@ describe("plugin setup — load_skill registered into tools:registry", () => {
 
   it("boots without error when tools:registry is absent", async () => {
     const ps = makePromptSystem();
-    const { ctx, provided } = makeCtx({ promptSystem: ps.service });
+    const { ctx, provided } = makeCtx({
+      config: { userRoot: "/tmp/does-not-exist/llm-skills-empty" },
+      promptSystem: ps.service,
+    });
     await plugin.setup(ctx);
     expect(provided["skills:registry"]).toBeDefined();
   });
@@ -250,9 +290,9 @@ describe("plugin setup — turn:start throttled rescan", () => {
   it("rescans only once within the interval and again after it elapses", async () => {
     const ps = makePromptSystem();
     const { ctx, subscribers, emitted } = makeCtx({
-      env: {
-        KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat"),
-        KAIZEN_LLM_SKILLS_RESCAN_MS: "50",
+      config: {
+        userRoot: join(FIXTURES, "ok-flat"),
+        rescanIntervalMs: 50,
       },
       promptSystem: ps.service,
     });
@@ -274,9 +314,9 @@ describe("plugin setup — turn:start throttled rescan", () => {
     const ps = makePromptSystem();
     // Use a registry path that exists so initial scan loads something.
     const { ctx, subscribers } = makeCtx({
-      env: {
-        KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat"),
-        KAIZEN_LLM_SKILLS_RESCAN_MS: "1",
+      config: {
+        userRoot: join(FIXTURES, "ok-flat"),
+        rescanIntervalMs: 1,
       },
       promptSystem: ps.service,
     });
@@ -296,7 +336,10 @@ describe("plugin setup — turn:start throttled rescan", () => {
 describe("plugin setup — onChange bumpGeneration on programmatic register", () => {
   it("calls bumpGeneration when a programmatic skill is registered/unregistered", async () => {
     const ps = makePromptSystem();
-    const { ctx, provided } = makeCtx({ promptSystem: ps.service });
+    const { ctx, provided } = makeCtx({
+      config: { userRoot: "/tmp/does-not-exist/llm-skills-empty" },
+      promptSystem: ps.service,
+    });
     await plugin.setup(ctx);
     const reg = provided["skills:registry"] as any;
     const callsBefore = ps.bumpGeneration.mock.calls.length;
@@ -318,7 +361,7 @@ describe("plugin stop() — lifecycle cleanup", () => {
     };
     const ps = makePromptSystem();
     const { ctx } = makeCtx({
-      env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
+      config: { userRoot: join(FIXTURES, "ok-flat") },
       toolsRegistry,
       promptSystem: ps.service,
     });
@@ -338,7 +381,7 @@ describe("plugin stop() — lifecycle cleanup", () => {
     };
     const ps = makePromptSystem();
     const { ctx } = makeCtx({
-      env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
+      config: { userRoot: join(FIXTURES, "ok-flat") },
       toolsRegistry,
       promptSystem: ps.service,
     });
@@ -353,7 +396,10 @@ describe("plugin stop() — lifecycle cleanup", () => {
 describe("plugin setup — slash:registry absent", () => {
   it("runs cleanly without slash:registry; /skills:* commands not registered", async () => {
     const ps = makePromptSystem();
-    const { ctx } = makeCtx({ promptSystem: ps.service });
+    const { ctx } = makeCtx({
+      config: { userRoot: "/tmp/does-not-exist/llm-skills-empty" },
+      promptSystem: ps.service,
+    });
     await plugin.setup(ctx);
     // Plugin must not throw and must still stop cleanly.
     await plugin.stop!();
@@ -365,7 +411,11 @@ describe("plugin setup — slash:registry present", () => {
   it("registers /skills:list and /skills:get when slash:registry is available", async () => {
     const ps = makePromptSystem();
     const slash = makeFakeSlashRegistry();
-    const { ctx } = makeCtx({ promptSystem: ps.service, slashRegistry: slash.service });
+    const { ctx } = makeCtx({
+      config: { userRoot: "/tmp/does-not-exist/llm-skills-empty" },
+      promptSystem: ps.service,
+      slashRegistry: slash.service,
+    });
     await plugin.setup(ctx);
     const names = slash.registered.map((r) => r.name).sort();
     expect(names).toEqual(["skills:get", "skills:list"]);
@@ -386,7 +436,7 @@ describe("plugin setup — new_skill registered into tools:registry", () => {
     };
     const ps = makePromptSystem();
     const { ctx } = makeCtx({
-      env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
+      config: { userRoot: join(FIXTURES, "ok-flat") },
       toolsRegistry,
       promptSystem: ps.service,
     });
@@ -406,7 +456,7 @@ describe("plugin setup — new_skill registered into tools:registry", () => {
     };
     const ps = makePromptSystem();
     const { ctx } = makeCtx({
-      env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
+      config: { userRoot: join(FIXTURES, "ok-flat") },
       toolsRegistry,
       promptSystem: ps.service,
     });

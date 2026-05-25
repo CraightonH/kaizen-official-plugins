@@ -122,8 +122,8 @@ describe("llm-environment plugin", () => {
     await plugin.stop!();
   });
 
-  it("declares all three services in plugin.services.consumes for topo ordering", () => {
-    expect(plugin.services?.consumes).toEqual(["prompt:registry", "slash:registry", "tools:registry"]);
+  it("declares all four services in plugin.services.consumes for topo ordering", () => {
+    expect(plugin.services?.consumes).toEqual(["config:store", "prompt:registry", "slash:registry", "tools:registry"]);
   });
 
   it("registers /env:refresh when slash:registry is present", async () => {

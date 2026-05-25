@@ -1,10 +1,9 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { PopupState } from "../state/store.ts";
+import { DEFAULT_CONFIG } from "../config.ts";
 
-const MAX_VISIBLE = 8;
-
-export const CompletionPopup: React.FC<{ popup: PopupState; noticeColor: string }> = ({ popup, noticeColor }) => {
+export const CompletionPopup: React.FC<{ popup: PopupState; noticeColor: string; maxVisible?: number }> = ({ popup, noticeColor, maxVisible }) => {
   if (popup.items.length === 0) {
     return (
       <Box>
@@ -14,9 +13,10 @@ export const CompletionPopup: React.FC<{ popup: PopupState; noticeColor: string 
   }
 
   // Window the visible items around the selected index, anchored at top.
+  const cap = maxVisible ?? DEFAULT_CONFIG.completionMaxVisible;
   const total = popup.items.length;
-  const start = Math.min(Math.max(0, popup.selectedIndex - (MAX_VISIBLE - 1)), Math.max(0, total - MAX_VISIBLE));
-  const end = Math.min(total, start + MAX_VISIBLE);
+  const start = Math.min(Math.max(0, popup.selectedIndex - (cap - 1)), Math.max(0, total - cap));
+  const end = Math.min(total, start + cap);
   const visible = popup.items.slice(start, end);
   const hidden = total - visible.length;
 

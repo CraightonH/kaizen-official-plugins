@@ -1,6 +1,6 @@
 {
   "name": "llm-local-tools",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Built-in local-development toolset (filesystem + shell) for the local harness.",
   "type": "module",
   "exports": {

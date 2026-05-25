@@ -4,6 +4,8 @@ import type {
   UiPromptTextRequest,
   UiTheme,
 } from "llm-contracts/public";
+import type { LlmTuiConfig } from "../public.d.ts";
+import { DEFAULT_CONFIG } from "../config.ts";
 
 export type PromptSlice =
   | null
@@ -51,12 +53,19 @@ export interface ToolCallEntry {
    * Rolling buffer of recent activity lines from a sub-agent dispatch. Only
    * populated for `dispatch_agent` calls — the TUI subscribes to events scoped
    * to the child session and pushes formatted lines here. Capped at
-   * AGENT_ACTIVITY_CAP entries; older lines are discarded.
+   * LlmTuiConfig.agentActivityCap entries; older lines are discarded.
    */
   agentActivity?: string[];
 }
 
-export const AGENT_ACTIVITY_CAP = 5;
+/**
+ * Legacy default for the rolling sub-agent activity buffer. Retained as an
+ * exported constant for backward compatibility with consumers / tests that
+ * still reference it. The authoritative value lives on the per-store config
+ * (`LlmTuiConfig.agentActivityCap`); this constant matches the baked-in
+ * default in `DEFAULT_CONFIG`.
+ */
+export const AGENT_ACTIVITY_CAP = DEFAULT_CONFIG.agentActivityCap;
 
 export type TranscriptLine = PlainTranscriptLine | ToolCallEntry;
 export interface BusyState {
@@ -127,6 +136,13 @@ export interface TuiSnapshot {
   sourcesVersion: number;
   /** Current theme. Pushed in via setTheme(); read by UI components. */
   theme: UiTheme;
+  /**
+   * Full plugin config (theme fields + non-theme UX knobs). Pushed in via
+   * setConfig(); read by UI components for popup sizing, debounce windows,
+   * tool-preview limits, etc. Theme fields are duplicated on snapshot.theme
+   * for back-compat with existing UiThemeService consumers.
+   */
+  config: LlmTuiConfig;
 }
 
 export class TuiStore {
@@ -143,6 +159,7 @@ export class TuiStore {
   private _prompt: PromptSlice = null;
   private _sourcesVersion = 0;
   private _theme: UiTheme;
+  private _config: LlmTuiConfig;
   private _seq = 0;
 
   // Bracketed-paste registry: pasted content is stored here keyed by id; the
@@ -156,8 +173,13 @@ export class TuiStore {
   private _listeners = new Set<() => void>();
   private _snapshot: TuiSnapshot;
 
-  constructor(opts: { theme: UiTheme }) {
+  constructor(opts: { theme: UiTheme; config?: LlmTuiConfig }) {
     this._theme = opts.theme;
+    // When a full config isn't supplied (e.g. unit tests that only care about
+    // theme), fall back to baked-in defaults and overlay the caller-supplied
+    // theme on top so theme fields stay consistent across snapshot.theme and
+    // snapshot.config.
+    this._config = opts.config ?? { ...DEFAULT_CONFIG, ...opts.theme };
     this._snapshot = this._build();
   }
 
@@ -251,7 +273,7 @@ export class TuiStore {
 
   /**
    * Push a sub-agent activity line onto the rolling buffer for a live
-   * dispatch_agent call. Caps to AGENT_ACTIVITY_CAP; oldest entries drop.
+   * dispatch_agent call. Caps to LlmTuiConfig.agentActivityCap; oldest entries drop.
    * No-op if the callId is not currently a live tool call.
    */
   appendAgentActivity(callId: string, line: string): void {
@@ -259,7 +281,7 @@ export class TuiStore {
     if (!cur) return;
     const next: ToolCallEntry = {
       ...cur,
-      agentActivity: [...(cur.agentActivity ?? []), line].slice(-AGENT_ACTIVITY_CAP),
+      agentActivity: [...(cur.agentActivity ?? []), line].slice(-this._config.agentActivityCap),
     };
     this._liveToolCalls = new Map(this._liveToolCalls).set(callId, next);
     this._emit();
@@ -618,6 +640,30 @@ export class TuiStore {
 
   setTheme(next: UiTheme): void {
     this._theme = next;
+    // Keep snapshot.config's theme fields in sync so components reading from
+    // either surface see the same values.
+    this._config = { ...this._config, ...next };
+    this._emit();
+  }
+
+  /**
+   * Replace the full config (theme + non-theme UX knobs). Updates both the
+   * theme projection on snapshot.theme and the full config on snapshot.config
+   * so a single config:store.watch() callback can drive both surfaces.
+   */
+  setConfig(next: LlmTuiConfig): void {
+    this._config = next;
+    // Project the theme subset by reference-stable extraction so existing
+    // UiThemeService.current()/snapshot.theme consumers continue to work.
+    this._theme = {
+      promptLabel: next.promptLabel,
+      promptColor: next.promptColor,
+      outputColor: next.outputColor,
+      noticeColor: next.noticeColor,
+      busyColor: next.busyColor,
+      statusBarColor: next.statusBarColor,
+      thoughtsMarkdown: next.thoughtsMarkdown,
+    };
     this._emit();
   }
 
@@ -636,6 +682,7 @@ export class TuiStore {
       prompt: this._prompt,
       sourcesVersion: this._sourcesVersion,
       theme: this._theme,
+      config: this._config,
     };
   }
 

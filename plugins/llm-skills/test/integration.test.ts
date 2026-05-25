@@ -43,6 +43,27 @@ function fakeToolsRegistry(emit: (e: string, p: unknown) => Promise<void>) {
   };
 }
 
+// Minimal config:store stand-in. Records per-plugin defaults via register()
+// and returns them merged with the per-test override map on get().
+function makeFakeConfig(overrides: Record<string, unknown> = {}) {
+  const sections = new Map<string, { defaults: Record<string, unknown> }>();
+  return {
+    register(spec: { plugin: string; defaults: Record<string, unknown> }) {
+      sections.set(spec.plugin, { defaults: spec.defaults });
+    },
+    get(plugin: string) {
+      const sec = sections.get(plugin);
+      return { ...(sec?.defaults ?? {}), ...overrides };
+    },
+    set: async () => {},
+    watch: () => () => {},
+    list: () => [],
+    ready: async () => {},
+    unset: async () => {},
+    getSpec: () => undefined,
+  };
+}
+
 function fakePromptSystem() {
   const sections: any[] = [];
   return {
@@ -70,9 +91,9 @@ describe("integration — llm-skills against a fake tools:registry", () => {
     const tools = fakeToolsRegistry(emit);
     const ps = fakePromptSystem();
 
+    const cfg = makeFakeConfig({ userRoot: join(FIXTURES, "ok-flat") });
     const ctx: any = {
       cwd: "/does-not-exist",
-      env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
       log: mock(() => {}),
       defineEvent: () => {},
       on: (event: string, fn: Function) => { (subscribers[event] ??= []).push(fn); },
@@ -83,6 +104,7 @@ describe("integration — llm-skills against a fake tools:registry", () => {
       useService: (name: string) => {
         if (name === "tools:registry") return tools;
         if (name === "prompt:registry") return ps.service;
+        if (name === "config:store") return cfg;
         return undefined;
       },
       secrets: { get: async () => undefined, refresh: async () => undefined },
@@ -128,9 +150,9 @@ describe("integration — llm-skills against a fake tools:registry", () => {
     };
     const tools = fakeToolsRegistry(emit);
     const ps = fakePromptSystem();
+    const cfg = makeFakeConfig({ userRoot: join(FIXTURES, "ok-flat") });
     const ctx: any = {
       cwd: "/does-not-exist",
-      env: { KAIZEN_LLM_SKILLS_PATH: join(FIXTURES, "ok-flat") },
       log: () => {},
       defineEvent: () => {},
       on: (event: string, fn: Function) => { (subscribers[event] ??= []).push(fn); },
@@ -141,6 +163,7 @@ describe("integration — llm-skills against a fake tools:registry", () => {
       useService: (name: string) => {
         if (name === "tools:registry") return tools;
         if (name === "prompt:registry") return ps.service;
+        if (name === "config:store") return cfg;
         return undefined;
       },
       secrets: { get: async () => undefined, refresh: async () => undefined },
@@ -175,9 +198,9 @@ describe("integration — new_skill end-to-end through fake tools:registry", () 
       return result;
     };
 
+    const cfg = makeFakeConfig({ userRoot });
     const ctx: any = {
       cwd: "/does-not-exist",
-      env: { KAIZEN_LLM_SKILLS_PATH: userRoot },
       log: mock(() => {}),
       defineEvent: () => {},
       on: (event: string, fn: Function) => { (subscribers[event] ??= []).push(fn); },
@@ -188,6 +211,7 @@ describe("integration — new_skill end-to-end through fake tools:registry", () 
       useService: (name: string) => {
         if (name === "tools:registry") return tools;
         if (name === "prompt:registry") return ps.service;
+        if (name === "config:store") return cfg;
         return undefined;
       },
       secrets: { get: async () => undefined, refresh: async () => undefined },

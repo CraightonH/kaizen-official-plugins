@@ -5,10 +5,11 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 ## Module map
 
 ```
-index.ts          Plugin lifecycle: resolves roots, builds registry, runs initial scan,
-                  provides skills:registry, registers a prompt:registry section and subscribes
-                  to turn:start, registers load_skill into tools:registry. The only file that
-                  touches `ctx`.
+index.ts          Plugin lifecycle: loads config from config:store, resolves roots,
+                  builds registry, runs initial scan, provides skills:registry, registers
+                  a prompt:registry section and subscribes to turn:start, registers
+                  load_skill into tools:registry. The only file that touches `ctx`.
+config.ts         DEFAULT_CONFIG (frozen) + CONFIG_SCHEMA for config:store. Pure.
 registry.ts       makeRegistry({ projectRoot, userRoot, warn, error }) → SkillsRegistryServiceImpl.
                   Pure logic. Owns three layered maps (project / user / programmatic) and a
                   snapshot string for change detection. Conflict resolution lives here.
@@ -52,7 +53,7 @@ Boundaries:
 - **Skills contribute via `prompt:registry`.** A section with id `"llm-skills:available"` and priority 160 is registered at setup. Its title is "Available skills". Generation is bumped after any rescan-changed event and after programmatic register/unregister calls.
 - **Tokens are cached at registration.** `manifest.tokens` is computed once (heuristic or frontmatter override) and never recomputed by `list()`. The `load_skill` handler recomputes only as a fallback when `list()` doesn't carry a token count for the loaded skill.
 - **`load_skill` is registered late and unregistered on stop.** The `services.consumes: ["tools:registry"]` declaration is what guarantees topological ordering — without it, `useService("tools:registry")` may run before the registry is ready. The cleanup callback is held in a module-scope `let` and drained by `stop()`, which is idempotent.
-- **Rescan throttling is wall-clock based.** `lastScanAt` is captured by the `turn:start` closure. If `KAIZEN_LLM_SKILLS_RESCAN_MS` is invalid or non-positive, fall back to the 30 s default. Never treat 0 as "always rescan".
+- **Rescan throttling is wall-clock based.** `lastScanAt` is captured by the `turn:start` closure. If `config.rescanIntervalMs` is non-positive, fall back to the 30 s default at runtime. Never treat 0 as "always rescan". The schema permits `min: 0` so user values are not silently reverted by the store; the clamp lives in `index.ts`.
 - **`new_skill` writes only SKILL.md.** Sibling files in the skill directory
   (`references/`, `scripts/`, anything else) are the user's concern. The tool
   refuses on collision via `lstat` so a partial scaffold the user is

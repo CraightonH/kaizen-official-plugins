@@ -6,19 +6,23 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 
 ```
 index.ts      Plugin lifecycle. The only file that touches `ctx`. Owns:
+              - config:store register + read (DEFAULT_CONFIG fallback)
               - event subscription wiring (the SUBSCRIBED list)
               - lazy listModels() probe + per-model context-cache
               - emitDiff() — the only place status:item-update / status:item-clear are emitted for the non-cost items
               - emitCost() — the only place the cost-estimate item is emitted
-              - soft `/status:show` + `status:show` tool registration and teardown
+              - soft `/status:show` + `status:show` tool registration and teardown (gated by config.slashCommandEnabled / config.toolEnabled)
               - lastEmitted dedup map
+config.ts     DEFAULT_CONFIG (frozen) + CONFIG_SCHEMA for config:store.
 state.ts      applyEvent(prev, name, payload) → StatusState. Pure reducer.
               Owns the StatusState shape, the `cleared` one-shot flag, tok/s
               math, and per-turn delta tracking. No I/O.
-cost.ts      loadRateTable() / tokensToCents() / formatDollars(). Pure.
-              CostDeps abstraction lets tests inject an in-memory rate file.
-context.ts   formatContextItem(used, ceiling) → "13.2k/32k [██░░] 41%". Pure.
-              Caller is responsible for not invoking it when ceiling is unknown.
+cost.ts       tokensToCents() / formatDollars(cents, decimals). Pure.
+              No FS, no Rate-file reader — rates come from config:store.
+context.ts    formatContextItem(used, ceiling, { width, fillGlyph, emptyGlyph })
+              → "13.2k/32k [██░░] 41%". Pure. Caller is responsible for not
+              invoking it when ceiling is unknown.
+public.d.ts   LlmStatusItemsConfig + CostRateEntry. Plugin-private.
 ```
 
 Boundaries:
@@ -34,7 +38,8 @@ Boundaries:
 - **Context ceiling is resolved at most once per model id.** `contextCache` and `modelsListed` gate `listModels()`. Providers without `listModels` must not be retried.
 - **`lastPromptTokens` ≠ cumulative `promptTokens`.** The `_ctx` item is denominated against the most recent call's prompt size (what the model actually saw), not session totals. Don't "fix" this.
 - **Empty status is worse than zeros.** `initialized` flips on `harness:start` so zero-valued counters are emitted before the first turn runs. Don't suppress them.
-- **Slash/tool adapters are soft and idempotent.** `slash:registry` and `tools:registry` are not manifest dependencies. They are probed at `harness:start`, registered at most once, and unregistered from `stop()`.
+- **Slash/tool adapters are soft and idempotent.** `slash:registry` and `tools:registry` are not manifest dependencies. They are probed at `harness:start`, registered at most once, and unregistered from `stop()`. Each adapter is additionally gated by `config.slashCommandEnabled` / `config.toolEnabled`.
+- **Config is setup-time only.** All knobs (cost rates, bar dimensions, decimal places, thresholds, adapter toggles) are read once during `setup()`. No `watch()` — changing presentation knobs at runtime requires a restart.
 
 ## Adding a new status item
 
@@ -43,16 +48,17 @@ Boundaries:
 3. In `index.ts`, add a `lastEmitted.<slot>` entry and a diff-emit block in `emitDiff()`. If `conversation:cleared` should reset it, handle that in the `state.cleared` branch.
 4. Use the existing key namespace conventions: short user-facing keys (`in`, `out`, `tok/s`); leading-underscore for non-textual or wide items (`_ctx`).
 
-## Cost table extensions
+## Cost rates
 
-`cost-table.json` is intentionally flat (`{ rates: { <model-id>: { promptCentsPerMTok, completionCentsPerMTok } } }`). If you add fields, treat them as optional and keep the existing shape backward-compatible — users hand-edit this file.
+Rates live on `config.costRates` (Record<modelId, CostRateEntry>), validated by
+`config:store` against `CONFIG_SCHEMA` in `config.ts`. Empty default — fully
+local sessions never see a `cost-estimate` event. The legacy
+`~/.kaizen/plugins/llm-status-items/cost-table.json` reader is gone; users
+copy rates into `~/.kaizen/harnesses/<key>/config.json` by hand.
 
-`tokensToCents` returning `null` is the "model not priced" signal. Preserve that — `emitCost` clears any prior estimate when it's seen, and downgrading to zero would be wrong (a partially-priced session is misleading).
-
-`loadRateTable` validates user-edited entries strictly. An absent file disables
-costs, but malformed JSON or entries without non-negative numeric
-`promptCentsPerMTok` and `completionCentsPerMTok` should fail setup with a clear
-`llm-status-items:` error.
+`tokensToCents` returning `null` is the "model not priced" signal. Preserve
+that — `emitCost` clears any prior estimate when it's seen, and downgrading
+to zero would be wrong (a partially-priced session is misleading).
 
 ## Testing
 
@@ -60,7 +66,7 @@ costs, but malformed JSON or entries without non-negative numeric
 cd plugins/llm-status-items && bun test
 ```
 
-Tests use `bun:test` only. `test/index.test.ts` ships a `makeCtx()` helper that fakes `ctx.on` / `ctx.emit` / `ctx.useService` and injects an in-memory rate table via the `_testCostDeps` private hook on ctx (production code never reads it). Use it for lifecycle tests; use `state.test.ts` / `cost.test.ts` patterns for pure-module tests.
+Tests use `bun:test` only. `test/index.test.ts` ships a `makeCtx()` helper that fakes `ctx.on` / `ctx.emit` / `ctx.useService` and injects an in-memory `config:store` shim — pass `{ rateTable }` (writes through to `costRates`) or `{ configOverrides }` to override defaults. Use it for lifecycle tests; use `state.test.ts` / `cost.test.ts` patterns for pure-module tests.
 
 ## Local deploy
 

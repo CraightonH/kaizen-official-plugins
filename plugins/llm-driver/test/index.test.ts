@@ -1,5 +1,6 @@
 import { describe, it, expect, mock } from "bun:test";
 import plugin from "../index.ts";
+import { DEFAULT_CONFIG, CONFIG_SCHEMA } from "../config.ts";
 import type { ChatMessage, LLMStreamEvent } from "llm-contracts/public";
 import type { SessionsStoreService, TurnHandle } from "llm-contracts/public";
 
@@ -82,7 +83,11 @@ function makeCtx(deps: { ui: any; llm: any; cleared?: () => Promise<void>; cfg?:
       if (name === "ui:channel") return deps.ui;
       if (name === "llm:complete") return deps.llm;
       if (name === "sessions:store") return sessions;
-      throw new Error(`useService: no provider for '${name}'`);
+      // Optional services (config:store, prompt:registry, tools:registry,
+      // dispatch:strategy) are looked up via useService and the plugin
+      // handles `undefined` returns. Return undefined rather than throwing
+      // so the topo-hint optional pattern works under the fake ctx.
+      return undefined;
     },
     on: (name: string, fn: Function) => {
       (handlers[name] ??= []).push(fn);
@@ -103,16 +108,17 @@ describe("llm-driver index", () => {
   it("metadata + setup defines + provides driver:run-conversation", async () => {
     expect(plugin.name).toBe("llm-driver");
     expect(plugin.driver).toBe(true);
-    expect(plugin.config?.defaults).toEqual({ defaultSystemPrompt: "" });
-    expect(plugin.config?.schema).toMatchObject({
-      type: "object",
-      properties: { defaultSystemPrompt: { type: "string" } },
-    });
+    // Legacy plugin.config block was removed; config now flows through
+    // config:store. Sanity-check the module-level defaults + schema.
+    expect(plugin.config).toBeUndefined();
+    expect(DEFAULT_CONFIG).toEqual({ defaultSystemPrompt: "" });
+    expect(CONFIG_SCHEMA).toEqual({ defaultSystemPrompt: { type: "string" } });
     expect(plugin.services?.consumes).toEqual([
       "events:vocabulary",
       "ui:channel",
       "llm:complete",
       "sessions:store",
+      "config:store",
     ]);
     const ctx = makeCtx({ ui: makeUi([]), llm: makeLlm([]) });
     await plugin.setup!(ctx);

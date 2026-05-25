@@ -1,11 +1,13 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { LLMCompleteService, ModelInfo, Vocab } from "llm-contracts/public";
+import type { ConfigStoreService, LLMCompleteService, ModelInfo, Vocab } from "llm-contracts/public";
 import { applyEvent, initialState, type StatusState } from "./state.ts";
-import { formatDollars, loadRateTable, realCostDeps, tokensToCents, type CostDeps, type RateTable } from "./cost.ts";
+import { formatDollars, tokensToCents, type RateTable } from "./cost.ts";
 import { formatContextItem } from "./context.ts";
 import { buildSnapshot } from "./snapshot.ts";
 import { registerStatusSlash, type SlashRegistryLike } from "./slash.ts";
 import { registerStatusTool, type ToolsRegistryLike } from "./tool.ts";
+import { DEFAULT_CONFIG, CONFIG_SCHEMA } from "./config.ts";
+import type { LlmStatusItemsConfig } from "./public.d.ts";
 
 function subscribedEvents(vocab: Vocab): string[] {
   return [
@@ -26,21 +28,43 @@ function subscribedEvents(vocab: Vocab): string[] {
 const plugin: KaizenPlugin = {
   name: "llm-status-items",
   apiVersion: "3.0.0",
-  permissions: { tier: "unscoped" },
-  services: { consumes: ["events:vocabulary", "llm:complete"] },
+  permissions: { tier: "trusted" },
+  services: { consumes: ["events:vocabulary", "llm:complete", "config:store"] },
 
   async setup(ctx) {
+    const log = (m: string) => ctx.log?.(m);
+
+    // Load config (topo-hint optional).
+    let config: LlmStatusItemsConfig = { ...DEFAULT_CONFIG };
+    const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
+    if (cfgSvc) {
+      try {
+        cfgSvc.register<LlmStatusItemsConfig>({
+          plugin: "llm-status-items",
+          defaults: { ...DEFAULT_CONFIG },
+          schema: CONFIG_SCHEMA,
+        });
+        config = cfgSvc.get<LlmStatusItemsConfig>("llm-status-items");
+      } catch (e) {
+        log(`llm-status-items: config:store register failed (${(e as Error).message}); using defaults`);
+      }
+    } else {
+      log("llm-status-items: config:store unavailable; using DEFAULT_CONFIG");
+    }
+
     ctx.consumeService("events:vocabulary");
     const vocab = ctx.useService<Vocab>("events:vocabulary");
     // Consumed lazily — listModels() only runs the first time we see a
     // model id at runtime, by which point the provider has registered.
     ctx.consumeService("llm:complete");
 
-    // Cost deps come from a private test hook on ctx, falling back to the real fs.
-    // (`_testCostDeps` is only set by tests; production code never reads it.)
-    const costDeps: CostDeps = (ctx as any)._testCostDeps ?? realCostDeps();
-    const rates: RateTable = await loadRateTable(costDeps);
+    const rates: RateTable = config.costRates;
     const hasAnyRate = Object.keys(rates).length > 0;
+    const barOptions = {
+      width: config.contextBarWidth,
+      fillGlyph: config.contextBarFillGlyph,
+      emptyGlyph: config.contextBarEmptyGlyph,
+    };
 
     let state: StatusState = initialState();
     let costCents = 0;
@@ -153,7 +177,7 @@ const plugin: KaizenPlugin = {
       // tok/s — show 0 before the first measurement so the slot is visible.
       const tpsValue = state.tokensPerSec === null
         ? (initialized ? "0" : null)
-        : state.tokensPerSec >= 10
+        : state.tokensPerSec >= config.tokensPerSecIntegerThreshold
           ? state.tokensPerSec.toFixed(0)
           : state.tokensPerSec.toFixed(1);
       if (tpsValue !== null && tpsValue !== lastEmitted.tokensPerSec) {
@@ -169,7 +193,7 @@ const plugin: KaizenPlugin = {
       } else if (state.contextLength) {
         // Render with zero used before any call has been made. Keeps the bar
         // visible from harness:start instead of waiting for first llm:done.
-        const value = formatContextItem(state.lastPromptTokens, state.contextLength);
+        const value = formatContextItem(state.lastPromptTokens, state.contextLength, barOptions);
         if (value !== lastEmitted.ctx) {
           await ctx.emit(vocab.STATUS_ITEM_UPDATE, { key: "_ctx", value });
           lastEmitted.ctx = value;
@@ -202,7 +226,7 @@ const plugin: KaizenPlugin = {
         return;
       }
       costCents += inc;
-      const display = formatDollars(costCents);
+      const display = formatDollars(costCents, config.costDecimalPlaces);
       if (display !== lastEmitted.cost) {
         await ctx.emit(vocab.STATUS_ITEM_UPDATE, { key: "cost-estimate", value: display });
         lastEmitted.cost = display;
@@ -244,14 +268,18 @@ const plugin: KaizenPlugin = {
     ctx.on(vocab.HARNESS_START, async () => {
       if (adaptersRegistered) return;
       adaptersRegistered = true;
-      try {
-        const slash = ctx.useService<SlashRegistryLike>("slash:registry");
-        if (slash) adapterUnregisters.push(...registerStatusSlash(slash, getSnapshot));
-      } catch { /* slash:registry absent — skip */ }
-      try {
-        const toolsReg = ctx.useService<ToolsRegistryLike>("tools:registry");
-        if (toolsReg) adapterUnregisters.push(...registerStatusTool(toolsReg, getSnapshot));
-      } catch { /* tools:registry absent — skip */ }
+      if (config.slashCommandEnabled) {
+        try {
+          const slash = ctx.useService<SlashRegistryLike>("slash:registry");
+          if (slash) adapterUnregisters.push(...registerStatusSlash(slash, getSnapshot));
+        } catch { /* slash:registry absent — skip */ }
+      }
+      if (config.toolEnabled) {
+        try {
+          const toolsReg = ctx.useService<ToolsRegistryLike>("tools:registry");
+          if (toolsReg) adapterUnregisters.push(...registerStatusTool(toolsReg, getSnapshot));
+        } catch { /* tools:registry absent — skip */ }
+      }
     });
 
     (plugin as any)._stop = () => {

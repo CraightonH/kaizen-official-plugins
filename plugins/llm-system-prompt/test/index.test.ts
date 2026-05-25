@@ -9,7 +9,7 @@ import type {
   RegisteredSection,
 } from "../public";
 
-function makeFakeCtx(opts: { slash?: boolean; tools?: boolean } = {}) {
+function makeFakeCtx(opts: { slash?: boolean; tools?: boolean; configOverrides?: Record<string, unknown> } = {}) {
   const services: Record<string, unknown> = {};
   const provided: Record<string, unknown> = {};
   const consumed: string[] = [];
@@ -22,9 +22,26 @@ function makeFakeCtx(opts: { slash?: boolean; tools?: boolean } = {}) {
   }> = [];
   const slash = opts.slash ?? true;
   const tools = opts.tools ?? true;
+  const configOverrides = opts.configOverrides ?? {};
   const vocab = {
     PROMPT_REBUILT: "prompt:rebuilt",
     PROMPT_RELOAD: "prompt:reload",
+  };
+
+  const configStore = {
+    _registered: undefined as Record<string, unknown> | undefined,
+    register<T>(spec: { plugin: string; defaults: T }) {
+      this._registered = { ...(spec.defaults as object), ...configOverrides };
+    },
+    get<T>(_plugin: string): T {
+      return this._registered as T;
+    },
+    set: async () => {},
+    unset: async () => {},
+    watch: () => () => {},
+    list: () => [],
+    ready: async () => {},
+    getSpec: () => undefined,
   };
 
   const slashRegistry = {
@@ -64,6 +81,7 @@ function makeFakeCtx(opts: { slash?: boolean; tools?: boolean } = {}) {
     consumeService: (n: string) => { consumed.push(n); },
     useService: (n: string) => {
       if (n === "events:vocabulary") return vocab;
+      if (n === "config:store") return configStore;
       if (n === "slash:registry" && slash) return slashRegistry;
       if (n === "tools:registry" && tools) return toolsRegistry;
       throw new Error(`missing service ${n}`);
@@ -160,8 +178,9 @@ describe("index.ts — plugin lifecycle", () => {
     mkdirSync(join(dir, "global"), { recursive: true });
     writeFileSync(join(dir, "global", "system-prompt.md"), "GLOBAL-MARKER");
 
-    const ctx = makeFakeCtx();
-    ctx.env.KAIZEN_SYSTEM_PROMPT_GLOBAL = join(dir, "global", "system-prompt.md");
+    const ctx = makeFakeCtx({
+      configOverrides: { globalPath: join(dir, "global", "system-prompt.md") },
+    });
     await plugin.setup!(ctx as any);
     const svc = ctx.provided["prompt:registry"] as any;
     const out = await svc.assemble();

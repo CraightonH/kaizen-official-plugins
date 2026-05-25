@@ -81,7 +81,7 @@ export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, source
       return <ThoughtsBlock text={e.text} color={theme.noticeColor} />;
     }
     if (e.kind === "tool_call") {
-      return <ToolCallBlock entry={e} registry={toolRenderers} theme={theme} />;
+      return <ToolCallBlock entry={e} registry={toolRenderers} theme={theme} previewMax={snap.config.toolPreviewChars} />;
     }
     if (e.kind === "output") {
       // Render assistant output through marked-terminal by default. Caller can
@@ -120,7 +120,7 @@ export const App: React.FC<AppProps> = ({ store, registry, toolRenderers, source
         <>
           <LiveToolCalls store={store} registry={toolRenderers} theme={theme} />
           {snap.busy.active && snap.liveThinking && (
-            <ThinkingBox text={snap.liveThinking} color={theme.noticeColor} />
+            <ThinkingBox text={snap.liveThinking} color={theme.noticeColor} tailLines={snap.config.thinkingTailLines} />
           )}
           {snap.busy.active && (
             <SpinnerLine

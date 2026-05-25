@@ -5,15 +5,19 @@ Notes for agents editing this plugin. See `README.md` for the user-facing contra
 ## Module map
 
 ```
-index.ts          Plugin lifecycle. Resolves tools:registry, registers every entry from ALL_TOOLS,
-                  collects unregister fns, and assigns a closure to `plugin._stop` that runs them
-                  on `stop()`. The only file that touches `ctx`.
-tools.ts          ALL_TOOLS array. Re-exports {schema, handler} from each per-tool module.
-                  Add a new tool by appending here.
-public.d.ts       Re-exports ToolSchema/ToolCall from llm-contracts/public and the TOOL_NAMES tuple.
+index.ts          Plugin lifecycle. Loads config via config:store (topo-hint optional),
+                  resolves tools:registry, registers every entry from buildAllTools(config),
+                  collects unregister fns, and assigns a closure to `plugin._stop` that runs
+                  them on `stop()`. The only file that touches `ctx`.
+tools.ts          buildAllTools(config) factory. Threads config into each per-tool module's
+                  makeHandler. Add a new tool by appending here.
+config.ts         DEFAULT_CONFIG (frozen) + CONFIG_SCHEMA for config:store. Pure module,
+                  no I/O, no ctx.
+public.d.ts       Re-exports ToolSchema/ToolCall from llm-contracts/public, the TOOL_NAMES
+                  tuple, and the plugin-private LlmLocalToolsConfig interface.
 util.ts           Pure helpers shared by every tool: resolvePath, truncateBytes, truncateMiddle,
-                  sniffBinary, ensureParentExists, hasGitRoot, formatLineNumbered, plus the
-                  size-cap constants. No I/O state, no globals beyond constants.
+                  sniffBinary, ensureParentExists, hasGitRoot, formatLineNumbered,
+                  isBinaryContentType. No I/O state, no globals (caps live in config.ts).
 tools/read.ts     Line-numbered file read with offset/limit, binary sniff, 50 MB hard refusal.
 tools/write.ts    Overwrite-only writer; refuses if path does not exist.
 tools/create.ts   Create-only writer; refuses if path already exists.
@@ -51,7 +55,7 @@ Boundaries:
 - **Path resolution is per-call.** Every handler resolves paths via `resolvePath(p, args.cwd)` at invoke time against `process.cwd()`. There is no plugin-owned working directory. Don't add one.
 - **Errors throw native `Error`.** No special error envelope. The registry catches and emits `tool:error`; the active dispatch strategy turns that into a `tool` message. Error messages must include the resolved absolute path when relevant — the LLM uses it to recover.
 - **Truncation markers are stable.** The exact `... [truncated: ...]` shape is part of the contract with the LLM (it has been trained on this idiom). Don't reword.
-- **Caps live in `util.ts`.** `MAX_READ_BYTES` (50 MB hard refusal), `READ_CAP_BYTES` (256 KB), `READ_CAP_LINES` (2000), `BASH_OUTPUT_CAP` (256 KB), `GREP_DEFAULT_MAX` (200), `GLOB_CAP` (1000), `WEB_FETCH_CAP_BYTES` (512 KB in-context), `WEB_FETCH_DOWNLOAD_CAP_BYTES` (50 MB on disk), `WEB_FETCH_DEFAULT_TIMEOUT_MS` (30 s). Binary content-type classification lives in `isBinaryContentType()` — also in `util.ts`. Tools import them; do not re-declare per-tool defaults.
+- **Caps live in `config.ts` as `DEFAULT_CONFIG`.** Handlers receive them via a closure-bound `LlmLocalToolsConfig` returned from each module's `makeHandler(config)`. Fields: `readMaxBytes` (50 MB hard refusal), `readCapBytes` (256 KB), `readCapLines` (2000), `bashOutputCap` (256 KB), `bashDefaultTimeoutMs` (120 s), `grepDefaultMax` (200), `globCap` (1000), `webFetchCapBytes` (512 KB in-context), `webFetchDownloadCapBytes` (50 MB on disk), `webFetchDefaultTimeoutMs` (30 s). Schema `maximum:` ceilings on bash/web_fetch timeouts stay hardcoded — they are static guards above any configurable default. Binary content-type classification lives in `isBinaryContentType()` in `util.ts`. Tool modules export both `makeHandler(config)` and a `handler` bound to `DEFAULT_CONFIG` for the per-tool tests; production wiring always goes through `buildAllTools(config)`.
 - **`edit` uniqueness is load-bearing.** Multi-match without `replace_all` MUST throw with the match count. This is the single most important behavioral guarantee — it is what makes `edit` safe for unattended use.
 - **`bash` middle-truncates.** Compiler/test output carries signal at both ends. Don't switch to head- or tail-only truncation.
 - **`bash` cancellation.** The registry's `ToolExecutionContext.signal` must SIGTERM the spawned process group. `turn:cancel` relies on this.
@@ -61,10 +65,10 @@ Boundaries:
 
 ## Adding a new tool
 
-1. Create `tools/<name>.ts` exporting `{ schema, handler }`. The schema is a `ToolSchema` (from `llm-contracts/public`); the handler is `(args: any, ctx: any) => Promise<unknown>`.
-2. Resolve paths via `resolvePath`. Use the size-cap constants from `util.ts`. Throw native `Error` on failure with informative messages.
+1. Create `tools/<name>.ts` exporting `schema`, `makeHandler(config)`, and (for the per-tool tests) a `handler` bound to `DEFAULT_CONFIG`. The schema is a `ToolSchema` (from `llm-contracts/public`); the handler is `(args: any, ctx: any) => Promise<unknown>`.
+2. Resolve paths via `resolvePath`. If the tool has tunable knobs, add fields to `LlmLocalToolsConfig` (`public.d.ts`), `DEFAULT_CONFIG` and `CONFIG_SCHEMA` (`config.ts`), and read them off the `config` closure inside `makeHandler`. Throw native `Error` on failure with informative messages.
 3. Tag it: `tags: ["local", "<category>"]`. Reuse `fs` / `shell` if it fits; introduce a new secondary tag only if a capability plugin needs to filter on it.
-4. Append `{ schema, handler }` to `ALL_TOOLS` in `tools.ts`.
+4. Append `{ schema, handler: <mod>.makeHandler(config) }` to `buildAllTools` in `tools.ts`.
 5. If it changes the published surface, also update `TOOL_NAMES` in `index.ts` and `public.d.ts`.
 6. Add `test/tools/<name>.test.ts` with bun:test using `node:fs.mkdtempSync` for isolation.
 
@@ -78,7 +82,7 @@ cd plugins/llm-local-tools && bun test
 
 Tests use `bun:test` only — no external mocking framework. Each tool test creates its own `mkdtempSync` directory and tears it down in `afterEach`. Static inputs live under `test/fixtures/`.
 
-`scaffold.test.ts` asserts that `ALL_TOOLS` registers every expected name with the right tags — when adding/removing a tool, that test is the contract gate.
+`scaffold.test.ts` asserts that `buildAllTools(DEFAULT_CONFIG)` (via `plugin.setup()`) registers every expected name with the right tags — when adding/removing a tool, that test is the contract gate.
 
 ## Local deploy
 

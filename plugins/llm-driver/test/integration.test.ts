@@ -75,7 +75,10 @@ describe("llm-driver integration (synthetic llm:complete)", () => {
         if (n === "ui:channel") return ui;
         if (n === "llm:complete") return llm;
         if (n === "sessions:store") return sessions;
-        throw new Error(`useService: no provider for '${n}'`);
+        // Optional services (config:store, prompt:registry, …) return
+        // undefined so the topo-hint optional pattern in setup() can fall
+        // back to defaults under the fake ctx.
+        return undefined;
       },
       on: (n: string, fn: Function) => { (handlers[n] ??= []).push(fn); return () => {}; },
       emit: async (n: string, p?: any) => { events.push({ name: n, payload: p }); for (const fn of handlers[n] ?? []) await fn(p); },
@@ -118,7 +121,7 @@ describe("llm-driver integration (synthetic llm:complete)", () => {
       useService: (n: string) => {
         if (n === "llm:complete") return llm;
         if (n === "sessions:store") return sessions;
-        throw new Error(`useService: no provider for '${n}'`);
+        return undefined;
       },
       on: (n: string, fn: Function) => { (handlers[n] ??= []).push(fn); return () => {}; },
       emit: async (n: string, p?: any) => { events.push({ name: n, payload: p }); for (const fn of handlers[n] ?? []) await fn(p); },
@@ -168,7 +171,7 @@ describe("llm-driver integration (synthetic llm:complete)", () => {
       useService: (n: string) => {
         if (n === "llm:complete") return llm;
         if (n === "sessions:store") return sessions;
-        throw new Error(`useService: no provider for '${n}'`);
+        return undefined;
       },
       on: (n: string, fn: Function) => { (handlers[n] ??= []).push(fn); return () => {}; },
       emit: async (n: string, p?: any) => { events.push({ name: n, payload: p }); for (const fn of handlers[n] ?? []) await fn(p); },
@@ -226,7 +229,7 @@ describe("llm-driver integration (synthetic llm:complete)", () => {
         if (n === "ui:channel") return ui;
         if (n === "llm:complete") return llm;
         if (n === "sessions:store") return sessions;
-        throw new Error(`useService: no provider for '${n}'`);
+        return undefined;
       },
       on: (n: string, fn: Function) => { (handlers[n] ??= []).push(fn); return () => {}; },
       emit: async (n: string, p?: any) => { events.push({ name: n, payload: p }); for (const fn of handlers[n] ?? []) await fn(p); },

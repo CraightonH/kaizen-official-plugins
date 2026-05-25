@@ -28,11 +28,21 @@ When `tools:registry` is present, the plugin registers:
 - `environment_refresh` — re-captures the snapshot. Tagged
   `["environment", "diagnostic", "synthetic"]`.
 
+## Configuration
+
+Stored in the harness config file under the `llm-environment` key
+(`~/.kaizen/harnesses/<key>/config.json`).
+
+| Field   | Type    | Default | Notes |
+|---------|---------|---------|-------|
+| enabled | boolean | `true`  | When `false`, the section renders empty and is dropped. |
+
 ## Kill switches
 
 Three layers, in increasing finality:
 
-1. `KAIZEN_ENVIRONMENT_DISABLE=1` — the section renders empty and is dropped.
+1. Set `enabled: false` in the harness config for `llm-environment` — the
+   section renders empty and is dropped (requires harness restart).
 2. `prompt:disable llm-environment:env` — per-session toggle via the
    `llm-system-prompt` slash command.
 3. Uninstall the plugin from the harness manifest.

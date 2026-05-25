@@ -12,8 +12,12 @@ Notes for agents editing this plugin. See the design spec at
   touches `ctx` or `process`.
 - **Platform guard.** `index.ts` bails on non-darwin platforms with a log
   line and returns cleanly. Tests assert this.
-- **Service constant.** `kaizen-secrets`. Do not change without considering
-  migration for existing users.
+- **Service constant.** Default `kaizen-secrets`, configurable via
+  `config:store` field `keychainService` (see `config.ts`). Changing it
+  orphans existing entries — handle migration manually. Read once at
+  `setup()`; no `watch()` (re-registering the resolver under a new svce
+  mid-session would silently orphan in-flight reads). Restart kaizen to
+  pick up changes.
 
 ## Local deploy
 

@@ -7,14 +7,15 @@ Notes for agents editing this plugin. See `README.md` for the user contract.
 ```
 index.ts         Plugin lifecycle: captures snapshot at setup(), registers section at p=30,
                  best-effort registers /env:refresh and environment_refresh. Only file
-                 touching `ctx`.
-environment.ts   captureEnvironment({ cwd, env? }) → { section, refresh }. Pure logic.
+                 touching `ctx`. Registers config:store spec and reads `enabled`.
+config.ts        DEFAULT_CONFIG (frozen) + CONFIG_SCHEMA for config:store.
+environment.ts   captureEnvironment({ cwd, enabled? }) → { section, refresh }. Pure logic.
                  Synchronous git detection (walks up for .git; reads HEAD directly).
                  No shell-out.
 slash.ts         makeEnvSlashHandlers({ refresh }) → { refresh }. Stateless factory.
 tool.ts          makeEnvToolHandlers({ refresh }) → { refresh }. Stateless factory.
                  Exports ENVIRONMENT_REFRESH_SCHEMA constant.
-public.d.ts      EnvironmentSnapshot, GitSnapshot. No service is exported.
+public.d.ts      EnvironmentSnapshot, GitSnapshot, LlmEnvironmentConfig. No service is exported.
 test/fixtures.ts buildFixtures(root) → FixtureSet. Builds hand-rolled .git/ trees in a
                  tmpdir at test time (git refuses to track paths containing .git/).
 ```
@@ -45,8 +46,11 @@ benefits from the static prompt section even without a refresh affordance.
   cache read; do not add filesystem watchers.
 - **`render()` never throws.** Git-detection failures are swallowed and
   surfaced as `git.isRepo = false`.
-- **Empty render → section dropped.** `KAIZEN_ENVIRONMENT_DISABLE=1` returns
-  `""`; the prompt registry drops empty sections.
+- **Empty render → section dropped.** When `enabled: false` is set on the
+  `llm-environment` config, `render()` returns `""`; the prompt registry
+  drops empty sections. The `enabled` value is read once in `setup()` — no
+  `watch()` is wired up, so a config change requires a harness restart
+  (matches the "static between refreshes" invariant).
 - **Non-repo → no git line.** When `isRepo === false`, the `Git branch:` line
   is omitted entirely. Never emit "Git branch: no" or similar.
 - **Detached HEAD renders `Git branch: (detached HEAD)`.** `git.branch` is

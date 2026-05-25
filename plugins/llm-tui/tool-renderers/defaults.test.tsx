@@ -4,6 +4,7 @@ import { render } from "ink-testing-library";
 import { ToolCallBlock } from "../ui/ToolCallBlock.tsx";
 import { makeToolRendererRegistry } from "./registry.ts";
 import { defaultRenderers } from "./defaults.tsx";
+import { DEFAULT_CONFIG } from "../config.ts";
 import type { ToolCallEntry } from "../state/store.ts";
 
 const theme = {
@@ -15,9 +16,14 @@ const theme = {
   thoughtsMarkdown: true,
 } as const;
 
+// Test config = baked-in defaults overlaid with the test theme. The
+// non-theme UX-knob fields (toolExpandedPreviewLines, toolExpandedLineWidth,
+// etc.) need real values for the renderers to behave correctly.
+const testConfig = { ...DEFAULT_CONFIG, ...theme };
+
 function withDefaults() {
   const reg = makeToolRendererRegistry();
-  for (const r of defaultRenderers(() => theme as any)) reg.service.register(r);
+  for (const r of defaultRenderers(() => testConfig as any)) reg.service.register(r);
   return reg;
 }
 

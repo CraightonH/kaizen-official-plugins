@@ -15,6 +15,7 @@ const ctx = { signal: new AbortController().signal, callId: "c1", log: () => {} 
 // Use the JS-fallback handler for deterministic tests across environments.
 const handler = makeHandler({ rgPath: null });
 
+
 describe("grep tool", () => {
   it("schema metadata", () => {
     expect(schema.name).toBe("grep");

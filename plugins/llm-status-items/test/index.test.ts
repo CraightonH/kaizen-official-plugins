@@ -19,7 +19,23 @@ const VOCAB = {
   STATUS_ITEM_CLEAR: "status:item-clear",
 };
 
-function makeCtx(opts: { rateTable?: Record<string, any> } = {}) {
+function makeConfigStore(overrides: Record<string, any> = {}) {
+  const stored = new Map<string, any>();
+  return {
+    register: mock(({ plugin, defaults }: { plugin: string; defaults: any }) => {
+      stored.set(plugin, { ...defaults, ...overrides });
+    }),
+    get: mock((plugin: string) => stored.get(plugin)),
+    set: mock(async () => {}),
+    unset: mock(async () => {}),
+    watch: mock(() => () => {}),
+    list: mock(() => []),
+    ready: mock(async () => {}),
+    getSpec: mock(() => undefined),
+  };
+}
+
+function makeCtx(opts: { rateTable?: Record<string, any>; configOverrides?: Record<string, any> } = {}) {
   const subscribed: string[] = [];
   // Support multiple handlers per event name (plugins may register more than
   // one ctx.on() for the same event — e.g. harness:start for both the reducer
@@ -37,10 +53,16 @@ function makeCtx(opts: { rateTable?: Record<string, any> } = {}) {
     },
   });
   const emits: Emit[] = [];
+  const configOverrides = {
+    ...(opts.rateTable !== undefined ? { costRates: opts.rateTable } : {}),
+    ...(opts.configOverrides ?? {}),
+  };
+  const configStore = makeConfigStore(configOverrides);
   return {
     subscribed,
     handlers,
     emits,
+    configStore,
     log: mock(() => {}),
     config: {},
     defineEvent: mock(() => {}),
@@ -53,19 +75,18 @@ function makeCtx(opts: { rateTable?: Record<string, any> } = {}) {
     defineService: mock(() => {}),
     provideService: mock(() => {}),
     consumeService: mock(() => {}),
-    useService: mock((id: string) => id === "events:vocabulary" ? VOCAB : undefined),
+    useService: mock((id: string) => {
+      if (id === "events:vocabulary") return VOCAB;
+      if (id === "config:store") return configStore;
+      return undefined;
+    }),
     secrets: { get: mock(async () => undefined), refresh: mock(async () => undefined) },
-    // Internal facades the plugin reads — see Step 2 implementation.
-    _testCostDeps: {
-      home: "/home/u",
-      readFile: async () => JSON.stringify({ rates: opts.rateTable ?? {} }),
-    },
   } as any;
 }
 
 describe("llm-status-items setup", () => {
-  it("requires only the events vocabulary and LLM completion service", () => {
-    expect(plugin.services?.consumes).toEqual(["events:vocabulary", "llm:complete"]);
+  it("requires events vocabulary, LLM completion, and config:store services", () => {
+    expect(plugin.services?.consumes).toEqual(["events:vocabulary", "llm:complete", "config:store"]);
   });
 
   it("subscribes to exactly the spec'd events", async () => {

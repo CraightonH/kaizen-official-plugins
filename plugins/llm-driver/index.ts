@@ -1,26 +1,20 @@
 import type { KaizenPlugin } from "kaizen/types";
 import type {
   ChatMessage,
+  ConfigStoreService,
   LLMCompleteService,
   SessionsStoreService,
   UiChannelService,
 } from "llm-contracts/public";
 import type { DriverService, RunConversationInput, RunConversationOutput, ToolDispatchStrategy } from "llm-contracts/public";
+import type { LlmDriverConfig } from "./public.d.ts";
+import { DEFAULT_CONFIG, CONFIG_SCHEMA } from "./config.ts";
 import { runConversation, type RunConversationDeps, type ToolsRegistryService } from "./loop.ts";
 import { type CurrentTurn } from "./state.ts";
 import { newTurnId } from "./ids.ts";
 import { wireCancel } from "./cancel.ts";
 import { pickBusyMessage } from "./busy-messages.ts";
 import { pickDoneMessage } from "./done-messages.ts";
-
-
-interface DriverConfig {
-  defaultSystemPrompt?: string;
-}
-
-const DEFAULTS = {
-  defaultSystemPrompt: "",
-} as const;
 
 // Plugin-scoped state. setup() and start() receive different ctx instances
 // (kaizen creates a fresh ctx for the driver's start phase), so state must
@@ -39,6 +33,10 @@ const state: {
   activeSessionId: null,
   systemPrompt: "",
 };
+// Plugin config loaded from config:store in setup(). Falls back to a fresh
+// spread of DEFAULT_CONFIG when the service is missing or register() throws,
+// so the rest of the plugin can always read `config.<field>` directly.
+let config: LlmDriverConfig = { ...DEFAULT_CONFIG };
 let buildDeps: (() => RunConversationDeps) | null = null;
 // `input:handled` short-circuit: subscribers (e.g. llm-slash-commands) emit
 // this to tell the driver to skip the LLM round-trip for the just-submitted
@@ -59,25 +57,13 @@ const plugin: KaizenPlugin = {
   apiVersion: "3.0.0",
   driver: true,
   permissions: { tier: "unscoped" },
-  config: {
-    schema: {
-      type: "object",
-      properties: {
-        defaultSystemPrompt: {
-          type: "string",
-          description: "Fallback system prompt used by the interactive loop when prompt:system is not bound.",
-        },
-      },
-      additionalProperties: false,
-    },
-    defaults: DEFAULTS,
-  },
   services: {
     consumes: [
       "events:vocabulary",
       "ui:channel",
       "llm:complete",
       "sessions:store",
+      "config:store",
     ],
     provides: ["driver:run-conversation"],
   },
@@ -99,6 +85,26 @@ const plugin: KaizenPlugin = {
     inputHandled = false;
     exitRequested = false;
     moduleUi = null;
+    config = { ...DEFAULT_CONFIG };
+
+    // Load config from config:store (topo-hint optional — kaizen-config boots
+    // early, but tests pass a fake ctx with no config service). register() is
+    // one-shot per harness boot; the try/catch keeps dev hot-reloads working.
+    const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
+    if (cfgSvc) {
+      try {
+        cfgSvc.register<LlmDriverConfig>({
+          plugin: "llm-driver",
+          defaults: { ...DEFAULT_CONFIG },
+          schema: CONFIG_SCHEMA,
+        });
+        config = cfgSvc.get<LlmDriverConfig>("llm-driver");
+      } catch (e) {
+        ctx.log(`llm-driver: config:store register failed (${(e as Error).message}); using defaults`);
+      }
+    } else {
+      ctx.log("llm-driver: config:store unavailable; using DEFAULT_CONFIG");
+    }
 
     // Subscribers
     wireCancel(ctx as any, () => state.currentTurn);
@@ -164,7 +170,7 @@ const plugin: KaizenPlugin = {
         strategy: safeUse<ToolDispatchStrategy>("dispatch:strategy"),
         log: ctx.log.bind(ctx),
         idGen: newTurnId,
-        defaultSystemPrompt: state.systemPrompt || (ctx.config as DriverConfig)?.defaultSystemPrompt || DEFAULTS.defaultSystemPrompt,
+        defaultSystemPrompt: state.systemPrompt || config.defaultSystemPrompt,
         promptSystem: safeUse<{ assemble(): Promise<string>; generation(): number }>("prompt:registry"),
       };
       return depsCache;
@@ -185,8 +191,7 @@ const plugin: KaizenPlugin = {
       throw new Error("llm-driver.start() called before setup() — buildDeps not initialized");
     }
 
-    const cfg = (ctx.config ?? {}) as DriverConfig;
-    state.systemPrompt = cfg.defaultSystemPrompt ?? DEFAULTS.defaultSystemPrompt;
+    state.systemPrompt = config.defaultSystemPrompt;
     const sessions = ctx.useService<SessionsStoreService>("sessions:store")!;
 
     await ctx.emit("harness:start");

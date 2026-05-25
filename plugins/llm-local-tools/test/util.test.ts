@@ -11,22 +11,17 @@ import {
   ensureParentExists,
   hasGitRoot,
   formatLineNumbered,
-  MAX_READ_BYTES,
-  READ_CAP_BYTES,
-  READ_CAP_LINES,
-  BASH_OUTPUT_CAP,
-  GREP_DEFAULT_MAX,
-  GLOB_CAP,
 } from "../util.ts";
+import { DEFAULT_CONFIG } from "../config.ts";
 
 describe("util", () => {
-  it("constants match spec", () => {
-    expect(MAX_READ_BYTES).toBe(50 * 1024 * 1024);
-    expect(READ_CAP_BYTES).toBe(256 * 1024);
-    expect(READ_CAP_LINES).toBe(2000);
-    expect(BASH_OUTPUT_CAP).toBe(256 * 1024);
-    expect(GREP_DEFAULT_MAX).toBe(200);
-    expect(GLOB_CAP).toBe(1000);
+  it("default-config caps match spec", () => {
+    expect(DEFAULT_CONFIG.readMaxBytes).toBe(50 * 1024 * 1024);
+    expect(DEFAULT_CONFIG.readCapBytes).toBe(256 * 1024);
+    expect(DEFAULT_CONFIG.readCapLines).toBe(2000);
+    expect(DEFAULT_CONFIG.bashOutputCap).toBe(256 * 1024);
+    expect(DEFAULT_CONFIG.grepDefaultMax).toBe(200);
+    expect(DEFAULT_CONFIG.globCap).toBe(1000);
   });
 
   it("resolvePath returns absolute paths against baseCwd", () => {

@@ -1,5 +1,5 @@
 import type { KaizenPlugin } from "kaizen/types";
-import type { SkillsRegistryService } from "llm-contracts/public";
+import type { ConfigStoreService, SkillsRegistryService } from "llm-contracts/public";
 import type { ToolsRegistryService } from "llm-tools-registry/public";
 import type { SystemPromptService } from "llm-contracts/public";
 import { homedir } from "node:os";
@@ -10,36 +10,15 @@ import { LOAD_SKILL_SCHEMA, makeLoadSkillHandler } from "./tool.ts";
 import { NEW_SKILL_SCHEMA, makeNewSkillHandler } from "./new-skill.ts";
 import { registerSlashCommands } from "./slash-commands.ts";
 import type { SlashRegistryService } from "llm-contracts/public";
+import type { LlmSkillsConfig } from "./public.d.ts";
+import { DEFAULT_CONFIG, CONFIG_SCHEMA } from "./config.ts";
 
-const DEFAULT_RESCAN_MS = 30000;
-
-function readEnv(ctx: any, key: string): string | undefined {
-  // Prefer ctx.env if the harness exposes it; fall back to process.env.
-  const fromCtx = ctx.env && typeof ctx.env === "object" ? (ctx.env as Record<string, string | undefined>)[key] : undefined;
-  if (typeof fromCtx === "string" && fromCtx.length > 0) return fromCtx;
-  const fromProc = process.env[key];
-  return fromProc && fromProc.length > 0 ? fromProc : undefined;
-}
-
-function resolveUserRoot(ctx: any): string {
-  const override = readEnv(ctx, "KAIZEN_LLM_SKILLS_PATH");
-  if (override) {
-    // Spec: colon-separated override; v0 honours the first segment.
-    return override.split(":")[0]!;
-  }
-  const home = readEnv(ctx, "HOME") ?? homedir();
-  return join(home, ".kaizen", "skills");
-}
-
-function resolveProjectRoot(ctx: any): string {
-  const cwd = typeof ctx.cwd === "string" && ctx.cwd.length > 0 ? ctx.cwd : process.cwd();
-  return join(cwd, ".kaizen", "skills");
-}
-
-function rescanIntervalMs(ctx: any): number {
-  const raw = readEnv(ctx, "KAIZEN_LLM_SKILLS_RESCAN_MS");
-  const n = raw ? parseInt(raw, 10) : NaN;
-  return Number.isFinite(n) && n > 0 ? n : DEFAULT_RESCAN_MS;
+// Expand a leading `~/` (or bare `~`) to the user's home directory.
+// Mirrors what shells and most JS path utilities do for user-scope paths.
+function expandHome(p: string): string {
+  if (p === "~") return homedir();
+  if (p.startsWith("~/")) return join(homedir(), p.slice(2));
+  return p;
 }
 
 // Module-scope cleanup handles. setup() populates these; stop() drains them.
@@ -67,13 +46,38 @@ const plugin: KaizenPlugin = {
     // loads first so the registration in setup() succeeds via useService.
     // When absent, the lookup returns undefined and the /skills:* commands
     // are simply not registered. No consumeService backs this entry.
-    consumes: ["tools:registry", "slash:registry"],
+    // config:store is topo-hint optional — boots early (right after
+    // llm-contracts) so it is virtually always present in the local harness;
+    // when absent, setup() falls back to DEFAULT_CONFIG.
+    consumes: ["tools:registry", "slash:registry", "config:store"],
   },
 
   async setup(ctx) {
-    const projectRoot = resolveProjectRoot(ctx);
-    const userRoot = resolveUserRoot(ctx);
-    const interval = rescanIntervalMs(ctx);
+    // Load config (topo-hint optional).
+    let config: LlmSkillsConfig = { ...DEFAULT_CONFIG };
+    const cfgSvc = ctx.useService<ConfigStoreService>("config:store");
+    if (cfgSvc) {
+      try {
+        cfgSvc.register<LlmSkillsConfig>({
+          plugin: "llm-skills",
+          defaults: { ...DEFAULT_CONFIG },
+          schema: CONFIG_SCHEMA,
+        });
+        config = cfgSvc.get<LlmSkillsConfig>("llm-skills");
+      } catch (e) {
+        ctx.log(`llm-skills: config:store register failed (${(e as Error).message}); using defaults`);
+      }
+    } else {
+      ctx.log("llm-skills: config:store unavailable; using DEFAULT_CONFIG");
+    }
+
+    const userRoot = expandHome(config.userRoot);
+    const cwd = typeof ctx.cwd === "string" && ctx.cwd.length > 0 ? ctx.cwd : process.cwd();
+    const projectRoot = join(cwd, ".kaizen", "skills");
+    // "Never treat 0 as 'always rescan'" invariant (CLAUDE.md): the schema
+    // permits min: 0 so user values are not silently reverted by the store,
+    // but the runtime clamps to the default when ≤ 0.
+    const interval = config.rescanIntervalMs > 0 ? config.rescanIntervalMs : DEFAULT_CONFIG.rescanIntervalMs;
 
     // Resolve prompt:registry early so onChange can call bumpGeneration.
     const promptSystem = ctx.useService<SystemPromptService>("prompt:registry");

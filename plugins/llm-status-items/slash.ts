@@ -54,7 +54,7 @@ export function formatSnapshot(snap: StatusSnapshot): string {
     lines.push(`tok/s (last):    ${formatTokensPerSec(snap.tokensPerSec)}`);
   }
   if (snap.costCents != null) {
-    lines.push(`cost (est):      ${formatDollars(snap.costCents)}`);
+    lines.push(`cost (est):      ${formatDollars(snap.costCents, 4)}`);
   }
 
   return lines.join("\n");

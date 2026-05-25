@@ -103,15 +103,17 @@ Events are declared by the `llm-events` VOCAB; this plugin emits them but does n
 
 ## Configuration
 
-Environment variables (read at setup time via `ctx.env` then `process.env`):
+Configuration is routed through `kaizen-config`'s `config:store` service.
+Edit values through the `/config` slash commands or directly in
+`~/.kaizen/harnesses/<key>/config.json` under `plugins.llm-skills`.
 
-| Var | Effect |
-|-----|--------|
-| `KAIZEN_LLM_SKILLS_PATH` | Override user root. Colon-separated; v0 honors only the first segment. |
-| `KAIZEN_LLM_SKILLS_RESCAN_MS` | Throttle interval for `turn:start` rescans. Default 30000. |
-| `HOME` | Used to resolve the default user root (`$HOME/.kaizen/skills`). |
+| Field | Default | Effect |
+|-------|---------|--------|
+| `userRoot` | `~/.kaizen/skills` | User-scope skills root. A leading `~/` is expanded to `$HOME`. |
+| `rescanIntervalMs` | `30000` | Throttle interval (ms) for `turn:start`-driven rescans. Values ≤ 0 fall back to the default at runtime. |
 
-The project root is always `<ctx.cwd>/.kaizen/skills` and is not overridable.
+The project root is always `<ctx.cwd>/.kaizen/skills` and is not overridable
+(intentional — see `CLAUDE.md`).
 
 ## Permissions
 

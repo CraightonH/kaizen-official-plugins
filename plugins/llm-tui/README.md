@@ -10,7 +10,7 @@ Generic Ink+React chat TUI for non-claude-wrapper LLM harnesses. Renders a strea
 - Tracks tool lifecycle events as live tool-call rows and finalizes them into transcript entries. Built-in renderers cover common local tools; peer plugins can register richer renderers.
 - Hosts a registerable completion popup beneath the input. Multiple sources may register against any single-character trigger; results are merged, debounced (~50ms), and sorted by `sortWeight` desc then `label` asc.
 - Renders the status bar from a key/value map driven entirely by status events (no public method to mutate it).
-- Loads theme tokens from `~/.kaizen/plugins/llm-tui/config.json` (overridable via `KAIZEN_LLM_TUI_CONFIG`), merged over harness-supplied defaults from plugin config, merged over baked-in defaults.
+- Loads theme tokens and non-theme UX knobs from the harness `config:store` (under the `llm-tui` section in `~/.kaizen/harnesses/<key>/config.json` and its project-layer override), merged over harness-supplied defaults from plugin config, merged over baked-in defaults.
 - Falls back to a line-oriented readline channel when stdin/stdout is not a TTY: `writeOutput` → stdout, `writeNotice` → stderr, `writeUser` → `> {text}`, busy/timing/thinking/draft methods are no-ops, `readInput` reads a line.
 - Esc emits `turn:cancel` while busy. Ctrl+C is two-step: first press cancels a busy turn and/or clears the input, second press within the exit window exits the process.
 
@@ -95,6 +95,7 @@ interface UiTheme {
   noticeColor: string;
   busyColor: string;
   statusBarColor: string;
+  thoughtsMarkdown: boolean;
 }
 
 interface UiThemeService {
@@ -102,7 +103,7 @@ interface UiThemeService {
 }
 ```
 
-Read once at mount. No hot reload — restart picks up config changes. Colour fields accept named Ink colours or `#rrggbb` hex.
+Live-updated via `config:store.watch("llm-tui")`. Colour fields accept named Ink colours or `#rrggbb` hex.
 
 **Service** — `ui:tool-renderer`
 
@@ -155,12 +156,41 @@ Semantics:
 
 ## Configuration
 
-| Var / file | Effect |
-|------------|--------|
-| `~/.kaizen/plugins/llm-tui/config.json` | Optional `{ theme: { ... } }` overrides. Missing → defaults silently. Malformed JSON → notice logged, defaults applied. Unknown / invalid colour fields → ignored individually, valid fields kept. |
-| `KAIZEN_LLM_TUI_CONFIG` | Override the config file path. |
-| `defaultConfig.theme` in `plugin.json` | Per-harness defaults; merged over baked-in defaults, then user config wins on conflict. |
+Config is routed through `kaizen-config` via the `config:store` service. The
+plugin registers under the section name `llm-tui`; values resolve in the
+documented order (baked-in defaults → home file → project file).
+
+Editable fields (flat under `plugins.llm-tui` in
+`~/.kaizen/harnesses/<key>/config.json` and its project-layer override):
+
+| Field | Default | Effect |
+|-------|---------|--------|
+| `promptLabel` | `kaizen` | Label rendered in the top border of the input box. |
+| `promptColor` | `magenta` | Frame + caret color. |
+| `outputColor` | `white` | Transcript body color. |
+| `noticeColor` | `yellow` | Notices, hints, error trails. |
+| `busyColor` | `magenta` | Spinner + thinking box. |
+| `statusBarColor` | `gray` | Status bar text. |
+| `thoughtsMarkdown` | `true` | Render finalized Thoughts blocks through markdown. |
+| `completionDebounceMs` | `50` | Debounce window before a popup query fires. Captured at construction; restart to apply. |
+| `completionMaxVisible` | `8` | Max popup rows shown at once. |
+| `ctrlCExitWindowMs` | `2000` | Window during which a second Ctrl+C exits. |
+| `thinkingTailLines` | `5` | Tail lines of live reasoning kept visible above the input. |
+| `agentActivityCap` | `5` | Max sub-agent activity rows under a `dispatch_agent` call. |
+| `toolPreviewChars` | `80` | Char cap for the one-line tool-call preview. |
+| `toolExpandedLineWidth` | `200` | Per-line truncation width in expanded tool-call views. |
+| `toolExpandedPreviewLines` | `10` | Row count shown in expanded views for bash/edit/write/create. |
+| `toolFallbackJsonChars` | `1500` | Byte cap for unknown-tool arg/result JSON in expanded view. |
+
+Colour fields accept named Ink colours or `#rrggbb` hex. Colour and label
+fields apply live via `config:store.watch`; `completionDebounceMs` is read
+once at construction and needs a restart to take effect.
+
+Harnesses can seed theme defaults via `defaultConfig.theme` in their
+plugin manifest entry; user-supplied values in `config.json` win on conflict.
 
 ## Permissions
 
-`tier: unscoped` — owns the terminal (raw mode, full-screen Ink render) and reads a config file under the user's home directory.
+`tier: unscoped` — owns the terminal (raw mode, full-screen Ink render). All
+config I/O happens inside `kaizen-config`; this plugin needs no `fs.read` /
+`fs.write` permissions of its own for config purposes.

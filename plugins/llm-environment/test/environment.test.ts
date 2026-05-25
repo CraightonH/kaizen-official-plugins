@@ -67,10 +67,10 @@ describe("captureEnvironment", () => {
     expect(await handle.section.render()).toContain("- Git branch: main");
   });
 
-  it("returns empty string when KAIZEN_ENVIRONMENT_DISABLE=1", async () => {
+  it("returns empty string when enabled is false", async () => {
     const handle = captureEnvironment({
       cwd: f.gitBranch,
-      env: { KAIZEN_ENVIRONMENT_DISABLE: "1" },
+      enabled: false,
     });
     await handle.refresh();
     expect(await handle.section.render()).toBe("");

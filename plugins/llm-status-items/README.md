@@ -63,28 +63,38 @@ Both events belong to the `llm-events` VOCAB; this plugin emits them but does no
 
 ## Configuration
 
-Cost estimation reads a JSON rate table from disk at setup. Missing file → cost item disabled silently (fully local sessions emit nothing).
+Cost rates and a handful of display knobs are configured via `config:store`
+under the `llm-status-items` section of
+`~/.kaizen/harnesses/<key>/config.json`. See the per-field defaults in
+`config.ts`. The legacy `~/.kaizen/plugins/llm-status-items/cost-table.json`
+file is no longer read — copy your rates into `config.json` by hand.
 
-**Path:** `~/.kaizen/plugins/llm-status-items/cost-table.json`
+Example:
 
-**Shape:**
-
-```json
+```jsonc
 {
-  "rates": {
-    "gpt-4.1-mini": {
-      "promptCentsPerMTok": 40,
-      "completionCentsPerMTok": 160
+  "plugins": {
+    "llm-status-items": {
+      "costRates": {
+        "gpt-4.1-mini": { "promptCentsPerMTok": 40, "completionCentsPerMTok": 160 }
+      }
     }
   }
 }
 ```
 
-Cost is computed as `(promptTokens * promptCentsPerMTok + completionTokens * completionCentsPerMTok) / 1_000_000` per `llm:done`, accumulated, and rendered as `$d.dddd`. Models not in the table emit nothing (any prior `cost-estimate` is cleared).
+Empty `costRates` (the default) silently disables the `cost-estimate` status
+item — fully local sessions emit nothing. Cost is computed as
+`(promptTokens * promptCentsPerMTok + completionTokens * completionCentsPerMTok) / 1_000_000`
+per `llm:done`, accumulated, and rendered using `costDecimalPlaces`
+(default 4) → `$d.dddd`. Models not in the table emit nothing (any prior
+`cost-estimate` is cleared).
 
-Malformed JSON throws at setup; an absent file is fine. Invalid rate entries
-also throw at setup. Each model entry must define non-negative numeric
-`promptCentsPerMTok` and `completionCentsPerMTok`.
+Other knobs (all optional, defaults shown):
+`costDecimalPlaces` (4), `contextBarWidth` (10), `contextBarFillGlyph`
+("█"), `contextBarEmptyGlyph` ("░"), `tokensPerSecIntegerThreshold` (10),
+`slashCommandEnabled` (true), `toolEnabled` (true). Bar glyphs must render
+in one monospace cell or the bar will misalign.
 
 ## Slash Command And Tool
 
@@ -122,4 +132,5 @@ interface StatusSnapshot {
 
 ## Permissions
 
-`tier: unscoped` — reads one file under the user's home directory; no network or shell access.
+`tier: trusted` — no filesystem, network, or shell access. (Config I/O lives
+inside `kaizen-config`'s permission boundary.)
