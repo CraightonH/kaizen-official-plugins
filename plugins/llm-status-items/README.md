@@ -132,5 +132,9 @@ interface StatusSnapshot {
 
 ## Permissions
 
-`tier: trusted` — no filesystem, network, or shell access. (Config I/O lives
-inside `kaizen-config`'s permission boundary.)
+`tier: unscoped`. The plugin itself does no FS or shell I/O, but it calls
+`listModels()` on `llm:complete` to discover the runtime-loaded model and
+its context ceiling — and the kaizen runtime attributes that transitive
+`net.connect` to the caller (this plugin), not the provider. Until that
+attribution changes, a scoped tier would have to enumerate every possible
+LLM `baseUrl`, which isn't practical.

@@ -28,25 +28,15 @@ function subscribedEvents(vocab: Vocab): string[] {
 const plugin: KaizenPlugin = {
   name: "llm-status-items",
   apiVersion: "3.0.0",
-  permissions: {
-    tier: "scoped",
-    events: {
-      subscribe: [
-        "harness:start",
-        "llm:before-call",
-        "llm:done",
-        "turn:start",
-        "turn:end",
-        "tool:before-execute",
-        "tool:result",
-        "tool:error",
-        "conversation:cleared",
-        "session:active-changed",
-        "session:renamed",
-      ],
-      emit: ["status:item-update", "status:item-clear"],
-    },
-  },
+  // tier: "unscoped" — the plugin itself does no FS/net/exec, but it
+  // calls listModels() on the llm:complete service, which triggers a
+  // net.connect against the user's configured LLM endpoint. The kaizen
+  // runtime attributes that net.connect to the *caller* (this plugin),
+  // not the provider, so a scoped tier would have to enumerate every
+  // possible LLM baseUrl. Until that attribution changes (or the
+  // contract surface adds an "ambient model id" lookup that doesn't
+  // require a network probe), unscoped is the only practical option.
+  permissions: { tier: "unscoped" },
   services: { consumes: ["events:vocabulary", "llm:complete", "config:store"] },
 
   async setup(ctx) {
@@ -121,16 +111,11 @@ const plugin: KaizenPlugin = {
     async function listOnce(): Promise<void> {
       if (modelsListed) return;
       let llm: LLMCompleteService | null = null;
-      let useErr: string | null = null;
-      try { llm = ctx.useService<LLMCompleteService>("llm:complete") ?? null; } catch (e) { llm = null; useErr = (e as Error).message; }
+      try { llm = ctx.useService<LLMCompleteService>("llm:complete") ?? null; } catch { llm = null; }
       modelsListed = true;
-      // TEMP DIAGNOSTIC
-      ctx.log?.(`llm-status-items[dbg] listOnce: useService=${llm ? "ok" : "null"} useErr=${useErr ?? "-"}`);
       if (!llm) return;
       try {
         const models: ModelInfo[] = await llm.listModels();
-        // TEMP DIAGNOSTIC
-        ctx.log?.(`llm-status-items[dbg] listModels returned ${models.length} model(s): ${models.map((m) => `${m.id}(loaded=${m.loadedContextLength ?? "-"} max=${m.maxContextLength ?? "-"} ctx=${m.contextLength ?? "-"})`).join(", ")}`);
         for (const m of models) {
           const ceiling = m.loadedContextLength ?? m.maxContextLength ?? m.contextLength ?? null;
           contextCache.set(m.id, ceiling);
@@ -139,9 +124,7 @@ const plugin: KaizenPlugin = {
             ambientLoadedModelId = m.id;
           }
         }
-      } catch (e) {
-        // TEMP DIAGNOSTIC
-        ctx.log?.(`llm-status-items[dbg] listModels threw: ${(e as Error).message}`);
+      } catch {
         // listModels not supported or transient failure — ctx item silently
         // hidden, all other status items continue to work.
       }
@@ -262,8 +245,6 @@ const plugin: KaizenPlugin = {
     for (const name of subscribedEvents(vocab)) {
       ctx.on(name, async (payload: any) => {
         state = applyEvent(state, name, payload);
-        // TEMP DIAGNOSTIC — remove after model/ctx regression is found.
-        ctx.log?.(`llm-status-items[dbg] evt=${name} state.model=${state.model ?? "null"} state.contextLength=${state.contextLength ?? "null"} ambientId=${ambientLoadedModelId ?? "null"} ambientCeil=${ambientLoadedCeiling ?? "null"} modelsListed=${modelsListed}`);
         // harness:start: probe the provider once so the bar can render
         // model + ctx before any turn runs, and flip `initialized` so
         // zero-valued counters appear instead of being suppressed.
