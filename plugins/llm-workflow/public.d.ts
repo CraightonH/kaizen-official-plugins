@@ -13,16 +13,15 @@ export interface WorkflowConfigFile {
   };
 }
 
-// Filled in by Task 4
-// export {
-//   MetaParseError,
-//   WorkerSpawnError,
-//   ScriptError,
-//   WorkflowTimeoutError,
-//   WorkflowAbortedError,
-//   WorkflowNestingError,
-//   AgentLifetimeCapError,
-//   BudgetExceededError,
-//   WorkflowRegistryLoadingError,
-//   WorkflowNotFoundError,
-// } from "./errors.ts";
+export {
+  MetaParseError,
+  WorkerSpawnError,
+  ScriptError,
+  WorkflowTimeoutError,
+  WorkflowAbortedError,
+  WorkflowNestingError,
+  AgentLifetimeCapError,
+  BudgetExceededError,
+  WorkflowRegistryLoadingError,
+  WorkflowNotFoundError,
+} from "./errors.ts";
