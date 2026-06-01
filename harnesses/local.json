@@ -1,6 +1,6 @@
 {
   "plugins": [
-    "official/llm-contracts@0.5.0",
+    "official/llm-contracts@0.6.0",
     "official/kaizen-config@0.2.0",
     "official/kaizen-secrets-keychain@0.1.0",
     "official/llm-events@0.8.0",
@@ -22,6 +22,7 @@
     "official/llm-environment@0.1.0",
     "official/llm-codemode@0.3.1",
     "official/llm-agents@0.2.2",
+    "official/llm-workflow@0.1.0",
     "official/llm-status-items@0.1.1",
     "official/llm-hooks-shell@0.1.2",
     "official/llm-tool-approval@0.2.2"

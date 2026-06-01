@@ -27,6 +27,7 @@
       "description": "Service contract definitions for the local harness. Pure types + defineService; no runtime behavior.",
       "categories": ["foundation", "contracts"],
       "versions": [
+        { "version": "0.6.0", "source": { "type": "file", "path": "plugins/llm-contracts" } },
         { "version": "0.5.0", "source": { "type": "file", "path": "plugins/llm-contracts" } },
         { "version": "0.4.0", "source": { "type": "file", "path": "plugins/llm-contracts" } },
         { "version": "0.3.0", "source": { "type": "file", "path": "plugins/llm-contracts" } },
@@ -188,6 +189,15 @@
         { "version": "0.2.1", "source": { "type": "file", "path": "plugins/llm-agents" } },
         { "version": "0.2.0", "source": { "type": "file", "path": "plugins/llm-agents" } },
         { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-agents" } }
+      ]
+    },
+    {
+      "kind": "plugin",
+      "name": "llm-workflow",
+      "description": "Sandboxed multi-agent workflow orchestration. Provides workflow:registry and the Workflow tool.",
+      "categories": ["workflow", "agents", "llm"],
+      "versions": [
+        { "version": "0.1.0", "source": { "type": "file", "path": "plugins/llm-workflow" } }
       ]
     },
     {
