@@ -10,7 +10,7 @@ import { PIPELINE_SRC } from "./primitives/pipeline.ts";
 declare const self: DedicatedWorkerGlobalScope;
 
 const ALLOW_KEYS = new Set<string>([
-  "self","globalThis","console","JSON","Math","Promise","Array","Object",
+  "self","globalThis","console","JSON","Math","Date","Promise","Array","Object",
   "String","Number","Boolean","RegExp","Error","TypeError","RangeError","SyntaxError",
   "Map","Set","WeakMap","WeakSet","Symbol","BigInt","Uint8Array","Int8Array","Uint16Array",
   "Int16Array","Uint32Array","Int32Array","Float32Array","Float64Array","ArrayBuffer",
@@ -87,9 +87,10 @@ function stripExports(code: string): string {
   // AsyncFunction body scope doesn't allow `export` declarations.
   // Strip `export` keyword from named declarations so the transpiled
   // source runs correctly inside `new AsyncFunction(src)()`.
+  // Leading whitespace is preserved so indented scripts (common in tests/inline strings) work.
   return code
-    .replace(/^export\s+default\s+/gm, "const __default__ = ")
-    .replace(/^export\s+(const|let|var|function\*?|class|async\s+function\*?)\s/gm, "$1 ");
+    .replace(/^([ \t]*)export\s+default\s+/gm, "$1const __default__ = ")
+    .replace(/^([ \t]*)export\s+(const|let|var|function\*?|class|async\s+function\*?)\s/gm, "$1$2 ");
 }
 
 function transpileToJs(code: string): string {
