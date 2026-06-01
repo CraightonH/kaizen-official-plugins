@@ -1,6 +1,6 @@
 {
   "name": "llm-events",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Event vocabulary, shared LLM types, and provider service definitions",
   "type": "module",
   "exports": {

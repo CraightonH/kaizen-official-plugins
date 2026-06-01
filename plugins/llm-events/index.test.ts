@@ -115,6 +115,12 @@ describe("llm-events", () => {
       "mcp:registration-conflict",
       "agent:dispatch:start",
       "agent:dispatch:end",
+      "workflow:start",
+      "workflow:phase",
+      "workflow:agent-start",
+      "workflow:agent-end",
+      "workflow:log",
+      "workflow:end",
     ]);
     const actual = new Set(Object.values(VOCAB));
     for (const name of expected) expect(actual.has(name)).toBe(true);
@@ -178,6 +184,15 @@ describe("llm-events", () => {
 
   it("VOCAB includes mcp:registration-conflict", () => {
     expect(VOCAB.MCP_REGISTRATION_CONFLICT).toBe("mcp:registration-conflict");
+  });
+
+  it("VOCAB includes workflow:* lifecycle events", () => {
+    expect(VOCAB.WORKFLOW_START).toBe("workflow:start");
+    expect(VOCAB.WORKFLOW_PHASE).toBe("workflow:phase");
+    expect(VOCAB.WORKFLOW_AGENT_START).toBe("workflow:agent-start");
+    expect(VOCAB.WORKFLOW_AGENT_END).toBe("workflow:agent-end");
+    expect(VOCAB.WORKFLOW_LOG).toBe("workflow:log");
+    expect(VOCAB.WORKFLOW_END).toBe("workflow:end");
   });
 
   it("VOCAB.SESSION_HANDOFF is exposed", () => {

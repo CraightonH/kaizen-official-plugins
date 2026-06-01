@@ -51,6 +51,12 @@ export const VOCAB: Vocab = Object.freeze({
   MCP_REGISTRATION_CONFLICT: "mcp:registration-conflict",
   AGENT_DISPATCH_START: "agent:dispatch:start",
   AGENT_DISPATCH_END: "agent:dispatch:end",
+  WORKFLOW_START: "workflow:start",
+  WORKFLOW_PHASE: "workflow:phase",
+  WORKFLOW_AGENT_START: "workflow:agent-start",
+  WORKFLOW_AGENT_END: "workflow:agent-end",
+  WORKFLOW_LOG: "workflow:log",
+  WORKFLOW_END: "workflow:end",
 } as const);
 
 const plugin: KaizenPlugin = {

@@ -46,6 +46,12 @@ export interface Vocab {
   readonly MCP_REGISTRATION_CONFLICT: "mcp:registration-conflict";
   readonly AGENT_DISPATCH_START: "agent:dispatch:start";
   readonly AGENT_DISPATCH_END: "agent:dispatch:end";
+  readonly WORKFLOW_START: "workflow:start";
+  readonly WORKFLOW_PHASE: "workflow:phase";
+  readonly WORKFLOW_AGENT_START: "workflow:agent-start";
+  readonly WORKFLOW_AGENT_END: "workflow:agent-end";
+  readonly WORKFLOW_LOG: "workflow:log";
+  readonly WORKFLOW_END: "workflow:end";
 }
 export type EventName = Vocab[keyof Vocab];
 
