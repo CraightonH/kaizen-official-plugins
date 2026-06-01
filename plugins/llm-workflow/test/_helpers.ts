@@ -1,6 +1,8 @@
 // Shared fakes used across unit + integration tests.
 import type { DriverService, RunConversationInput, RunConversationOutput, ChatMessage } from "llm-contracts/public";
 
+export { counter } from "../util-counter.ts";
+
 export function fakeDriver(opts: {
   reply?: (input: RunConversationInput) => Promise<RunConversationOutput>;
 } = {}): { driver: DriverService; calls: RunConversationInput[] } {
@@ -14,11 +16,6 @@ export function fakeDriver(opts: {
     },
   };
   return { driver, calls };
-}
-
-export function counter() {
-  let n = 0;
-  return { next: () => ++n, peek: () => n };
 }
 
 export interface EventCapture {

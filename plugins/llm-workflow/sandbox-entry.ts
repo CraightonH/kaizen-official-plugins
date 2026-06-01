@@ -83,10 +83,25 @@ const AsyncFunctionCtor: FunctionConstructor = (async function () {}).constructo
 
 const BunTranspilerCtor: (new (opts: { loader: string }) => { transformSync(s: string): string }) | undefined =
   (globalThis as any).Bun?.Transpiler;
+function stripExports(code: string): string {
+  // AsyncFunction body scope doesn't allow `export` declarations.
+  // Strip `export` keyword from named declarations so the transpiled
+  // source runs correctly inside `new AsyncFunction(src)()`.
+  return code
+    .replace(/^export\s+default\s+/gm, "const __default__ = ")
+    .replace(/^export\s+(const|let|var|function\*?|class|async\s+function\*?)\s/gm, "$1 ");
+}
+
 function transpileToJs(code: string): string {
-  if (!BunTranspilerCtor) return code;
-  try { return new BunTranspilerCtor({ loader: "ts" }).transformSync(code); }
-  catch { return code; }
+  if (!BunTranspilerCtor) {
+    return stripExports(code);
+  }
+  try {
+    const transpiled = new BunTranspilerCtor({ loader: "ts" }).transformSync(code);
+    return stripExports(transpiled);
+  } catch {
+    return stripExports(code);
+  }
 }
 
 function installPrimitives(boot: BootMsg): void {
