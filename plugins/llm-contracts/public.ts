@@ -59,3 +59,11 @@ export type {
   SecretRef,
 } from "./contracts/secrets-registry";
 export { isSecretRef } from "./contracts/secrets-registry";
+export type {
+  WorkflowPhase,
+  WorkflowMeta,
+  WorkflowManifest,
+  RunOptions,
+  RunResult,
+  WorkflowRegistryService,
+} from "./contracts/workflow-registry";

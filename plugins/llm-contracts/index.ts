@@ -20,6 +20,7 @@ import * as uiPromptContract from "./contracts/ui-prompt";
 import * as driverContract from "./contracts/driver";
 import * as axiomsRegistryContract from "./contracts/axioms-registry";
 import * as secretsRegistryContract from "./contracts/secrets-registry";
+import * as workflowRegistryContract from "./contracts/workflow-registry";
 
 const plugin: KaizenPlugin = {
   name: "llm-contracts",
@@ -49,6 +50,7 @@ const plugin: KaizenPlugin = {
     ctx.defineService(driverContract.CONTRACT_ID, { description: driverContract.DESCRIPTION });
     ctx.defineService(axiomsRegistryContract.CONTRACT_ID, { description: axiomsRegistryContract.DESCRIPTION });
     ctx.defineService(secretsRegistryContract.CONTRACT_ID, { description: secretsRegistryContract.DESCRIPTION });
+    ctx.defineService(workflowRegistryContract.CONTRACT_ID, { description: workflowRegistryContract.DESCRIPTION });
   },
 };
 

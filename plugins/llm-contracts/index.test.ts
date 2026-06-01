@@ -32,6 +32,7 @@ describe("llm-contracts defineService", () => {
       "driver:run-conversation",
       "axioms:registry",
       "secrets:registry",
+      "workflow:registry",
     ];
 
     for (const id of expected) {
