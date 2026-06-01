@@ -1,0 +1,26 @@
+{
+  "name": "llm-workflow",
+  "version": "0.1.0",
+  "description": "Sandboxed multi-agent workflow orchestration for the local harness.",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./public": "./public.d.ts",
+    "./ambient": "./ambient.d.ts"
+  },
+  "keywords": ["kaizen-plugin"],
+  "dependencies": {
+    "kaizen-config": "workspace:*",
+    "llm-contracts": "workspace:*",
+    "llm-events": "workspace:*",
+    "llm-tools-registry": "workspace:*",
+    "llm-driver": "workspace:*",
+    "llm-session-manager": "workspace:*",
+    "llm-system-prompt": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/json-schema": "^7.0.15",
+    "typescript": "^5.4.0"
+  }
+}
